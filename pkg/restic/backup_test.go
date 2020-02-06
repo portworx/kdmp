@@ -1,3 +1,5 @@
+// +build unittest
+
 package restic
 
 import (
@@ -176,9 +178,9 @@ func TestBackupExecutor(t *testing.T) {
 }
 
 func testTeardown(t *testing.T) {
-	os.RemoveAll(testSource)
-	os.RemoveAll(testRepoName)
-	os.Remove(testSecretFilePath)
+	require.NoError(t, os.RemoveAll(testSource))
+	require.NoError(t, os.RemoveAll(testRepoName))
+	require.NoError(t, os.Remove(testSecretFilePath))
 }
 
 func testSetup(t *testing.T) {
@@ -191,7 +193,7 @@ func testSetup(t *testing.T) {
 	out, err := cmd.CombinedOutput()
 	require.NoError(t, err, "unexpected error on repo init: ", string(out))
 
-	os.MkdirAll(testSource, os.ModeDir)
+	require.NoError(t, os.MkdirAll(testSource, os.ModeDir))
 	ddCmd := exec.Command("dd", "if=/dev/zero", "of=/tmp/source/10M", "bs=1M", "count=10")
 	out, err = ddCmd.CombinedOutput()
 	require.NoError(t, err, "unexpected error on source generation: ", string(out))

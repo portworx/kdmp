@@ -107,10 +107,14 @@ func (b *backupExecutor) Run() error {
 	}
 	b.isRunning = true
 	go func() {
-		b.execCmd.Wait()
+		err := b.execCmd.Wait()
 		// backup has completed
 		b.responseLock.Lock()
 		defer b.responseLock.Unlock()
+		if err != nil {
+			b.lastError = fmt.Errorf("failed to run the backup command: %v", err)
+			return
+		}
 
 		summaryResponse, err := getSummary(b.outBuf.Bytes(), b.errBuf.Bytes())
 		if err != nil {
@@ -165,7 +169,7 @@ func getSummary(outBytes []byte, errBytes []byte) (*BackupSummaryResponse, error
 
 	if len(outLines) <= 2 {
 		return nil, &Error{
-			Reason:    fmt.Sprintf("backup summary not available"),
+			Reason:    "backup summary not available",
 			CmdOutput: string(outBytes),
 			CmdErr:    string(errBytes),
 		}
@@ -190,7 +194,7 @@ func getSummary(outBytes []byte, errBytes []byte) (*BackupSummaryResponse, error
 		return summaryResponse, nil
 	}
 	return nil, &Error{
-		Reason: fmt.Sprintf("could not find backup summary"),
+		Reason: "could not find backup summary",
 	}
 }
 

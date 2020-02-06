@@ -42,13 +42,13 @@ lint:
 vet:
 	go vet $(PKGS)
 	go vet -tags unittest $(PKGS)
-	go vet -tags integrationtest github.com/portworx/px-backup/test/integration_test
+	#go vet -tags integrationtest github.com/portworx/kdmp/test/integration_test
 
 
 staticcheck:
 	go get -u honnef.co/go/tools/cmd/staticcheck
 	staticcheck $(PKGS)
-	staticcheck -tags integrationtest test/integration_test/*.go
+	#staticcheck -tags integrationtest test/integration_test/*.go
 	staticcheck -tags unittest $(PKGS)
 
 
@@ -56,7 +56,7 @@ errcheck:
 	go get -u github.com/kisielk/errcheck
 	errcheck -ignoregenerated -verbose -blank $(PKGS)
 	errcheck -ignoregenerated -verbose -blank -tags unittest $(PKGS)
-	errcheck -ignoregenerated -verbose -blank -tags integrationtest github.com/portworx/px-backup/test/integration_test
+	#errcheck -ignoregenerated -verbose -blank -tags integrationtest github.com/portworx/kdmp/test/integration_test
 
 
 check-fmt:
