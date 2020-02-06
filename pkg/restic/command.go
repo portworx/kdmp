@@ -38,6 +38,7 @@ func (c *Command) AddFlag(flag string) *Command {
 	return c
 }
 
+// Cmd returns os/exec.Cmd object for the provided Command
 func (c *Command) Cmd() *exec.Cmd {
 	// Get all the flags
 	argsSlice := []string{
