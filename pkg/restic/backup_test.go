@@ -180,7 +180,7 @@ func TestBackupExecutor(t *testing.T) {
 func testTeardown(t *testing.T) {
 	require.NoError(t, os.RemoveAll(testSource))
 	require.NoError(t, os.RemoveAll(testRepoName))
-	require.NoError(t, os.Remove(testSecretFilePath))
+	require.NoError(t, os.RemoveAll(testSecretFilePath))
 }
 
 func testSetup(t *testing.T) {
