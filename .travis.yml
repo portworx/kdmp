@@ -3,9 +3,6 @@ dist: trusty
 language: go
 go:
   - 1.13.7
-before_install:
-  - sudo apt-get update -yq
-  - sudo apt-get install restic
 script:
   - |
     if [ "${TRAVIS_BRANCH}" == "master" ]; then
