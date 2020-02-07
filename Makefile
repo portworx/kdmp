@@ -1,3 +1,9 @@
+DOCKER_HUB_REPO?=portworx
+DOCKER_HUB_KDMP_UNITTEST_IMAGE?=px-kdmp-unittest
+DOCKER_HUB_KDMP_TAG?=latest
+
+KDMP_UNITTEST_IMG=$(DOCKER_HUB_REPO)/$(DOCKER_HUB_KDMP_UNITTEST_IMAGE):$(DOCKER_HUB_KDMP_TAG)
+
 BASE_DIR    := $(shell git rev-parse --show-toplevel)
 GIT_SHA     := $(shell git rev-parse --short HEAD)
 BIN         :=$(BASE_DIR)/bin
@@ -18,7 +24,13 @@ GO_FILES := $(shell find . -name '*.go' | grep -v 'vendor' | \
 
 all: pretest test
 
-test: unittest
+test:
+	sudo docker run --rm -it -v ${GOPATH}:/go: $(KDMP_UNITTEST_IMG) make unittest
+
+test-container:
+	@echo "Building container: docker build --tag $(KDMP_UNITTEST_IMG) -f Dockerfile.unittest ."
+	sudo docker build --tag $(KDMP_UNITTEST_IMG) -f Dockerfile.unittest .
+
 
 unittest:
 	echo "mode: atomic" > coverage.txt
