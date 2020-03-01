@@ -9,7 +9,7 @@ GIT_SHA     := $(shell git rev-parse --short HEAD)
 BIN         :=$(BASE_DIR)/bin
 
 ifndef PKGS
-PKGS := $(shell go list ./... 2>&1 | grep -v 'github.com/portworx/kdmp/vendor' | grep -v versioned | grep -v 'pkg/apis/v1')
+	PKGS := $(shell go list ./... 2>&1 | grep -v 'go: ' | grep -v 'github.com/portworx/kdmp/vendor' | grep -v versioned | grep -v 'pkg/apis/v1')
 endif
 
 GO_FILES := $(shell find . -name '*.go' | grep -v 'vendor' | \
@@ -49,7 +49,7 @@ lint:
         if [ -n "$$(golint $${file})" ]; then \
             exit 1; \
         fi; \
-    done
+        done
 
 vet:
 	go vet $(PKGS)
@@ -81,4 +81,15 @@ gocyclo:
 	go get -u github.com/fzipp/gocyclo
 	gocyclo -over 15 $(GO_FILES)
 
-pretest: check-fmt lint vet errcheck staticcheck
+pretest: vendor-verify check-fmt lint vet errcheck staticcheck
+
+codegen:
+	@echo "Generating CRD"
+	@hack/update-codegen.sh
+
+vendor:
+	go mod tidy
+	go mod vendor
+
+vendor-verify:
+	go mod verify
