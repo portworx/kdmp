@@ -1,6 +1,9 @@
 sudo: required
 dist: trusty
 language: go
+env:
+  global:
+    - GO111MODULE=on
 go:
   - 1.13.7
 script:
