@@ -81,15 +81,12 @@ gocyclo:
 	go get -u github.com/fzipp/gocyclo
 	gocyclo -over 15 $(GO_FILES)
 
-pretest: vendor-verify check-fmt lint vet errcheck staticcheck
+pretest: check-fmt lint vet errcheck staticcheck
 
 codegen:
 	@echo "Generating CRD"
 	@hack/update-codegen.sh
 
-vendor:
+vendor-sync:
 	go mod tidy
 	go mod vendor
-
-vendor-verify:
-	go mod verify

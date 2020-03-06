@@ -7,6 +7,7 @@ require (
 	github.com/sirupsen/logrus v1.4.2
 	github.com/stretchr/testify v1.4.0
 	github.com/urfave/cli v1.22.2
+	golang.org/x/tools v0.0.0-20200309202150-20ab64c0d93f // indirect
 	k8s.io/api v0.16.6
 	k8s.io/apiextensions-apiserver v0.0.0
 	k8s.io/apimachinery v0.16.6

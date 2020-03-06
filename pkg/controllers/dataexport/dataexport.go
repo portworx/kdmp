@@ -20,7 +20,7 @@ import (
 )
 
 var (
-	resyncPeriod = 30 * time.Second
+	resyncPeriod = 10 * time.Second
 )
 
 // Controller is a k8s controller that handles DataExport resources.
@@ -43,7 +43,10 @@ func (c *Controller) Init(mgr manager.Manager) error {
 	}
 
 	// Create a new controller
-	ctrl, err := controller.New("data-export-controller", mgr, controller.Options{Reconciler: c})
+	ctrl, err := controller.New("data-export-controller", mgr, controller.Options{
+		Reconciler:              c,
+		MaxConcurrentReconciles: 10,
+	})
 	if err != nil {
 		return err
 	}
@@ -64,11 +67,10 @@ func (c *Controller) Init(mgr manager.Manager) error {
 // Result.Requeue is true, otherwise upon completion it will remove the work from the queue.
 //
 func (c *Controller) Reconcile(request reconcile.Request) (reconcile.Result, error) {
-	logrus.Debugf("Reconciling GroupVolumeSnapshot %s/%s", request.Namespace, request.Name)
+	logrus.Debugf("Reconciling DataExport %s/%s", request.Namespace, request.Name)
 
-	// Fetch the GroupSnapshot instance
-	groupSnapshot := &kdmpapi.DataExport{}
-	err := c.client.Get(context.TODO(), request.NamespacedName, groupSnapshot)
+	dataExport := &kdmpapi.DataExport{}
+	err := c.client.Get(context.TODO(), request.NamespacedName, dataExport)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			// Request object not found, could have been deleted after reconcile request.
@@ -77,11 +79,16 @@ func (c *Controller) Reconcile(request reconcile.Request) (reconcile.Result, err
 			return reconcile.Result{}, nil
 		}
 		// Error reading the object - requeue the request.
-		return reconcile.Result{RequeueAfter: 10 * time.Second}, err
+		return reconcile.Result{RequeueAfter: 2 * time.Second}, err
 	}
 
-	if err = c.sync(context.TODO(), groupSnapshot); err != nil {
-		return reconcile.Result{RequeueAfter: 3 * time.Second}, err
+	requeue, err := c.sync(context.TODO(), dataExport)
+	if err != nil {
+		logrus.Errorf("kdmp controller: %s/%s: %s", request.Namespace, request.Name, err)
+		return reconcile.Result{RequeueAfter: 2 * time.Second}, err
+	}
+	if requeue {
+		return reconcile.Result{Requeue: requeue}, nil
 	}
 
 	return reconcile.Result{RequeueAfter: resyncPeriod}, nil
