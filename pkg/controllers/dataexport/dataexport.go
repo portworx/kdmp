@@ -8,7 +8,6 @@ import (
 	kdmpapi "github.com/portworx/kdmp/pkg/apis/kdmp/v1alpha1"
 	"github.com/portworx/sched-ops/k8s/apiextensions"
 	"github.com/sirupsen/logrus"
-	batchv1 "k8s.io/api/batch/v1"
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	runtimeclient "sigs.k8s.io/controller-runtime/pkg/client"
@@ -52,12 +51,7 @@ func (c *Controller) Init(mgr manager.Manager) error {
 	}
 
 	// Watch for changes to primary resource
-	if err = ctrl.Watch(&source.Kind{Type: &kdmpapi.DataExport{}}, &handler.EnqueueRequestForObject{}); err != nil {
-		return err
-	}
-
-	// Watch Jobs and enqueue owning DataExport key
-	return ctrl.Watch(&source.Kind{Type: &batchv1.Job{}}, &handler.EnqueueRequestForOwner{OwnerType: &kdmpapi.DataExport{}, IsController: true})
+	return ctrl.Watch(&source.Kind{Type: &kdmpapi.DataExport{}}, &handler.EnqueueRequestForObject{})
 }
 
 // Reconcile reads that state of the cluster for an object and makes changes based on the state read
