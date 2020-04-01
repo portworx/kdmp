@@ -98,6 +98,7 @@ type ExportStatus struct {
 	Stage              DataExportStage  `json:"stage,omitempty"`
 	Status             DataExportStatus `json:"status,omitempty"`
 	Reason             string           `json:"reason,omitempty"`
+	TransferID         string           `json:"transferID,omitempty"`
 	ProgressPercentage int              `json:"progressPercentage,omitempty"`
 }
 

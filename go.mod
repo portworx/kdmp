@@ -3,11 +3,12 @@ module github.com/portworx/kdmp
 go 1.13
 
 require (
+	github.com/google/uuid v1.1.1
 	github.com/portworx/sched-ops v0.0.0-20200226052527-b624a2f22d6c
 	github.com/sirupsen/logrus v1.4.2
 	github.com/stretchr/testify v1.4.0
 	github.com/urfave/cli v1.22.2
-	golang.org/x/tools v0.0.0-20200309202150-20ab64c0d93f // indirect
+	golang.org/x/tools v0.0.0-20200408132156-9ee5ef7a2c0d // indirect
 	k8s.io/api v0.16.6
 	k8s.io/apiextensions-apiserver v0.0.0
 	k8s.io/apimachinery v0.16.6

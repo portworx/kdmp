@@ -3,15 +3,13 @@ package dataexport
 import (
 	"context"
 	"fmt"
-	"reflect"
 
 	kdmpapi "github.com/portworx/kdmp/pkg/apis/kdmp/v1alpha1"
-	"github.com/portworx/sched-ops/k8s/batch"
+	"github.com/portworx/kdmp/pkg/drivers"
+	"github.com/portworx/kdmp/pkg/drivers/driversinstance"
 	"github.com/portworx/sched-ops/k8s/core"
-	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // Data export label names/keys.
@@ -20,9 +18,6 @@ const (
 	LabelControllerName = "controller-name"
 )
 
-// controllerKind contains the schema.GroupVersionKind for this controller type.
-var controllerKind = kdmpapi.SchemeGroupVersion.WithKind(reflect.TypeOf(kdmpapi.DataExport{}).Name())
-
 func (c *Controller) sync(ctx context.Context, in *kdmpapi.DataExport) (bool, error) {
 	if in == nil {
 		return false, nil
@@ -30,8 +25,14 @@ func (c *Controller) sync(ctx context.Context, in *kdmpapi.DataExport) (bool, er
 
 	dataExport := *in
 
+	// TODO: validate DataExport resource
+	driver, err := driversinstance.Get(string(dataExport.Spec.Type))
+	if err != nil {
+		return false, fmt.Errorf("%q driver: not found", dataExport.Spec.Type)
+	}
+
 	if dataExport.DeletionTimestamp != nil {
-		return false, batch.Instance().DeleteJob(toJobName(dataExport.Name), dataExport.Namespace)
+		return false, driver.DeleteJob(dataExport.Status.TransferID)
 	}
 
 	// set stage
@@ -62,12 +63,18 @@ func (c *Controller) sync(ctx context.Context, in *kdmpapi.DataExport) (bool, er
 			return true, c.client.Update(ctx, setStatus(&dataExport, kdmpapi.DataExportStatusInitial, ""))
 		}
 
-		// create a rsync job
-		err := c.client.Create(context.TODO(), jobFrom(&dataExport))
-		if err != nil && !errors.IsAlreadyExists(err) {
+		// start data transfer
+		id, err := driver.StartJob(
+			drivers.WithSourcePVC(dataExport.Spec.Source.PersistentVolumeClaim.GetName()),
+			drivers.WithDestinationPVC(dataExport.Spec.Destination.PersistentVolumeClaim.GetName()),
+			drivers.WithNamespace(dataExport.Spec.Source.PersistentVolumeClaim.GetNamespace()),
+			drivers.WithLabels(jobLabels(dataExport.GetName())),
+		)
+		if err != nil {
 			return false, c.updateStatus(&dataExport, kdmpapi.DataExportStatusFailed, err.Error())
 		}
 
+		dataExport.Status.TransferID = id
 		return true, c.client.Update(ctx, setStatus(&dataExport, kdmpapi.DataExportStatusSuccessful, ""))
 	case kdmpapi.DataExportStageTransferInProgress:
 		if dataExport.Status.Status == kdmpapi.DataExportStatusSuccessful {
@@ -76,19 +83,16 @@ func (c *Controller) sync(ctx context.Context, in *kdmpapi.DataExport) (bool, er
 			return true, c.client.Update(ctx, setStatus(&dataExport, kdmpapi.DataExportStatusInitial, ""))
 		}
 
-		// check if a rsync job is created
-		rsyncJob, err := batch.Instance().GetJob(toJobName(dataExport.Name), dataExport.Namespace)
+		// get transfer job status
+		progress, err := driver.JobStatus(dataExport.Status.TransferID)
 		if err != nil {
 			return false, c.updateStatus(&dataExport, kdmpapi.DataExportStatusFailed, err.Error())
 		}
+		dataExport.Status.ProgressPercentage = progress
 
 		// transfer in progress
-		if !isJobCompleted(rsyncJob) {
-			// TODO: update data transfer progress percentage
-			if isStatusEqual(&dataExport, kdmpapi.DataExportStatusInProgress, "") {
-				return false, nil
-			}
-			return false, c.client.Update(ctx, setStatus(&dataExport, kdmpapi.DataExportStatusInProgress, ""))
+		if !drivers.IsTransferCompleted(progress) {
+			return false, c.updateStatus(&dataExport, kdmpapi.DataExportStatusInProgress, string(progress))
 		}
 
 		return true, c.client.Update(ctx, setStatus(&dataExport, kdmpapi.DataExportStatusSuccessful, ""))
@@ -116,6 +120,7 @@ func (c *Controller) checkClaims(de *kdmpapi.DataExport) error {
 	}
 
 	dstPVC := de.Spec.Destination.PersistentVolumeClaim
+	// TODO: use size of src pvc if not provided
 	if err := c.ensureUnmountedPVC(dstPVC.Name, dstPVC.Namespace, de.Name); err != nil {
 		// create pvc if it's not found
 		if errors.IsNotFound(err) {
@@ -169,26 +174,6 @@ func toPodNames(objs []corev1.Pod) []string {
 	return out
 }
 
-func jobLabels(DataExportName string) map[string]string {
-	return map[string]string{
-		LabelController:     DataExportName,
-		LabelControllerName: DataExportName,
-	}
-}
-
-func toJobName(DataExportName string) string {
-	return fmt.Sprintf("job-%s", DataExportName)
-}
-
-func isJobCompleted(j *batchv1.Job) bool {
-	for _, c := range j.Status.Conditions {
-		if c.Type == batchv1.JobComplete && c.Status == corev1.ConditionTrue {
-			return true
-		}
-	}
-	return false
-}
-
 func setStatus(de *kdmpapi.DataExport, status kdmpapi.DataExportStatus, reason string) *kdmpapi.DataExport {
 	de.Status.Status = status
 	de.Status.Reason = reason
@@ -199,63 +184,9 @@ func isStatusEqual(de *kdmpapi.DataExport, status kdmpapi.DataExportStatus, reas
 	return de.Status.Status == status && de.Status.Reason == reason
 }
 
-func jobFrom(dataExport *kdmpapi.DataExport) *batchv1.Job {
-	return &batchv1.Job{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "Job",
-			APIVersion: "batch/v1",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:            toJobName(dataExport.Name),
-			Namespace:       dataExport.Namespace,
-			OwnerReferences: []metav1.OwnerReference{*metav1.NewControllerRef(dataExport, controllerKind)},
-			Labels:          jobLabels(dataExport.Name),
-		},
-		Spec: batchv1.JobSpec{
-			Template: corev1.PodTemplateSpec{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels:     jobLabels(dataExport.Name),
-					Finalizers: nil,
-				},
-				Spec: corev1.PodSpec{
-					RestartPolicy: corev1.RestartPolicyOnFailure,
-					Containers: []corev1.Container{
-						{
-							Name:    "rsync",
-							Image:   "eeacms/rsync",
-							Command: []string{"/bin/sh", "-x", "-c", "ls -la /src; ls -la /dst/; rsync -avz /src/ /dst"},
-							VolumeMounts: []corev1.VolumeMount{
-								{
-									Name:      "src-vol",
-									MountPath: "/src",
-								},
-								{
-									Name:      "dst-vol",
-									MountPath: "/dst",
-								},
-							},
-						},
-					},
-					Volumes: []corev1.Volume{
-						{
-							Name: "src-vol",
-							VolumeSource: corev1.VolumeSource{
-								PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-									ClaimName: dataExport.Spec.Source.PersistentVolumeClaim.Name,
-								},
-							},
-						},
-						{
-							Name: "dst-vol",
-							VolumeSource: corev1.VolumeSource{
-								PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-									ClaimName: dataExport.Spec.Destination.PersistentVolumeClaim.Name,
-								},
-							},
-						},
-					},
-				},
-			},
-		},
+func jobLabels(DataExportName string) map[string]string {
+	return map[string]string{
+		LabelController:     DataExportName,
+		LabelControllerName: DataExportName,
 	}
 }
