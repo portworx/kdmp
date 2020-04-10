@@ -51,6 +51,9 @@ const (
 	// DataExportStageSnapshotInProgress if a driver supports this stage, it means a data
 	// is processing.
 	DataExportStageSnapshotInProgress DataExportStage = "SnapshotInProgress"
+	// DataExportStageSnapshotRestore if a driver supports this stage, it means a PVC is
+	// creating from a snapshot.
+	DataExportStageSnapshotRestore DataExportStage = "SnapshotRestore"
 	// DataExportStageTransferScheduled when the rsync daemon and pod are currently being
 	// scheduled by Kubernetes.
 	DataExportStageTransferScheduled DataExportStage = "TransferScheduled"
@@ -75,10 +78,11 @@ type DataExport struct {
 
 // DataExportSpec defines configuration parameters for DataExport.
 type DataExportSpec struct {
-	Type        DataExportType        `json:"type,omitempty"`
-	ClusterPair string                `json:"clusterPair,omitempty"`
-	Source      DataExportSource      `json:"source,omitempty"`
-	Destination DataExportDestination `json:"destination,omitempty"`
+	Type                 DataExportType        `json:"type,omitempty"`
+	ClusterPair          string                `json:"clusterPair,omitempty"`
+	SnapshotStorageClass string                `json:"snapshotStorageClass,omitempty"`
+	Source               DataExportSource      `json:"source,omitempty"`
+	Destination          DataExportDestination `json:"destination,omitempty"`
 }
 
 // DataExportSource defines a PVC name and namespace that should be processed.
@@ -95,11 +99,15 @@ type DataExportDestination struct {
 
 // ExportStatus indicates a current state of the data transfer.
 type ExportStatus struct {
-	Stage              DataExportStage  `json:"stage,omitempty"`
-	Status             DataExportStatus `json:"status,omitempty"`
-	Reason             string           `json:"reason,omitempty"`
-	TransferID         string           `json:"transferID,omitempty"`
-	ProgressPercentage int              `json:"progressPercentage,omitempty"`
+	Stage                DataExportStage  `json:"stage,omitempty"`
+	Status               DataExportStatus `json:"status,omitempty"`
+	Reason               string           `json:"reason,omitempty"`
+	SnapshotID           string           `json:"snapshotID,omitempty"`
+	SnapshotNamespace    string           `json:"snapshotNamespace,omitempty"`
+	SnapshotPVCName      string           `json:"snapshotPVCName,omitempty"`
+	SnapshotPVCNamespace string           `json:"snapshotPVCNamespace,omitempty"`
+	TransferID           string           `json:"transferID,omitempty"`
+	ProgressPercentage   int              `json:"progressPercentage,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
