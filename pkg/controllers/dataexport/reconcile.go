@@ -3,7 +3,9 @@ package dataexport
 import (
 	"context"
 	"fmt"
+	"reflect"
 
+	"github.com/libopenstorage/stork/pkg/controllers"
 	kdmpapi "github.com/portworx/kdmp/pkg/apis/kdmp/v1alpha1"
 	"github.com/portworx/kdmp/pkg/drivers"
 	"github.com/portworx/kdmp/pkg/drivers/driversinstance"
@@ -32,7 +34,16 @@ func (c *Controller) sync(ctx context.Context, in *kdmpapi.DataExport) (bool, er
 	}
 
 	if dataExport.DeletionTimestamp != nil {
-		return false, driver.DeleteJob(dataExport.Status.TransferID)
+		if !controllers.ContainsFinalizer(&dataExport, cleanupFinalizer) {
+			return false, nil
+		}
+
+		if err = c.cleanUp(driver, dataExport); err != nil {
+			return true, fmt.Errorf("%s: cleanup: %s", reflect.TypeOf(dataExport), err)
+		}
+
+		controllers.RemoveFinalizer(&dataExport, cleanupFinalizer)
+		return true, c.client.Update(ctx, &dataExport)
 	}
 
 	// set stage
@@ -104,6 +115,16 @@ func (c *Controller) sync(ctx context.Context, in *kdmpapi.DataExport) (bool, er
 	}
 
 	return false, nil
+}
+
+func (c *Controller) cleanUp(driver drivers.Interface, de kdmpapi.DataExport) error {
+	if driver == nil {
+		return fmt.Errorf("driver is nil")
+	}
+	if de.Status.TransferID == "" {
+		return nil
+	}
+	return driver.DeleteJob(de.Status.TransferID)
 }
 
 func (c *Controller) updateStatus(de *kdmpapi.DataExport, status kdmpapi.DataExportStatus, errMsg string) error {

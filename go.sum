@@ -315,7 +315,10 @@ github.com/libopenstorage/autopilot-api v0.6.0/go.mod h1:6JLrPbR3ZJQFbUY/+QJMl/a
 github.com/libopenstorage/external-storage v5.2.0+incompatible/go.mod h1:H0Gzy0h36rbJPxu3lKdrIPw1h0k0c4YFtTGGlBEBPc8=
 github.com/libopenstorage/openstorage v8.0.0+incompatible/go.mod h1:Sp1sIObHjat1BeXhfMqLZ14wnOzEhNx2YQedreMcUyc=
 github.com/libopenstorage/operator v0.0.0-20191009190641-8642de5d0812/go.mod h1:Qh+VXOB6hj60VmlgsmY+R1w+dFuHK246UueM4SAqZG0=
+github.com/libopenstorage/stork v0.0.0-20191009210244-6a3497c42b2a h1:txdOiMDx3l+cURRzjP448jYodLiqEJ4rFWMM0oo3Kow=
 github.com/libopenstorage/stork v0.0.0-20191009210244-6a3497c42b2a/go.mod h1:qBSzYTJVHlOMg5RINNiHD1kBzlasnrc2uKLPZLgu1Qs=
+github.com/libopenstorage/stork v1.3.0-beta1.0.20200410032049-df8bcecf8f71 h1:JvN0CEINrpjBAQWpd5nwewb8ytxFBQiqzCp4uazKW00=
+github.com/libopenstorage/stork v1.3.0-beta1.0.20200410032049-df8bcecf8f71/go.mod h1:qBSzYTJVHlOMg5RINNiHD1kBzlasnrc2uKLPZLgu1Qs=
 github.com/lightstep/lightstep-tracer-go v0.15.6/go.mod h1:6AMpwZpsyCFwSovxzM78e+AsYxE8sGwiM6C3TytaWeI=
 github.com/lovoo/gcloud-opentracing v0.3.0/go.mod h1:ZFqk2y38kMDDikZPAK7ynTTGuyt17nSPdS3K5e+ZTBY=
 github.com/magiconair/properties v1.8.0/go.mod h1:PppfXfuXeibc/6YijjN8zIbojt8czPbwD3XqdrwzmxQ=

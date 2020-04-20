@@ -5,6 +5,7 @@ import (
 	"reflect"
 	"time"
 
+	"github.com/libopenstorage/stork/pkg/controllers"
 	kdmpapi "github.com/portworx/kdmp/pkg/apis/kdmp/v1alpha1"
 	"github.com/portworx/sched-ops/k8s/apiextensions"
 	"github.com/sirupsen/logrus"
@@ -20,6 +21,8 @@ import (
 
 var (
 	resyncPeriod = 10 * time.Second
+
+	cleanupFinalizer = "kdmp.portworx.com/finalizer-cleanup"
 )
 
 // Controller is a k8s controller that handles DataExport resources.
@@ -74,6 +77,11 @@ func (c *Controller) Reconcile(request reconcile.Request) (reconcile.Result, err
 		}
 		// Error reading the object - requeue the request.
 		return reconcile.Result{RequeueAfter: 2 * time.Second}, err
+	}
+
+	if !controllers.ContainsFinalizer(dataExport, cleanupFinalizer) {
+		controllers.SetFinalizer(dataExport, cleanupFinalizer)
+		return reconcile.Result{Requeue: true}, c.client.Update(context.TODO(), dataExport)
 	}
 
 	requeue, err := c.sync(context.TODO(), dataExport)

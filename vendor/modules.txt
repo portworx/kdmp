@@ -60,6 +60,8 @@ github.com/imdario/mergo
 github.com/json-iterator/go
 # github.com/konsorten/go-windows-terminal-sequences v1.0.2
 github.com/konsorten/go-windows-terminal-sequences
+# github.com/libopenstorage/stork v1.3.0-beta1.0.20200410032049-df8bcecf8f71
+github.com/libopenstorage/stork/pkg/controllers
 # github.com/mailru/easyjson v0.7.0
 github.com/mailru/easyjson/buffer
 github.com/mailru/easyjson/jlexer

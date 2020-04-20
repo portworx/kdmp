@@ -4,6 +4,7 @@ go 1.13
 
 require (
 	github.com/google/uuid v1.1.1
+	github.com/libopenstorage/stork v1.3.0-beta1.0.20200410032049-df8bcecf8f71
 	github.com/portworx/sched-ops v0.0.0-20200226052527-b624a2f22d6c
 	github.com/sirupsen/logrus v1.4.2
 	github.com/stretchr/testify v1.4.0
