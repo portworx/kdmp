@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/google/uuid"
 	"github.com/portworx/kdmp/pkg/drivers"
 	"github.com/portworx/sched-ops/k8s/batch"
 	batchv1 "k8s.io/api/batch/v1"
@@ -42,12 +41,11 @@ func (d Driver) StartJob(opts ...drivers.JobOption) (id string, err error) {
 	if err != nil {
 		return "", err
 	}
-	job, err := batch.Instance().CreateJob(rsyncJob)
-	if err != nil && !errors.IsAlreadyExists(err) {
+	if _, err = batch.Instance().CreateJob(rsyncJob); err != nil && !errors.IsAlreadyExists(err) {
 		return "", err
 	}
 
-	return namespacedName(job.Namespace, job.Name), nil
+	return namespacedName(rsyncJob.Namespace, rsyncJob.Name), nil
 }
 
 // DeleteJob stops data transfer between volumes.
@@ -57,7 +55,11 @@ func (d Driver) DeleteJob(id string) error {
 		return err
 	}
 
-	return batch.Instance().DeleteJob(name, namespace)
+	if err = batch.Instance().DeleteJob(name, namespace); err != nil && !errors.IsNotFound(err) {
+		return err
+	}
+
+	return nil
 }
 
 // JobStatus returns a progress status for a data transfer.
@@ -80,15 +82,10 @@ func (d Driver) JobStatus(id string) (progress int, err error) {
 }
 
 func jobFor(srcVol, dstVol, namespace string, labels map[string]string) (*batchv1.Job, error) {
-	uuidv4, err := uuid.NewRandom()
-	if err != nil {
-		return nil, fmt.Errorf("build job id: %s", err)
-	}
-
 	labels = addJobLabels(labels)
 	return &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      toJobName(uuidv4.String()[:6]),
+			Name:      toJobName(srcVol),
 			Namespace: namespace,
 			Labels:    labels,
 		},
