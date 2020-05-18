@@ -14,7 +14,6 @@ import (
 	"github.com/portworx/sched-ops/k8s/core"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/utils/pointer"
 )
 
 // Data export label names/keys.
@@ -32,18 +31,18 @@ func (c *Controller) sync(ctx context.Context, in *kdmpapi.DataExport) (bool, er
 
 	// set the initial stage
 	if dataExport.Status.Stage == "" {
+		// TODO: validate DataExport resource & update status?
 		dataExport.Status.Stage = kdmpapi.DataExportStageInitial
 		dataExport.Status.Status = kdmpapi.DataExportStatusInitial
 		return true, c.client.Update(ctx, &dataExport)
 	}
 
-	// TODO: validate DataExport resource & update status?
 	driver, err := driversinstance.Get(string(dataExport.Spec.Type))
 	if err != nil {
 		return false, err
 	}
 
-	snapshotter, err := snapshotsinstance.Get(snapshots.ExternalStorage)
+	snapshotter, err := snapshotsinstance.GetForStorageClass(dataExport.Spec.SnapshotStorageClass)
 	if err != nil {
 		return false, fmt.Errorf("get snapshotter for a storage provider: %s", err)
 	}
@@ -163,6 +162,7 @@ func (c *Controller) stageSnapshotScheduled(ctx context.Context, snapshotter sna
 		snapshots.PVCName(srcPVC.Name),
 		snapshots.PVCNamespace(srcPVC.Namespace),
 		snapshots.RestoreNamespaces(dstPVC.Namespace),
+		snapshots.SnapshotClassName(dataExport.Spec.SnapshotStorageClass),
 	)
 	if err != nil {
 		return false, c.updateStatus(dataExport, kdmpapi.DataExportStatusFailed, err.Error())
@@ -232,6 +232,7 @@ func (c *Controller) cleanUp(driver drivers.Interface, snapshotter snapshots.Dri
 	if driver == nil {
 		return fmt.Errorf("driver is nil")
 	}
+
 	if snapshotter == nil {
 		return fmt.Errorf("snapshot driver is nil")
 	}
@@ -278,7 +279,7 @@ func (c *Controller) restoreSnapshot(ctx context.Context, snapshotter snapshots.
 	}
 
 	restoreSpec := corev1.PersistentVolumeClaimSpec{
-		StorageClassName: pointer.StringPtr(de.Spec.SnapshotStorageClass),
+		StorageClassName: srcPvc.Spec.StorageClassName,
 		AccessModes:      srcPvc.Spec.AccessModes,
 		Resources:        srcPvc.Spec.Resources,
 	}
@@ -306,6 +307,7 @@ func (c *Controller) checkClaims(de *kdmpapi.DataExport) error {
 
 	dstPVC := de.Spec.Destination.PersistentVolumeClaim
 	// TODO: use size of src pvc if not provided
+	// TODO: create pvc on the DataTransfer stage
 	if err := c.ensureUnmountedPVC(dstPVC.Name, dstPVC.Namespace, de.Name); err != nil {
 		// create pvc if it's not found
 		if errors.IsNotFound(err) {

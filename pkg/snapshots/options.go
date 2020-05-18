@@ -93,6 +93,9 @@ func RestoreNamespaces(namespaces ...string) Option {
 // SnapshotClassName is the name of the VolumeSnapshotClass requested by the VolumeSnapshot.
 func SnapshotClassName(name string) Option {
 	return func(opts *Options) error {
+		if strings.TrimSpace(name) == "" {
+			return fmt.Errorf("snapshot class is empty")
+		}
 		opts.SnapshotClassName = name
 		return nil
 	}

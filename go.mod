@@ -6,11 +6,13 @@ require (
 	github.com/kubernetes-csi/external-snapshotter/v2 v2.1.1
 	github.com/kubernetes-incubator/external-storage v0.0.0-00010101000000-000000000000
 	github.com/libopenstorage/stork v1.3.0-beta1.0.20200410032049-df8bcecf8f71
-	github.com/portworx/sched-ops v0.0.0-20200226052527-b624a2f22d6c
+	github.com/portworx/sched-ops v0.0.0-20200506183916-30fe0dc40344
 	github.com/sirupsen/logrus v1.4.2
 	github.com/stretchr/testify v1.4.0
 	github.com/urfave/cli v1.22.2
-	golang.org/x/tools v0.0.0-20200408132156-9ee5ef7a2c0d // indirect
+	golang.org/x/lint v0.0.0-20200302205851-738671d3881b // indirect
+	golang.org/x/tools v0.0.0-20200515220128-d3bf790afa53 // indirect
+	honnef.co/go/tools v0.0.1-2020.1.4 // indirect
 	k8s.io/api v0.17.0
 	k8s.io/apiextensions-apiserver v0.16.6
 	k8s.io/apimachinery v0.17.1-beta.0
@@ -22,7 +24,7 @@ require (
 
 replace (
 	github.com/kubernetes-incubator/external-storage => github.com/libopenstorage/external-storage v5.3.0-alpha.1.0.20200130041458-d2b33d4448ea+incompatible
-	github.com/portworx/sched-ops => github.com/saheienko/sched-ops v0.0.0-20200505104752-34ac8cc408af
+	github.com/porworx/sched-ops => github.com/portworx/sched-ops v0.0.0-20200506183916-30fe0dc40344
 	k8s.io/api => k8s.io/api v0.16.6
 	k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.16.6
 	k8s.io/apimachinery => k8s.io/apimachinery v0.16.6

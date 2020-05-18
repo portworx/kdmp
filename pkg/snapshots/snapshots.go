@@ -17,6 +17,7 @@ const (
 // List of supported snapshot drivers.
 var (
 	ExternalStorage = "external-storage"
+	CSI             = "csi"
 )
 
 // Status is a snapshot status.

@@ -85,7 +85,7 @@ github.com/modern-go/reflect2
 github.com/pkg/errors
 # github.com/pmezard/go-difflib v1.0.0
 github.com/pmezard/go-difflib/difflib
-# github.com/portworx/sched-ops v0.0.0-20200226052527-b624a2f22d6c => github.com/saheienko/sched-ops v0.0.0-20200505104752-34ac8cc408af
+# github.com/portworx/sched-ops v0.0.0-20200506183916-30fe0dc40344
 github.com/portworx/sched-ops/k8s/apiextensions
 github.com/portworx/sched-ops/k8s/batch
 github.com/portworx/sched-ops/k8s/common

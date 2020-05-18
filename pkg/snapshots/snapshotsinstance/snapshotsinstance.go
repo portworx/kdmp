@@ -5,13 +5,15 @@ import (
 	"sync"
 
 	"github.com/portworx/kdmp/pkg/snapshots"
+	"github.com/portworx/kdmp/pkg/snapshots/externalsnapshotter"
 	"github.com/portworx/kdmp/pkg/snapshots/externalstorage"
 )
 
 var (
-	mu         sync.Mutex
-	driversMap = map[string]snapshots.Driver{
+	mu            sync.Mutex
+	driversByName = map[string]snapshots.Driver{
 		snapshots.ExternalStorage: externalstorage.Driver{},
+		snapshots.CSI:             externalsnapshotter.Driver{},
 	}
 )
 
@@ -24,21 +26,34 @@ func Add(driver snapshots.Driver) error {
 		return fmt.Errorf("driver is nil")
 	}
 
-	driversMap[driver.Name()] = driver
+	driversByName[driver.Name()] = driver
 	return nil
 }
-
-// TODO: replace get with DriverFor(provisioner) func to provide snapshot backend for a storage backend
 
 // Get retrieves a driver for provided name.
 func Get(name string) (snapshots.Driver, error) {
 	mu.Lock()
 	defer mu.Unlock()
 
-	driver, ok := driversMap[name]
+	driver, ok := driversByName[name]
 	if !ok || driver == nil {
 		return nil, fmt.Errorf("%q driver: not found", name)
 	}
 
 	return driver, nil
+}
+
+// GetForStorageClass retrieves a driver for provided storage class name.
+// It takes a csi driver by default.
+func GetForStorageClass(name string) (snapshots.Driver, error) {
+	mu.Lock()
+	defer mu.Unlock()
+
+	// TODO: GetForStorageClass map?
+	switch name {
+	case externalstorage.DefaultStorageClass:
+		return externalstorage.Driver{}, nil
+	}
+
+	return externalsnapshotter.Driver{}, nil
 }
