@@ -4,12 +4,17 @@ DOCKER_HUB_KDMP_TAG?=latest
 
 KDMP_UNITTEST_IMG=$(DOCKER_HUB_REPO)/$(DOCKER_HUB_KDMP_UNITTEST_IMAGE):$(DOCKER_HUB_KDMP_TAG)
 
+RELEASE_VER := v0.1.0
+BUILD_DATE  := $(shell date -u +'%Y-%m-%dT%H:%M:%SZ')
 BASE_DIR    := $(shell git rev-parse --show-toplevel)
-GIT_SHA     := $(shell git rev-parse --short HEAD)
-BIN         :=$(BASE_DIR)/bin
+GIT_SHA     := $(shell git rev-parse HEAD)
+BIN         := $(BASE_DIR)/bin
+
+export GO111MODULE=on
+export GOFLAGS = -mod=vendor
 
 ifndef PKGS
-	PKGS := $(shell go list ./... 2>&1 | grep -v 'go: ' | grep -v 'github.com/portworx/kdmp/vendor' | grep -v versioned | grep -v 'pkg/apis/v1')
+	PKGS := $(shell GOFLAGS=-mod=vendor go list ./... 2>&1 | grep -v 'go: ' | grep -v 'github.com/portworx/kdmp/vendor' | grep -v versioned | grep -v 'pkg/apis/v1')
 endif
 
 GO_FILES := $(shell find . -name '*.go' | grep -v 'vendor' | \
@@ -43,7 +48,7 @@ unittest:
 	done
 
 lint:
-	go get -u golang.org/x/lint/golint
+	GO111MODULE=off go get -u golang.org/x/lint/golint
 	for file in $(GO_FILES); do \
         golint $${file}; \
         if [ -n "$$(golint $${file})" ]; then \
@@ -58,14 +63,14 @@ vet:
 
 
 staticcheck:
-	go get -u honnef.co/go/tools/cmd/staticcheck
+	GO111MODULE=off go get -u honnef.co/go/tools/cmd/staticcheck
 	staticcheck $(PKGS)
 	#staticcheck -tags integrationtest test/integration_test/*.go
 	staticcheck -tags unittest $(PKGS)
 
 
 errcheck:
-	go get -u github.com/kisielk/errcheck
+	GO111MODULE=off go get -u github.com/kisielk/errcheck
 	errcheck -ignoregenerated -verbose -blank $(PKGS)
 	errcheck -ignoregenerated -verbose -blank -tags unittest $(PKGS)
 	#errcheck -ignoregenerated -verbose -blank -tags integrationtest github.com/portworx/kdmp/test/integration_test
@@ -90,3 +95,10 @@ codegen:
 vendor-sync:
 	go mod tidy
 	go mod vendor
+
+build:
+	go build -o ${BIN}/kdmp -ldflags="-s -w \
+	-X github.com/portworx/kdmp/pkg/version.gitVersion=${RELEASE_VER} \
+	-X github.com/portworx/kdmp/pkg/version.gitCommit=${GIT_SHA} \
+	-X github.com/portworx/kdmp/pkg/version.buildDate=${BUILD_DATE}" \
+	./cmd/kdmp

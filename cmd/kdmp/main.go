@@ -9,6 +9,7 @@ import (
 
 	"github.com/portworx/kdmp/pkg/apis"
 	"github.com/portworx/kdmp/pkg/controllers/dataexport"
+	"github.com/portworx/kdmp/pkg/version"
 	log "github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 	"k8s.io/client-go/rest"
@@ -64,6 +65,9 @@ func main() {
 
 func run(c *cli.Context) {
 	log.SetLevel(log.DebugLevel)
+
+	v := version.Get()
+	log.Infof("Starting kdmp: %s-%s, build date %s", v.GitVersion, v.GitCommit, v.BuildDate)
 
 	mgrOpts := manager.Options{}
 	if c.BoolT("leader-elect") {
