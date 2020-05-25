@@ -1,14 +1,18 @@
-DOCKER_HUB_REPO?=portworx
-DOCKER_HUB_KDMP_UNITTEST_IMAGE?=px-kdmp-unittest
-DOCKER_HUB_KDMP_TAG?=latest
-
-KDMP_UNITTEST_IMG=$(DOCKER_HUB_REPO)/$(DOCKER_HUB_KDMP_UNITTEST_IMAGE):$(DOCKER_HUB_KDMP_TAG)
-
 RELEASE_VER := v0.1.0
 BUILD_DATE  := $(shell date -u +'%Y-%m-%dT%H:%M:%SZ')
 BASE_DIR    := $(shell git rev-parse --show-toplevel)
 GIT_SHA     := $(shell git rev-parse HEAD)
 BIN         := $(BASE_DIR)/bin
+
+DOCKER_IMAGE_REPO?=portworx
+DOCKER_IMAGE_NAME?=kdmp
+DOCKER_IMAGE_TAG?=$(RELEASE_VER)
+
+DOCKER_KDMP_UNITTEST_IMAGE?=px-kdmp-unittest
+DOCKER_KDMP_TAG?=latest
+
+DOCKER_IMAGE=$(DOCKER_IMAGE_REPO)/$(DOCKER_IMAGE_NAME):$(DOCKER_IMAGE_TAG)
+KDMP_UNITTEST_IMG=$(DOCKER_IMAGE_REPO)/$(DOCKER_KDMP_UNITTEST_IMAGE):$(DOCKER_KDMP_TAG)
 
 export GO111MODULE=on
 export GOFLAGS = -mod=vendor
@@ -27,7 +31,7 @@ GO_FILES := $(shell find . -name '*.go' | grep -v 'vendor' | \
 .DEFAULT_GOAL: all
 .PHONY: test
 
-all: pretest test
+all: pretest test build container
 
 test:
 	sudo docker run --rm -it -v ${GOPATH}:/go: $(KDMP_UNITTEST_IMG) make unittest
@@ -102,3 +106,11 @@ build:
 	-X github.com/portworx/kdmp/pkg/version.gitCommit=${GIT_SHA} \
 	-X github.com/portworx/kdmp/pkg/version.buildDate=${BUILD_DATE}" \
 	./cmd/kdmp
+
+container:
+	docker build --tag $(DOCKER_IMAGE) .
+
+
+deploy:
+	docker push $(DOCKER_IMAGE)
+
