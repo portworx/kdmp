@@ -110,7 +110,7 @@ build:
 container:
 	docker build --tag $(DOCKER_IMAGE) .
 
-
+.PHONY: deploy
 deploy:
 	docker push $(DOCKER_IMAGE)
 

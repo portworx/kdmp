@@ -1,0 +1,32 @@
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: kdmp-operator
+  namespace: kube-system
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kdmp-operator
+  namespace: kube-system
+spec:
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+    type: RollingUpdate
+  replicas: 1
+  selector:
+    matchLabels:
+      name: kdmp-operator
+  template:
+    metadata:
+      labels:
+        name: kdmp-operator
+    spec:
+      containers:
+      - name: portworx-operator
+        image: portworx/kdmp
+        imagePullPolicy: Always
+      serviceAccountName: kdmp-operator
