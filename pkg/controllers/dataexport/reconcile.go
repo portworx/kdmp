@@ -14,6 +14,7 @@ import (
 	"github.com/portworx/sched-ops/k8s/core"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/pointer"
 )
 
@@ -28,13 +29,17 @@ func (c *Controller) sync(ctx context.Context, in *kdmpapi.DataExport) (bool, er
 		return false, nil
 	}
 
-	dataExport := *in
+	dataExport := in.DeepCopy()
 
 	// set the initial stage
 	if dataExport.Status.Stage == "" {
 		dataExport.Status.Stage = kdmpapi.DataExportStageInitial
 		dataExport.Status.Status = kdmpapi.DataExportStatusInitial
-		return true, c.client.Update(ctx, &dataExport)
+		return true, c.client.Update(ctx, dataExport)
+	}
+	// TODO: set defaults
+	if dataExport.Spec.Type == "" {
+		dataExport.Spec.Type = drivers.Rsync
 	}
 
 	// TODO: validate DataExport resource & update status?
@@ -49,7 +54,7 @@ func (c *Controller) sync(ctx context.Context, in *kdmpapi.DataExport) (bool, er
 	}
 
 	if dataExport.DeletionTimestamp != nil {
-		if !controllers.ContainsFinalizer(&dataExport, cleanupFinalizer) {
+		if !controllers.ContainsFinalizer(dataExport, cleanupFinalizer) {
 			return false, nil
 		}
 
@@ -57,8 +62,8 @@ func (c *Controller) sync(ctx context.Context, in *kdmpapi.DataExport) (bool, er
 			return true, fmt.Errorf("%s: cleanup: %s", reflect.TypeOf(dataExport), err)
 		}
 
-		controllers.RemoveFinalizer(&dataExport, cleanupFinalizer)
-		return true, c.client.Update(ctx, &dataExport)
+		controllers.RemoveFinalizer(dataExport, cleanupFinalizer)
+		return true, c.client.Update(ctx, dataExport)
 	}
 
 	switch dataExport.Status.Stage {
@@ -66,30 +71,36 @@ func (c *Controller) sync(ctx context.Context, in *kdmpapi.DataExport) (bool, er
 		if dataExport.Status.Status == kdmpapi.DataExportStatusSuccessful {
 			// set to the next stage
 			dataExport.Status.Stage = kdmpapi.DataExportStageTransferScheduled
-			if hasSnapshotStage(&dataExport) {
+			if hasSnapshotStage(dataExport) {
 				dataExport.Status.Stage = kdmpapi.DataExportStageSnapshotScheduled
 			}
-			return true, c.client.Update(ctx, setStatus(&dataExport, kdmpapi.DataExportStatusInitial, ""))
+			return true, c.client.Update(ctx, setStatus(dataExport, kdmpapi.DataExportStatusInitial, ""))
 		}
 
 		// ensure srd/dst volumes are available
-		if err := c.checkClaims(&dataExport); err != nil {
-			return false, c.updateStatus(&dataExport, kdmpapi.DataExportStatusFailed, err.Error())
+		if err := c.checkClaims(dataExport); err != nil {
+			msg := fmt.Sprintf("failed to check volume claims: %s", err)
+			return false, c.updateStatus(dataExport, kdmpapi.DataExportStatusFailed, msg)
 		}
 
-		return true, c.client.Update(ctx, setStatus(&dataExport, kdmpapi.DataExportStatusSuccessful, ""))
-	// TODO: 'merge' scheduled&inProgress stages
+		return true, c.client.Update(ctx, setStatus(dataExport, kdmpapi.DataExportStatusSuccessful, ""))
+	// TODO: 'merge' scheduled&inProgress&restore stages
 	case kdmpapi.DataExportStageSnapshotScheduled:
-		return c.stageSnapshotScheduled(ctx, snapshotter, &dataExport)
+		return c.stageSnapshotScheduled(ctx, snapshotter, dataExport)
 	case kdmpapi.DataExportStageSnapshotInProgress:
-		return c.stageSnapshotInProgress(ctx, snapshotter, &dataExport)
+		return c.stageSnapshotInProgress(ctx, snapshotter, dataExport)
 	case kdmpapi.DataExportStageSnapshotRestore:
-		return c.stageSnapshotRestore(ctx, snapshotter, &dataExport)
+		return c.stageSnapshotRestore(ctx, snapshotter, dataExport)
 	case kdmpapi.DataExportStageTransferScheduled:
 		if dataExport.Status.Status == kdmpapi.DataExportStatusSuccessful {
 			// set to the next stage
 			dataExport.Status.Stage = kdmpapi.DataExportStageTransferInProgress
-			return true, c.client.Update(ctx, setStatus(&dataExport, kdmpapi.DataExportStatusInitial, ""))
+			return true, c.client.Update(ctx, setStatus(dataExport, kdmpapi.DataExportStatusInitial, ""))
+		}
+
+		if _, err := c.ensureDestinationPVC(ctx, dataExport); err != nil {
+			msg := fmt.Sprintf("destination PVC check failed: %s", err)
+			return false, c.updateStatus(dataExport, kdmpapi.DataExportStatusFailed, msg)
 		}
 
 		srcPVC := dataExport.Spec.Source.PersistentVolumeClaim.Name
@@ -107,41 +118,44 @@ func (c *Controller) sync(ctx context.Context, in *kdmpapi.DataExport) (bool, er
 			drivers.WithLabels(jobLabels(dataExport.GetName())),
 		)
 		if err != nil {
-			return false, c.updateStatus(&dataExport, kdmpapi.DataExportStatusFailed, err.Error())
+			msg := fmt.Sprintf("failed to start a data transfer job: %s", err)
+			return false, c.updateStatus(dataExport, kdmpapi.DataExportStatusFailed, msg)
 		}
 
 		dataExport.Status.TransferID = id
-		return true, c.client.Update(ctx, setStatus(&dataExport, kdmpapi.DataExportStatusSuccessful, ""))
+		return true, c.client.Update(ctx, setStatus(dataExport, kdmpapi.DataExportStatusSuccessful, ""))
 	case kdmpapi.DataExportStageTransferInProgress:
 		if dataExport.Status.Status == kdmpapi.DataExportStatusSuccessful {
 			// set to the next stage
 			dataExport.Status.Stage = kdmpapi.DataExportStageFinal
-			return true, c.client.Update(ctx, setStatus(&dataExport, kdmpapi.DataExportStatusInitial, ""))
+			return true, c.client.Update(ctx, setStatus(dataExport, kdmpapi.DataExportStatusInitial, ""))
 		}
 
 		// get transfer job status
 		progress, err := driver.JobStatus(dataExport.Status.TransferID)
 		if err != nil {
-			return false, c.updateStatus(&dataExport, kdmpapi.DataExportStatusFailed, err.Error())
+			msg := fmt.Sprintf("failed to get %s job status: %s", dataExport.Status.TransferID, err)
+			return false, c.updateStatus(dataExport, kdmpapi.DataExportStatusFailed, msg)
 		}
 		dataExport.Status.ProgressPercentage = progress
 
 		// transfer in progress
 		if !drivers.IsTransferCompleted(progress) {
-			return false, c.updateStatus(&dataExport, kdmpapi.DataExportStatusInProgress, string(progress))
+			return false, c.updateStatus(dataExport, kdmpapi.DataExportStatusInProgress, string(progress))
 		}
 
-		return true, c.client.Update(ctx, setStatus(&dataExport, kdmpapi.DataExportStatusSuccessful, ""))
+		return true, c.client.Update(ctx, setStatus(dataExport, kdmpapi.DataExportStatusSuccessful, ""))
 	case kdmpapi.DataExportStageFinal:
 		if dataExport.Status.Status == kdmpapi.DataExportStatusSuccessful {
 			return false, nil
 		}
 
 		if err := c.cleanUp(driver, snapshotter, dataExport); err != nil {
-			return false, c.updateStatus(&dataExport, kdmpapi.DataExportStatusFailed, err.Error())
+			msg := fmt.Sprintf("failed to remove resources: %s", err)
+			return false, c.updateStatus(dataExport, kdmpapi.DataExportStatusFailed, msg)
 		}
 
-		return true, c.client.Update(ctx, setStatus(&dataExport, kdmpapi.DataExportStatusSuccessful, ""))
+		return true, c.client.Update(ctx, setStatus(dataExport, kdmpapi.DataExportStatusSuccessful, ""))
 	}
 
 	return false, nil
@@ -165,7 +179,8 @@ func (c *Controller) stageSnapshotScheduled(ctx context.Context, snapshotter sna
 		snapshots.RestoreNamespaces(dstPVC.Namespace),
 	)
 	if err != nil {
-		return false, c.updateStatus(dataExport, kdmpapi.DataExportStatusFailed, err.Error())
+		msg := fmt.Sprintf("failed to create a snapshot: %s", err)
+		return false, c.updateStatus(dataExport, kdmpapi.DataExportStatusFailed, msg)
 	}
 
 	dataExport.Status.SnapshotID = name
@@ -187,8 +202,8 @@ func (c *Controller) stageSnapshotInProgress(ctx context.Context, snapshotter sn
 	srcPvc := dataExport.Spec.Source.PersistentVolumeClaim
 	status, err := snapshotter.SnapshotStatus(dataExport.Status.SnapshotID, srcPvc.Namespace)
 	if err != nil {
-		// TODO: use status 'unknown'?
-		return false, c.updateStatus(dataExport, kdmpapi.DataExportStatusFailed, err.Error())
+		msg := fmt.Sprintf("failed to get a snapshot status: %s", err)
+		return false, c.updateStatus(dataExport, kdmpapi.DataExportStatusFailed, msg)
 	}
 
 	if status == snapshots.StatusFailed {
@@ -216,11 +231,13 @@ func (c *Controller) stageSnapshotRestore(ctx context.Context, snapshotter snaps
 
 	pvc, err := c.restoreSnapshot(ctx, snapshotter, dataExport)
 	if err != nil {
-		return false, c.updateStatus(dataExport, kdmpapi.DataExportStatusFailed, err.Error())
+		msg := fmt.Sprintf("failed to restore a snapshot: %s", err)
+		return false, c.updateStatus(dataExport, kdmpapi.DataExportStatusFailed, msg)
 	}
 
 	if pvc.Status.Phase != corev1.ClaimBound {
-		return false, c.updateStatus(dataExport, kdmpapi.DataExportStatusInProgress, fmt.Sprintf("snapshot pvc phase is %q", pvc.Status.Phase))
+		msg := fmt.Sprintf("snapshot pvc phase is %q, expected- %q", pvc.Status.Phase, corev1.ClaimBound)
+		return false, c.updateStatus(dataExport, kdmpapi.DataExportStatusInProgress, msg)
 	}
 
 	dataExport.Status.SnapshotPVCName = pvc.Name
@@ -228,7 +245,7 @@ func (c *Controller) stageSnapshotRestore(ctx context.Context, snapshotter snaps
 	return true, c.updateStatus(dataExport, kdmpapi.DataExportStatusSuccessful, "")
 }
 
-func (c *Controller) cleanUp(driver drivers.Interface, snapshotter snapshots.Driver, de kdmpapi.DataExport) error {
+func (c *Controller) cleanUp(driver drivers.Interface, snapshotter snapshots.Driver, de *kdmpapi.DataExport) error {
 	if driver == nil {
 		return fmt.Errorf("driver is nil")
 	}
@@ -236,7 +253,7 @@ func (c *Controller) cleanUp(driver drivers.Interface, snapshotter snapshots.Dri
 		return fmt.Errorf("snapshot driver is nil")
 	}
 
-	if hasSnapshotStage(&de) {
+	if hasSnapshotStage(de) {
 		if de.Status.SnapshotID != "" && de.Status.SnapshotNamespace != "" {
 			if err := snapshotter.DeleteSnapshot(de.Status.SnapshotID, de.Status.SnapshotNamespace); err != nil && !errors.IsNotFound(err) {
 				return fmt.Errorf("delete %s/%s snapshot: %s", de.Status.SnapshotNamespace, de.Status.SnapshotID, err)
@@ -300,73 +317,167 @@ func (c *Controller) restoreSnapshot(ctx context.Context, snapshotter snapshots.
 
 func (c *Controller) checkClaims(de *kdmpapi.DataExport) error {
 	srcPVC := de.Spec.Source.PersistentVolumeClaim
-	if err := c.ensureUnmountedPVC(srcPVC.Name, srcPVC.Namespace, de.Name); err != nil {
-		return fmt.Errorf("source pvc: %s/%s: %v", srcPVC.Namespace, srcPVC.Name, err)
+	if srcPVC == nil {
+		return fmt.Errorf("source pvc should be provided")
 	}
+	// ignore a check for mounted pods if a source pvc has a snapshot (data will be copied from the snapshot)
+	src, err := c.checkPVC(srcPVC, !hasSnapshotStage(de))
+	if err != nil {
+		return fmt.Errorf("source pvc: %v", err)
+	}
+	srcPVC = src
 
 	dstPVC := de.Spec.Destination.PersistentVolumeClaim
-	// TODO: use size of src pvc if not provided
-	if err := c.ensureUnmountedPVC(dstPVC.Name, dstPVC.Namespace, de.Name); err != nil {
-		// create pvc if it's not found
-		if errors.IsNotFound(err) {
-			return c.client.Create(context.TODO(), dstPVC)
+	if dstPVC == nil {
+		return fmt.Errorf("destination pvc should be provided")
+	}
+	dstPVCexits := true
+	dst, err := c.checkPVC(dstPVC, true)
+	if err != nil {
+		if !errors.IsNotFound(err) {
+			return fmt.Errorf("destination pvc: %v", err)
 		}
 
-		return fmt.Errorf("destination pvc: %s/%s: %v", dstPVC.Namespace, dstPVC.Name, err)
+		// check provided pvc spec if destination pvc doesn't exist
+		if err = isValidDestinationSpec(dstPVC.Spec); err != nil {
+			return fmt.Errorf("destination pvc: %v", err)
+		}
+
+		dstPVCexits = false
+	}
+	if dst != nil {
+		dstPVC = dst
+	}
+
+	srcReq := srcPVC.Spec.Resources.Requests[corev1.ResourceStorage]
+	dstReq := dstPVC.Spec.Resources.Requests[corev1.ResourceStorage]
+	// dstReq < srcReq
+	if dstPVCexits && dstReq.Cmp(srcReq) == -1 {
+		return fmt.Errorf("size of the destination pvc (%s) is less than of the source one (%s)", dstReq.String(), srcReq.String())
 	}
 
 	return nil
 }
 
-func (c *Controller) ensureUnmountedPVC(name, namespace, dataExportName string) error {
-	pvc, err := core.Instance().GetPersistentVolumeClaim(name, namespace)
+func (c *Controller) checkPVC(in *corev1.PersistentVolumeClaim, checkMounts bool) (*corev1.PersistentVolumeClaim, error) {
+	if in.Name == "" || in.Namespace == "" {
+		return nil, fmt.Errorf("name and namespace should be provided")
+	}
+	pvc, err := core.Instance().GetPersistentVolumeClaim(in.Name, in.Namespace)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if pvc.Status.Phase != corev1.ClaimBound {
-		return fmt.Errorf("status: expected %s, got %s", corev1.ClaimBound, pvc.Status.Phase)
+		return nil, fmt.Errorf("status: expected %s, got %s", corev1.ClaimBound, pvc.Status.Phase)
 	}
 
-	// check if pvc is mounted
-	// TODO: as there is snapshot stage this can be deleted. check just destination pvc?
-	//pods, err := getMountPods(pvc.Name, pvc.Namespace)
-	//if err != nil {
-	//	return fmt.Errorf("get mounted pods: %v", err)
-	//}
-	//mounted := make([]corev1.Pod, 0)
-	//for _, pod := range pods {
-	//	// pvc is mounted to pod created for this volume
-	//	if pod.Labels[LabelControllerName] == dataExportName {
-	//		continue
-	//	}
-	//	mounted = append(mounted, pod)
-	//}
-	//if len(mounted) > 0 {
-	//	return fmt.Errorf("mounted to %v pods", toPodNames(pods))
-	//}
+	if checkMounts {
+		pods, err := core.Instance().GetPodsUsingPVC(pvc.Name, pvc.Namespace)
+		if err != nil {
+			return nil, fmt.Errorf("get mounted pods: %v", err)
+		}
+		if len(pods) > 0 {
+			return nil, fmt.Errorf("mounted to %v pods", toPodNames(pods))
+		}
+	}
 
-	return nil
+	return pvc, nil
 }
 
-//func getMountPods(pvcName, namespace string) ([]corev1.Pod, error) {
-//	return core.Instance().GetPodsUsingPVC(pvcName, namespace)
-//}
-//
-//func toPodNames(objs []corev1.Pod) []string {
-//	out := make([]string, 0)
-//	for _, o := range objs {
-//		out = append(out, o.Name)
-//	}
-//	return out
-//}
+func (c *Controller) ensureDestinationPVC(ctx context.Context, de *kdmpapi.DataExport) (*corev1.PersistentVolumeClaim, error) {
+	dst := de.Spec.Destination.PersistentVolumeClaim
+	dstPVC, err := core.Instance().GetPersistentVolumeClaim(dst.Name, dst.Namespace)
+	if err != nil {
+		if !errors.IsNotFound(err) {
+			return nil, fmt.Errorf("get destination pvc: %s", err)
+		}
+		// create a volume otherwise
+	}
+	if err == nil {
+		return dstPVC, nil
+	}
+
+	// Create a volume claim if it's not found
+	spec := dst.Spec
+	if err := isValidClaimSpec(spec); err != nil {
+		// use source spec parameters if destination on is invalid
+		src := de.Spec.Source.PersistentVolumeClaim
+		srcPVC, err := core.Instance().GetPersistentVolumeClaim(src.Name, src.Namespace)
+		if err != nil {
+			return nil, fmt.Errorf("get source pvc: %s", err)
+		}
+		spec = mergeSpec(spec, srcPVC.Spec)
+	}
+
+	// TODO: copy annotations and labels?
+	dstPVC = &corev1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      dst.Name,
+			Namespace: dst.Namespace,
+		},
+		Spec: corev1.PersistentVolumeClaimSpec{
+			AccessModes:      spec.AccessModes,
+			Resources:        spec.Resources,
+			StorageClassName: spec.StorageClassName,
+			VolumeMode:       spec.VolumeMode,
+		},
+	}
+	return core.Instance().CreatePersistentVolumeClaim(dstPVC)
+}
+
+func toPodNames(objs []corev1.Pod) []string {
+	out := make([]string, 0)
+	for _, o := range objs {
+		out = append(out, o.Name)
+	}
+	return out
+}
 
 func toSnapshotPVCName(name string) string {
 	return fmt.Sprintf("snap-%s", name)
 }
 
 func hasSnapshotStage(de *kdmpapi.DataExport) bool {
-	// TODO: ckech src/dst namespace and pvc status (mounted?)
 	return de.Spec.SnapshotStorageClass != ""
+}
+
+func isValidClaimSpec(spec corev1.PersistentVolumeClaimSpec) error {
+	if spec.StorageClassName == nil || *spec.StorageClassName == "" {
+		return fmt.Errorf("storageClassName should be set")
+	}
+	if spec.Resources.Requests == nil {
+		return fmt.Errorf("requests should be set")
+	}
+	if len(spec.AccessModes) == 0 {
+		return fmt.Errorf("accessModes should be set")
+	}
+	return nil
+}
+
+func isValidDestinationSpec(spec corev1.PersistentVolumeClaimSpec) error {
+	if spec.StorageClassName == nil || *spec.StorageClassName == "" {
+		return fmt.Errorf("storageClassName should be set")
+	}
+	return nil
+}
+
+func mergeSpec(dst, src corev1.PersistentVolumeClaimSpec) corev1.PersistentVolumeClaimSpec {
+	if dst.StorageClassName == nil {
+		dst.StorageClassName = src.StorageClassName
+	}
+	if dst.Resources.Requests == nil {
+		dst.Resources.Requests = src.Resources.Requests
+	}
+	if dst.Resources.Limits == nil {
+		dst.Resources.Limits = src.Resources.Limits
+	}
+	if dst.AccessModes == nil {
+		dst.AccessModes = src.AccessModes
+	}
+	if dst.VolumeMode == nil {
+		dst.VolumeMode = src.VolumeMode
+	}
+	return dst
 }
 
 func setStatus(de *kdmpapi.DataExport, status kdmpapi.DataExportStatus, reason string) *kdmpapi.DataExport {
