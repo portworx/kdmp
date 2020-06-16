@@ -1,7 +1,6 @@
 package v1alpha1
 
 import (
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -78,23 +77,26 @@ type DataExport struct {
 
 // DataExportSpec defines configuration parameters for DataExport.
 type DataExportSpec struct {
-	Type                 DataExportType        `json:"type,omitempty"`
-	ClusterPair          string                `json:"clusterPair,omitempty"`
-	SnapshotStorageClass string                `json:"snapshotStorageClass,omitempty"`
-	Source               DataExportSource      `json:"source,omitempty"`
-	Destination          DataExportDestination `json:"destination,omitempty"`
+	Type                 DataExportType            `json:"type,omitempty"`
+	ClusterPair          string                    `json:"clusterPair,omitempty"`
+	SnapshotStorageClass string                    `json:"snapshotStorageClass,omitempty"`
+	Source               DataExportObjectReference `json:"source,omitempty"`
+	Destination          DataExportObjectReference `json:"destination,omitempty"`
 }
 
-// DataExportSource defines a PVC name and namespace that should be processed.
-type DataExportSource struct {
-	PersistentVolumeClaim *corev1.PersistentVolumeClaim `json:"persistentVolumeClaim,omitempty"`
-}
-
-// DataExportDestination defines a backend for data transfer.
-type DataExportDestination struct {
-	// PersistentVolumeClaim defines a PVC backend for data transfer. If provided PVC doesn't exist
-	// a new one will be created using the spec configuration.
-	PersistentVolumeClaim *corev1.PersistentVolumeClaim `json:"persistentVolumeClaim,omitempty"`
+// DataExportObjectReference contains enough information to let you inspect the referred object.
+type DataExportObjectReference struct {
+	// API version of the referent.
+	APIVersion string `json:"apiVersion,omitempty"`
+	// Kind of the referent.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+	Kind string `json:"kind,omitempty"`
+	// Namespace of the referent.
+	// More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/
+	Namespace string `json:"namespace,omitempty"`
+	// Name of the referent.
+	// More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+	Name string `json:"name,omitempty"`
 }
 
 // ExportStatus indicates a current state of the data transfer.
