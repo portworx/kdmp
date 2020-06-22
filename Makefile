@@ -29,7 +29,7 @@ GO_FILES := $(shell find . -name '*.go' | grep -v 'vendor' | \
                                    grep -v 'generated')
 
 .DEFAULT_GOAL: all
-.PHONY: test
+.PHONY: test deploy build container
 
 all: pretest test build container
 
@@ -110,7 +110,5 @@ build:
 container:
 	docker build --tag $(DOCKER_IMAGE) .
 
-.PHONY: deploy
 deploy:
 	docker push $(DOCKER_IMAGE)
-
