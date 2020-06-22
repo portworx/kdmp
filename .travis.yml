@@ -9,13 +9,15 @@ go:
 script:
   - |
     if [ "${TRAVIS_BRANCH}" == "master" ]; then
-      export DOCKER_HUB_BACKUP_TAG=master
-      export DOCKER_HUB_BACKUP_TEST_TAG=latest
+      export DOCKER_IMAGE_TAG=master
     else
-      export DOCKER_HUB_BACKUP_TAG=`git rev-parse --short HEAD`
-      export DOCKER_HUB_BACKUP_TEST_TAG=`git rev-parse --short HEAD`
+      export DOCKER_IMAGE_TAG=`git rev-parse --short HEAD`
     fi
-    make all
+    make all &&
+    if [ "${TRAVIS_PULL_REQUEST}" == "false" ]; then
+      docker login -u "${DOCKER_USER}" -p "${DOCKER_PASSWORD}";
+      make deploy;
+    fi
 notifications:
   email:
     on_success: always
