@@ -4,11 +4,8 @@ import (
 	"fmt"
 	"time"
 
-	kdmpv1alpha1 "github.com/portworx/kdmp/pkg/apis/kdmp/v1alpha1"
 	"github.com/portworx/kdmp/pkg/executor"
 	"github.com/portworx/kdmp/pkg/restic"
-	"github.com/portworx/kdmp/pkg/utils"
-	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"k8s.io/kubectl/pkg/cmd/util"
 )
@@ -53,35 +50,36 @@ func runBackup(
 
 	repositoryName, err := executor.ParseBackupLocation(backupLocationName, namespace)
 	if err != nil {
-		updateDataExportStatusOnError(err)
+		//updateDataExportStatusOnError(err)
 		util.CheckErr(err)
 		return
 	}
 
 	backupCmd, err := restic.GetBackupCommand(repositoryName, secretFilePath, sourcePath)
 	if err != nil {
-		updateDataExportStatusOnError(err)
+		//updateDataExportStatusOnError(err)
 		util.CheckErr(err)
 		return
 	}
 	backupExecutor := restic.NewBackupExecutor(backupCmd)
 	if err := backupExecutor.Run(); err != nil {
 		err = fmt.Errorf("failed to run backup command: %v", err)
-		updateDataExportStatusOnError(err)
+		//updateDataExportStatusOnError(err)
 		util.CheckErr(err)
 		return
 	}
 	for {
 		time.Sleep(progressCheckInterval)
 		status, _ := backupExecutor.Status()
-		updateDataExportStatus(status)
+		//updateDataExportStatus(status)
 		if status.Done {
 			return
 		}
 	}
 }
 
-func updateDataExportStatus(status *restic.Status) {
+// Update the ExportProgress object
+/*func updateDataExportStatus(status *restic.Status) {
 	de, err := utils.Instance().GetDataExport(dataExportName, namespace)
 	if err != nil {
 		logrus.Errorf("failed to update status for DataExport %v object with error: %v", dataExportName, err)
@@ -117,4 +115,4 @@ func updateDataExportStatusOnError(exportErr error) {
 		logrus.Errorf("failed to update status for DataExport %v object with error: %v", dataExportName, err)
 	}
 	return
-}
+}*/
