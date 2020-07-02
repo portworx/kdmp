@@ -32,6 +32,8 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 	scheme.AddKnownTypes(SchemeGroupVersion,
 		&DataExport{},
 		&DataExportList{},
+		&VolumeBackup{},
+		&VolumeBackupList{},
 	)
 
 	metav1.AddToGroupVersion(scheme, SchemeGroupVersion)

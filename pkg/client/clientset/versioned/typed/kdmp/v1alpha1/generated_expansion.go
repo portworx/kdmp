@@ -9,3 +9,5 @@ LICENSE
 package v1alpha1
 
 type DataExportExpansion interface{}
+
+type VolumeBackupExpansion interface{}

@@ -22,6 +22,10 @@ func (c *FakeKdmpV1alpha1) DataExports(namespace string) v1alpha1.DataExportInte
 	return &FakeDataExports{c, namespace}
 }
 
+func (c *FakeKdmpV1alpha1) VolumeBackups(namespace string) v1alpha1.VolumeBackupInterface {
+	return &FakeVolumeBackups{c, namespace}
+}
+
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
 func (c *FakeKdmpV1alpha1) RESTClient() rest.Interface {
