@@ -8,9 +8,10 @@ import (
 )
 
 var (
-	namespace      string
-	dataExportName string
-	secretFilePath string
+	namespace          string
+	secretFilePath     string
+	backupLocationName string
+	backupLocationFile string
 )
 
 // NewCommand returns a restic command wrapper
@@ -20,8 +21,9 @@ func NewCommand() *cobra.Command {
 		Short: "a command executor for long running restic commands",
 	}
 
+	cmds.PersistentFlags().StringVar(&backupLocationName, "backup-location", "", "Name of the BackupLocation object, used for authentication")
 	cmds.PersistentFlags().StringVarP(&namespace, "namespace", "n", "", "Namespace for this command")
-	cmds.PersistentFlags().StringVarP(&dataExportName, "dataexport", "d", "", "Name of the DataExport object")
+	cmds.PersistentFlags().StringVar(&backupLocationFile, "backup-location-file", "", "Path to the BackupLocation object, used for authentication")
 	cmds.PersistentFlags().StringVarP(&secretFilePath, "secret-file-path", "s", "", "Path of the secret file used for locking/unlocking restic reposiories")
 
 	cmds.AddCommand(

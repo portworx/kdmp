@@ -2,6 +2,7 @@ package restic
 
 import (
 	"fmt"
+	"os"
 	"os/exec"
 )
 
@@ -24,6 +25,9 @@ type Command struct {
 	// Flags is a list of flags provided to the restic command.
 	// The order of the elements in the slice is important
 	Flags []string
+	// Envs is a list of environment variables to the restic command.
+	// Each entry is of the form "key=value".
+	Env []string
 }
 
 // AddArg adds an argument to the command
@@ -35,6 +39,12 @@ func (c *Command) AddArg(arg string) *Command {
 // AddFlag adds a flag to the command
 func (c *Command) AddFlag(flag string) *Command {
 	c.Flags = append(c.Flags, flag)
+	return c
+}
+
+// AddEnv adds environment variables to the command
+func (c *Command) AddEnv(envs []string) *Command {
+	c.Env = append(c.Env, envs...)
 	return c
 }
 
@@ -51,7 +61,9 @@ func (c *Command) Cmd() *exec.Cmd {
 	argsSlice = append(argsSlice, c.Flags...)
 	// Get the cmd args
 	argsSlice = append(argsSlice, c.Args...)
-	return exec.Command(baseCmd, argsSlice...)
+	cmd := exec.Command(baseCmd, argsSlice...)
+	cmd.Env = append(os.Environ(), c.Env...)
+	return cmd
 }
 
 // ID is a unique ID that identifies a running command

@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"path"
 
-	stork_api "github.com/libopenstorage/stork/pkg/apis/stork/v1alpha1"
+	storkapi "github.com/libopenstorage/stork/pkg/apis/stork/v1alpha1"
 	storkops "github.com/portworx/sched-ops/k8s/stork"
+	"k8s.io/apimachinery/pkg/util/yaml"
 )
 
 const (
@@ -16,50 +16,69 @@ const (
 )
 
 // ParseBackupLocation parses the provided backup location and returns the repository name
-func ParseBackupLocation(backupLocationName, namespace string) (string, error) {
-	backupLocation, err := storkops.Instance().GetBackupLocation(backupLocationName, namespace)
+func ParseBackupLocation(backupLocationName, namespace string) (string, []string, error) {
+	backupLocation, err := readBackupLocation(backupLocationName, namespace)
 	if err != nil {
-		return "", err
+		return "", nil, err
 	}
 
 	switch backupLocation.Location.Type {
-	case stork_api.BackupLocationS3:
+	case storkapi.BackupLocationS3:
 		return parseS3(backupLocation.Location)
-	case stork_api.BackupLocationAzure:
+	case storkapi.BackupLocationAzure:
 		return parseAzure(backupLocation.Location)
-	case stork_api.BackupLocationGoogle:
+	case storkapi.BackupLocationGoogle:
 		return parseGce(backupLocation.Location)
 	}
-	return "", fmt.Errorf("unsupported backup location: %v", backupLocation.Location.Type)
+	return "", nil, fmt.Errorf("unsupported backup location: %v", backupLocation.Location.Type)
 }
 
-func parseS3(backupLocation stork_api.BackupLocationItem) (string, error) {
+func readBackupLocation(name, namespace string) (*storkapi.BackupLocation, error) {
+	if namespace != "" {
+		return storkops.Instance().GetBackupLocation(name, namespace)
+	}
+
+	f, err := os.Open(name)
+	if err != nil {
+		return nil, err
+	}
+
+	out := &storkapi.BackupLocation{}
+	if err = yaml.NewYAMLOrJSONDecoder(f, 1024).Decode(out); err != nil {
+		return nil, err
+	}
+
+	return out, nil
+}
+
+func parseS3(backupLocation storkapi.BackupLocationItem) (string, []string, error) {
 	if backupLocation.S3Config == nil {
-		return "", fmt.Errorf("failed to parse s3 config from BackupLocation")
+		return "", nil, fmt.Errorf("failed to parse s3 config from BackupLocation")
 	}
 
-	os.Setenv("AWS_ACCESS_KEY_ID", backupLocation.S3Config.AccessKeyID)
-	os.Setenv("AWS_SECRET_ACCESS_KEY", backupLocation.S3Config.SecretAccessKey)
+	envs := make([]string, 0)
+	envs = append(envs, fmt.Sprintf("AWS_ACCESS_KEY_ID=%s", backupLocation.S3Config.AccessKeyID))
+	envs = append(envs, fmt.Sprintf("AWS_SECRET_ACCESS_KEY=%s", backupLocation.S3Config.SecretAccessKey))
 	if backupLocation.S3Config.Region != "" {
-		os.Setenv("AWS_REGION", backupLocation.S3Config.Region)
+		envs = append(envs, fmt.Sprintf("AWS_REGION=%s", backupLocation.S3Config.Region))
 	}
 
-	bucketName := path.Join(backupLocation.S3Config.Endpoint, backupLocation.Path)
-	return "s3:" + bucketName, nil
+	return fmt.Sprintf("s3:%s/%s", backupLocation.S3Config.Endpoint, backupLocation.Path), envs, nil
 }
 
-func parseAzure(backupLocation stork_api.BackupLocationItem) (string, error) {
+func parseAzure(backupLocation storkapi.BackupLocationItem) (string, []string, error) {
 	if backupLocation.AzureConfig == nil {
-		return "", fmt.Errorf("failed to parse azure config from BackupLocation")
+		return "", nil, fmt.Errorf("failed to parse azure config from BackupLocation")
 	}
-	os.Setenv("AZURE_ACCOUNT_NAME", backupLocation.AzureConfig.StorageAccountName)
-	os.Setenv("AZURE_ACCOUNT_KEY", backupLocation.AzureConfig.StorageAccountKey)
-	return "azure:" + backupLocation.Path + "/", nil
+	envs := make([]string, 0)
+	envs = append(envs, fmt.Sprintf("AZURE_ACCOUNT_NAME=%s", backupLocation.AzureConfig.StorageAccountName))
+	envs = append(envs, fmt.Sprintf("AZURE_ACCOUNT_KEY=%s", backupLocation.AzureConfig.StorageAccountKey))
+	return "azure:" + backupLocation.Path + "/", envs, nil
 }
 
-func parseGce(backupLocation stork_api.BackupLocationItem) (string, error) {
+func parseGce(backupLocation storkapi.BackupLocationItem) (string, []string, error) {
 	if backupLocation.GoogleConfig == nil {
-		return "", fmt.Errorf("failed to parse google config from BackupLocation")
+		return "", nil, fmt.Errorf("failed to parse google config from BackupLocation")
 	}
 
 	if err := ioutil.WriteFile(
@@ -67,11 +86,12 @@ func parseGce(backupLocation stork_api.BackupLocationItem) (string, error) {
 		[]byte(backupLocation.GoogleConfig.AccountKey),
 		0644,
 	); err != nil {
-		return "", fmt.Errorf("failed to parse google account key: %v", err)
+		return "", nil, fmt.Errorf("failed to parse google account key: %v", err)
 	}
 
-	os.Setenv("GOOGLE_PROJECT_ID", backupLocation.GoogleConfig.ProjectID)
-	os.Setenv("GOOGLE_APPLICATION_CREDENTIALS", googleAccountFilePath)
+	envs := make([]string, 0)
+	envs = append(envs, fmt.Sprintf("GOOGLE_PROJECT_ID=%s", backupLocation.GoogleConfig.ProjectID))
+	envs = append(envs, fmt.Sprintf("GOOGLE_APPLICATION_CREDENTIALS=%s", googleAccountFilePath))
 
-	return "gs:" + backupLocation.Path + "/", nil
+	return "gs:" + backupLocation.Path + "/", envs, nil
 }

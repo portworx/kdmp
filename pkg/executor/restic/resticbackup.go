@@ -11,19 +11,19 @@ import (
 )
 
 const (
-	progressCheckInterval = 1 * time.Minute
+	progressCheckInterval = 5 * time.Second
 )
 
 func newBackupCommand() *cobra.Command {
 	var (
-		backupLocationName string
-		sourcePath         string
+		sourcePath string
 	)
 	backupCommand := &cobra.Command{
 		Use:   "backup",
 		Short: "Start a restic backup",
 		Run: func(c *cobra.Command, args []string) {
-			if len(backupLocationName) == 0 {
+			// TODO: use both backupLocationName and backupLocationFile
+			if len(backupLocationFile) == 0 {
 				util.CheckErr(fmt.Errorf("backup-location argument is required for restic backups"))
 				return
 			}
@@ -31,28 +31,50 @@ func newBackupCommand() *cobra.Command {
 				util.CheckErr(fmt.Errorf("source-path argument is required for restic backups"))
 				return
 			}
-			runBackup(backupLocationName, sourcePath)
+			runBackup(backupLocationFile, sourcePath)
 		},
 	}
-	backupCommand.Flags().StringVar(&backupLocationName, "backup-location", "", "Name of the BackupLocation object")
 	backupCommand.Flags().StringVar(&sourcePath, "source-path", "", "Source for restic backup")
 	return backupCommand
 }
 
-func runBackup(
-	backupLocationName string,
-	sourcePath string,
-) {
-	if len(dataExportName) == 0 {
-		util.CheckErr(fmt.Errorf("dataexport argument is required for restic backups"))
-		return
-	}
-
-	repositoryName, err := executor.ParseBackupLocation(backupLocationName, namespace)
+func runBackup(backupLocationName string, sourcePath string) {
+	repositoryName, envs, err := executor.ParseBackupLocation(backupLocationName, namespace)
 	if err != nil {
 		//updateDataExportStatusOnError(err)
 		util.CheckErr(err)
 		return
+	}
+
+	initCmd, err := restic.GetInitCommand(repositoryName, secretFilePath)
+	if err != nil {
+		//updateDataExportStatusOnError(err)
+		util.CheckErr(err)
+		return
+	}
+	initCmd.AddEnv(envs)
+	initExecutor := restic.NewInitExecutor(initCmd)
+	if err := initExecutor.Run(); err != nil {
+		err = fmt.Errorf("failed to run backup command: %v", err)
+		//updateDataExportStatusOnError(err)
+		util.CheckErr(err)
+		return
+	}
+	for {
+		time.Sleep(progressCheckInterval)
+		status, err := initExecutor.Status()
+		if err != nil {
+			util.CheckErr(status.LastKnownError)
+			return
+		}
+		//updateDataExportStatus(status)
+		if status.LastKnownError != nil && status.LastKnownError != restic.ErrAlreadyInitialized {
+			util.CheckErr(status.LastKnownError)
+			return
+		}
+		if status.Done {
+			break
+		}
 	}
 
 	backupCmd, err := restic.GetBackupCommand(repositoryName, secretFilePath, sourcePath)
@@ -61,6 +83,7 @@ func runBackup(
 		util.CheckErr(err)
 		return
 	}
+	backupCmd.AddEnv(envs)
 	backupExecutor := restic.NewBackupExecutor(backupCmd)
 	if err := backupExecutor.Run(); err != nil {
 		err = fmt.Errorf("failed to run backup command: %v", err)
@@ -70,8 +93,16 @@ func runBackup(
 	}
 	for {
 		time.Sleep(progressCheckInterval)
-		status, _ := backupExecutor.Status()
+		status, err := backupExecutor.Status()
+		if err != nil {
+			util.CheckErr(status.LastKnownError)
+			return
+		}
 		//updateDataExportStatus(status)
+		if status.LastKnownError != nil {
+			util.CheckErr(status.LastKnownError)
+			return
+		}
 		if status.Done {
 			return
 		}
