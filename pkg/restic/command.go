@@ -62,7 +62,9 @@ func (c *Command) Cmd() *exec.Cmd {
 	// Get the cmd args
 	argsSlice = append(argsSlice, c.Args...)
 	cmd := exec.Command(baseCmd, argsSlice...)
-	cmd.Env = append(os.Environ(), c.Env...)
+	if len(c.Env) > 0 {
+		cmd.Env = append(os.Environ(), c.Env...)
+	}
 	return cmd
 }
 
