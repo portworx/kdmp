@@ -14,6 +14,9 @@ DOCKER_KDMP_TAG?=latest
 DOCKER_IMAGE=$(DOCKER_IMAGE_REPO)/$(DOCKER_IMAGE_NAME):$(DOCKER_IMAGE_TAG)
 KDMP_UNITTEST_IMG=$(DOCKER_IMAGE_REPO)/$(DOCKER_KDMP_UNITTEST_IMAGE):$(DOCKER_KDMP_TAG)
 
+RESTICEXECUTOR_DOCKER_IMAGE_NAME=resticexecutor
+RESTICEXECUTOR_DOCKER_IMAGE=$(DOCKER_IMAGE_REPO)/$(RESTICEXECUTOR_DOCKER_IMAGE_NAME):$(DOCKER_IMAGE_TAG)
+
 export GO111MODULE=on
 export GOFLAGS = -mod=vendor
 
@@ -52,8 +55,12 @@ unittest:
 	done
 
 restic:
-	@echo "Building restic_executor"
-	@go build -o $(BIN)/restic_executor $(BASE_DIR)/cmd/executor/restic.go
+	@echo "Building resticexecutor"
+	@go build -o $(BIN)/resticexecutor $(BASE_DIR)/cmd/executor/restic.go
+
+restic-container:
+	@echo "Building resticexecutor docker image"
+	docker build --tag $(RESTICEXECUTOR_DOCKER_IMAGE) -f Dockerfile.resticexecutor .
 
 lint:
 	GO111MODULE=off go get -u golang.org/x/lint/golint

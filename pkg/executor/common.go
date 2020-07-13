@@ -16,8 +16,8 @@ const (
 )
 
 // ParseBackupLocation parses the provided backup location and returns the repository name
-func ParseBackupLocation(backupLocationName, namespace string) (string, []string, error) {
-	backupLocation, err := readBackupLocation(backupLocationName, namespace)
+func ParseBackupLocation(name, namespace, filePath string) (string, []string, error) {
+	backupLocation, err := readBackupLocation(name, namespace, filePath)
 	if err != nil {
 		return "", nil, err
 	}
@@ -33,12 +33,15 @@ func ParseBackupLocation(backupLocationName, namespace string) (string, []string
 	return "", nil, fmt.Errorf("unsupported backup location: %v", backupLocation.Location.Type)
 }
 
-func readBackupLocation(name, namespace string) (*storkapi.BackupLocation, error) {
-	if namespace != "" {
+func readBackupLocation(name, namespace, filePath string) (*storkapi.BackupLocation, error) {
+	if name != "" {
+		if namespace == "" {
+			namespace = "default"
+		}
 		return storkops.Instance().GetBackupLocation(name, namespace)
 	}
 
-	f, err := os.Open(name)
+	f, err := os.Open(filePath)
 	if err != nil {
 		return nil, err
 	}

@@ -38,7 +38,7 @@ func TestGetRestoreCommand(t *testing.T) {
 			repo:        "test",
 			dstPath:     "dst/path",
 			secretPath:  "secret/path",
-			expectedCmd: exec.Command("restic", "restore", "--repo", "test", "--password-file", "secret/path", "--host", "kdmp", "--json", "--target", "dst/path", "latest"),
+			expectedCmd: exec.Command("restic", "restore", "--repo", "test", "--password-file", "secret/path", "--host", "kdmp", "--json", "--target", ".", "latest"),
 		},
 		{
 			name:        "custom snapshot id",
@@ -46,12 +46,15 @@ func TestGetRestoreCommand(t *testing.T) {
 			dstPath:     "dst/path",
 			secretPath:  "secret/path",
 			snapshotID:  "customID",
-			expectedCmd: exec.Command("restic", "restore", "--repo", "test", "--password-file", "secret/path", "--host", "kdmp", "--json", "--target", "dst/path", "customID"),
+			expectedCmd: exec.Command("restic", "restore", "--repo", "test", "--password-file", "secret/path", "--host", "kdmp", "--json", "--target", ".", "customID"),
 		},
 	}
 
 	for _, tc := range testCases {
 		restore, err := GetRestoreCommand(tc.repo, tc.snapshotID, tc.secretPath, tc.dstPath)
+		if tc.expectedCmd != nil {
+			tc.expectedCmd.Dir = tc.dstPath
+		}
 
 		require.Equalf(t, tc.expectedErr, err, "TC: %s", tc.name)
 		if err == nil {

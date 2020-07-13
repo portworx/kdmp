@@ -35,19 +35,22 @@ func TestGetBackupCommand(t *testing.T) {
 	require.NoError(t, err, "unexpected error on GetBackupCommand")
 
 	actualCmd := cmd.Cmd()
-	expectedCmd := exec.Command("restic", "backup", "--repo", "foo", "--password-file", "bar", "--host", "kdmp", "--json", "src")
+	expectedCmd := exec.Command("restic", "backup", "--repo", "foo", "--password-file", "bar", "--host", "kdmp", "--json", ".")
+	expectedCmd.Dir = "src"
 	require.Equal(t, actualCmd, expectedCmd, "unexpected command parsed")
 
 	cmd.AddArg("arg1")
 
 	actualCmd = cmd.Cmd()
-	expectedCmd = exec.Command("restic", "backup", "--repo", "foo", "--password-file", "bar", "--host", "kdmp", "--json", "src", "arg1")
+	expectedCmd = exec.Command("restic", "backup", "--repo", "foo", "--password-file", "bar", "--host", "kdmp", "--json", ".", "arg1")
+	expectedCmd.Dir = "src"
 	require.Equal(t, actualCmd, expectedCmd, "unexpected command parsed")
 
 	cmd.AddFlag("--flag").AddFlag("flag1")
 
 	actualCmd = cmd.Cmd()
-	expectedCmd = exec.Command("restic", "backup", "--repo", "foo", "--password-file", "bar", "--host", "kdmp", "--json", "--flag", "flag1", "src", "arg1")
+	expectedCmd = exec.Command("restic", "backup", "--repo", "foo", "--password-file", "bar", "--host", "kdmp", "--json", "--flag", "flag1", ".", "arg1")
+	expectedCmd.Dir = "src"
 	require.Equal(t, actualCmd, expectedCmd, "unexpected command parsed")
 
 }

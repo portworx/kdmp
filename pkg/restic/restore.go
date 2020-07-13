@@ -32,12 +32,13 @@ func GetRestoreCommand(
 		snapshotID = SnapshotIDLatest
 	}
 
-	flags := []string{"--target", dstPath}
+	flags := []string{"--target", "."}
 
 	return &Command{
 		Name:           "restore",
 		RepositoryName: repoName,
 		SecretFilePath: secretFilePath,
+		Dir:            dstPath,
 		Flags:          append(defaultFlags(), flags...),
 		Args:           []string{snapshotID},
 	}, nil
@@ -49,35 +50,11 @@ func GetRestoreCommand(
 // TODO: restic provides no progress info for a restore process now:
 //       https://github.com/restic/restic/issues/1154
 type RestoreProgressResponse struct {
-	MessageType      string   `json:"message_type"` // "status"
-	SecondsElapsed   uint64   `json:"seconds_elapsed,omitempty"`
-	SecondsRemaining uint64   `json:"seconds_remaining,omitempty"`
-	PercentDone      float64  `json:"percent_done"`
-	TotalFiles       uint64   `json:"total_files,omitempty"`
-	FilesDone        uint64   `json:"files_done,omitempty"`
-	TotalBytes       uint64   `json:"total_bytes,omitempty"`
-	BytesDone        uint64   `json:"bytes_done,omitempty"`
-	ErrorCount       uint     `json:"error_count,omitempty"`
-	CurrentFiles     []string `json:"current_files,omitempty"`
 }
 
 // RestoreSummaryResponse is the json representation of the summary output
 // of restic restore
 type RestoreSummaryResponse struct {
-	MessageType         string  `json:"message_type"` // "summary"
-	FilesNew            uint    `json:"files_new"`
-	FilesChanged        uint    `json:"files_changed"`
-	FilesUnmodified     uint    `json:"files_unmodified"`
-	DirsNew             uint    `json:"dirs_new"`
-	DirsChanged         uint    `json:"dirs_changed"`
-	DirsUnmodified      uint    `json:"dirs_unmodified"`
-	DataBlobs           int     `json:"data_blobs"`
-	TreeBlobs           int     `json:"tree_blobs"`
-	DataAdded           uint64  `json:"data_added"`
-	TotalFilesProcessed uint    `json:"total_files_processed"`
-	TotalBytesProcessed uint64  `json:"total_bytes_processed"`
-	TotalDuration       float64 `json:"total_duration"` // in seconds
-	SnapshotID          string  `json:"snapshot_id"`
 }
 
 type restoreExecutor struct {
@@ -125,6 +102,9 @@ func (b *restoreExecutor) Run() error {
 		defer b.responseLock.Unlock()
 		if err != nil {
 			b.lastError = fmt.Errorf("failed to run the restore command: %v", err)
+			if len(b.errBuf.Bytes()) > 0 {
+				b.lastError = parseStdErr(b.errBuf.Bytes())
+			}
 			return
 		}
 
@@ -153,14 +133,10 @@ func (b *restoreExecutor) Status() (*Status, error) {
 		return &Status{
 			ProgressPercentage: 100,
 			Done:               true,
-			LastKnownError:     nil,
 		}, nil
-	} // else restore is still in progress
+	}
 
-	return &Status{
-		Done:           false,
-		LastKnownError: nil,
-	}, nil
+	return &Status{}, nil
 }
 
 func getRestoreSummary(outBytes []byte, errBytes []byte) (*RestoreSummaryResponse, error) {

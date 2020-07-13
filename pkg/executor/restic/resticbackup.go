@@ -22,24 +22,23 @@ func newBackupCommand() *cobra.Command {
 		Use:   "backup",
 		Short: "Start a restic backup",
 		Run: func(c *cobra.Command, args []string) {
-			// TODO: use both backupLocationName and backupLocationFile
-			if len(backupLocationFile) == 0 {
-				util.CheckErr(fmt.Errorf("backup-location argument is required for restic backups"))
+			if len(backupLocationFile) == 0 && len(backupLocationName) == 0 {
+				util.CheckErr(fmt.Errorf("backup-location or backup-location-file has to be provided for restic backups"))
 				return
 			}
 			if len(sourcePath) == 0 {
 				util.CheckErr(fmt.Errorf("source-path argument is required for restic backups"))
 				return
 			}
-			runBackup(backupLocationFile, sourcePath)
+			runBackup(sourcePath)
 		},
 	}
 	backupCommand.Flags().StringVar(&sourcePath, "source-path", "", "Source for restic backup")
 	return backupCommand
 }
 
-func runBackup(backupLocationName string, sourcePath string) {
-	repositoryName, envs, err := executor.ParseBackupLocation(backupLocationName, namespace)
+func runBackup(sourcePath string) {
+	repositoryName, envs, err := executor.ParseBackupLocation(backupLocationName, namespace, backupLocationFile)
 	if err != nil {
 		//updateDataExportStatusOnError(err)
 		util.CheckErr(err)
