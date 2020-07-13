@@ -137,6 +137,9 @@ func parseStdErr(stdErr []byte) error {
 		if bytes.Contains(outLines[i], []byte("Fatal:")) {
 			return fmt.Errorf("error:%s", bytes.TrimLeft(outLines[i], "Fatal:"))
 		}
+		if len(outLines[i]) > 0 {
+			return fmt.Errorf("%s", outLines[i])
+		}
 	}
 	return nil
 }

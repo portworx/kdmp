@@ -51,6 +51,10 @@ unittest:
 		fi; \
 	done
 
+restic:
+	@echo "Building restic_executor"
+	@go build -o $(BIN)/restic_executor $(BASE_DIR)/cmd/executor/restic.go
+
 lint:
 	GO111MODULE=off go get -u golang.org/x/lint/golint
 	for file in $(GO_FILES); do \
