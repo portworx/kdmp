@@ -116,3 +116,5 @@ container:
 
 deploy:
 	docker push $(DOCKER_IMAGE)
+
+release: build container deploy

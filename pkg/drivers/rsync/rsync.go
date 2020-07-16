@@ -13,11 +13,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 )
 
-// Rsync driver label names/keys.
-const (
-	LabelDriver = "kdmp.portworx.com/driver-name"
-)
-
 // Driver is a rsync implementation of the data export interface.
 type Driver struct{}
 
@@ -35,6 +30,10 @@ func (d Driver) StartJob(opts ...drivers.JobOption) (id string, err error) {
 				return "", err
 			}
 		}
+	}
+
+	if err := d.validate(o); err != nil {
+		return "", err
 	}
 
 	rsyncJob, err := jobFor(o.SourcePVCName, o.DestinationPVCName, o.Namespace, o.Labels)
@@ -78,7 +77,18 @@ func (d Driver) JobStatus(id string) (progress int, err error) {
 		return 0, nil
 	}
 
+	if isJobFailed(job) {
+		return -1, fmt.Errorf("transfer is failed, check %s/%s job for details", namespace, name)
+	}
+
 	return drivers.TransferProgressCompleted, nil
+}
+
+func (d Driver) validate(o drivers.JobOpts) error {
+	if strings.TrimSpace(o.DestinationPVCName) == "" {
+		return fmt.Errorf("destination pvc name should be set")
+	}
+	return nil
 }
 
 func jobFor(srcVol, dstVol, namespace string, labels map[string]string) (*batchv1.Job, error) {
@@ -162,13 +172,22 @@ func addJobLabels(labels map[string]string) map[string]string {
 		labels = make(map[string]string)
 	}
 
-	labels[LabelDriver] = drivers.Rsync
+	labels[drivers.DriverNameLabel] = drivers.Rsync
 	return labels
 }
 
 func isJobCompleted(j *batchv1.Job) bool {
 	for _, c := range j.Status.Conditions {
 		if c.Type == batchv1.JobComplete && c.Status == corev1.ConditionTrue {
+			return true
+		}
+	}
+	return false
+}
+
+func isJobFailed(j *batchv1.Job) bool {
+	for _, c := range j.Status.Conditions {
+		if c.Type == batchv1.JobFailed && c.Status == corev1.ConditionTrue {
 			return true
 		}
 	}

@@ -2,7 +2,13 @@ package drivers
 
 // Known drivers.
 const (
-	Rsync = "rsync"
+	Rsync        = "rsync"
+	ResticBackup = "resticbackup"
+)
+
+// Driver labels.
+const (
+	DriverNameLabel = "kdmp.portworx.com/driver-name"
 )
 
 const (
