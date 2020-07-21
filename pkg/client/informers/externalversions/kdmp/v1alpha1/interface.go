@@ -16,6 +16,8 @@ import (
 type Interface interface {
 	// DataExports returns a DataExportInformer.
 	DataExports() DataExportInformer
+	// VolumeBackups returns a VolumeBackupInformer.
+	VolumeBackups() VolumeBackupInformer
 }
 
 type version struct {
@@ -32,4 +34,9 @@ func New(f internalinterfaces.SharedInformerFactory, namespace string, tweakList
 // DataExports returns a DataExportInformer.
 func (v *version) DataExports() DataExportInformer {
 	return &dataExportInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
+}
+
+// VolumeBackups returns a VolumeBackupInformer.
+func (v *version) VolumeBackups() VolumeBackupInformer {
+	return &volumeBackupInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }

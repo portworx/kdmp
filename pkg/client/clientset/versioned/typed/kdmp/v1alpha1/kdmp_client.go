@@ -17,6 +17,7 @@ import (
 type KdmpV1alpha1Interface interface {
 	RESTClient() rest.Interface
 	DataExportsGetter
+	VolumeBackupsGetter
 }
 
 // KdmpV1alpha1Client is used to interact with features provided by the kdmp.portworx.com group.
@@ -26,6 +27,10 @@ type KdmpV1alpha1Client struct {
 
 func (c *KdmpV1alpha1Client) DataExports(namespace string) DataExportInterface {
 	return newDataExports(c, namespace)
+}
+
+func (c *KdmpV1alpha1Client) VolumeBackups(namespace string) VolumeBackupInterface {
+	return newVolumeBackups(c, namespace)
 }
 
 // NewForConfig creates a new KdmpV1alpha1Client for the given config.
