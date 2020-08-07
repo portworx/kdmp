@@ -27,7 +27,7 @@ func newRestoreCommand() *cobra.Command {
 				util.CheckErr(fmt.Errorf("target-path argument is required for restic backups"))
 				return
 			}
-			runRestore(snapshotID, targetPath)
+			handleErr(runRestore(snapshotID, targetPath))
 		},
 	}
 	restoreCommand.Flags().StringVar(&targetPath, "target-path", "", "Destination path for restic restore backup")
@@ -35,38 +35,35 @@ func newRestoreCommand() *cobra.Command {
 	return restoreCommand
 }
 
-func runRestore(snapshotID, targetPath string) {
-	repositoryName, env, err := executor.ParseBackupLocation(backupLocationName, namespace, backupLocationFile)
+func runRestore(snapshotID, targetPath string) error {
+	repo, err := executor.ParseBackupLocation(resticRepo, backupLocationName, namespace, backupLocationFile)
 	if err != nil {
-		util.CheckErr(err)
-		return
+		return err
 	}
 
-	backupCmd, err := restic.GetRestoreCommand(repositoryName, snapshotID, secretFilePath, targetPath)
+	backupCmd, err := restic.GetRestoreCommand(repo.Path, snapshotID, secretFilePath, targetPath)
 	if err != nil {
-		util.CheckErr(err)
-		return
+		return err
 	}
-	backupCmd.AddEnv(env)
+	backupCmd.AddEnv(repo.AuthEnv)
 	backupExecutor := restic.NewRestoreExecutor(backupCmd)
 	if err := backupExecutor.Run(); err != nil {
 		err = fmt.Errorf("failed to run backup command: %v", err)
-		util.CheckErr(err)
-		return
+		return err
 	}
 	for {
 		time.Sleep(progressCheckInterval)
 		status, err := backupExecutor.Status()
 		if err != nil {
-			util.CheckErr(status.LastKnownError)
-			return
+			return err
 		}
 		if status.LastKnownError != nil {
-			util.CheckErr(status.LastKnownError)
-			return
+			return status.LastKnownError
 		}
 		if status.Done {
-			return
+			break
 		}
 	}
+
+	return nil
 }

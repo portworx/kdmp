@@ -8,7 +8,7 @@ const (
 	// VolumeBackupResourceName is name for the VolumeBackup resource.
 	VolumeBackupResourceName = "volumebackup"
 	// VolumeBackupResourcePlural is the name for list of VolumeBackup resources.
-	VolumeBackupResourcePlural = "volumebackup"
+	VolumeBackupResourcePlural = "volumebackups"
 )
 
 // +genclient
@@ -19,7 +19,7 @@ type VolumeBackup struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 	Spec              VolumeBackupSpec   `json:"spec"`
-	Status            VolumeBackupStatus `json:"status"`
+	Status            VolumeBackupStatus `json:"status,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

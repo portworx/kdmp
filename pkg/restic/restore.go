@@ -3,6 +3,7 @@ package restic
 import (
 	"bytes"
 	"fmt"
+	"os"
 	"os/exec"
 	"sync"
 )
@@ -123,6 +124,7 @@ func (b *restoreExecutor) Status() (*Status, error) {
 	defer b.responseLock.Unlock()
 
 	if b.lastError != nil {
+		fmt.Fprintln(os.Stderr, b.errBuf.String())
 		return &Status{
 			LastKnownError: b.lastError,
 			Done:           true,

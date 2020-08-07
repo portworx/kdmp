@@ -15,22 +15,32 @@ const (
 	googleAccountFilePath = "/root/.gce_credentials"
 )
 
+// Repository contains information used to connect the repository.
+type Repository struct {
+	// Name is a repository name without an url address.
+	Name string
+	// Path is a full repository name.
+	Path string
+	// AuthEnv is a set of environment variables used for authentication.
+	AuthEnv []string
+}
+
 // ParseBackupLocation parses the provided backup location and returns the repository name
-func ParseBackupLocation(name, namespace, filePath string) (string, []string, error) {
+func ParseBackupLocation(repoName, name, namespace, filePath string) (*Repository, error) {
 	backupLocation, err := readBackupLocation(name, namespace, filePath)
 	if err != nil {
-		return "", nil, err
+		return nil, err
 	}
 
 	switch backupLocation.Location.Type {
 	case storkapi.BackupLocationS3:
-		return parseS3(backupLocation.Location)
+		return parseS3(repoName, backupLocation.Location)
 	case storkapi.BackupLocationAzure:
-		return parseAzure(backupLocation.Location)
+		return parseAzure(repoName, backupLocation.Location)
 	case storkapi.BackupLocationGoogle:
-		return parseGce(backupLocation.Location)
+		return parseGce(repoName, backupLocation.Location)
 	}
-	return "", nil, fmt.Errorf("unsupported backup location: %v", backupLocation.Location.Type)
+	return nil, fmt.Errorf("unsupported backup location: %v", backupLocation.Location.Type)
 }
 
 func readBackupLocation(name, namespace, filePath string) (*storkapi.BackupLocation, error) {
@@ -54,9 +64,9 @@ func readBackupLocation(name, namespace, filePath string) (*storkapi.BackupLocat
 	return out, nil
 }
 
-func parseS3(backupLocation storkapi.BackupLocationItem) (string, []string, error) {
+func parseS3(repoName string, backupLocation storkapi.BackupLocationItem) (*Repository, error) {
 	if backupLocation.S3Config == nil {
-		return "", nil, fmt.Errorf("failed to parse s3 config from BackupLocation")
+		return nil, fmt.Errorf("failed to parse s3 config from BackupLocation")
 	}
 
 	envs := make([]string, 0)
@@ -66,22 +76,37 @@ func parseS3(backupLocation storkapi.BackupLocationItem) (string, []string, erro
 		envs = append(envs, fmt.Sprintf("AWS_REGION=%s", backupLocation.S3Config.Region))
 	}
 
-	return fmt.Sprintf("s3:%s/%s", backupLocation.S3Config.Endpoint, backupLocation.Path), envs, nil
+	if repoName == "" {
+		repoName = backupLocation.Path
+	}
+	return &Repository{
+		Name:    repoName,
+		Path:    fmt.Sprintf("s3:%s/%s", backupLocation.S3Config.Endpoint, repoName),
+		AuthEnv: envs,
+	}, nil
 }
 
-func parseAzure(backupLocation storkapi.BackupLocationItem) (string, []string, error) {
+func parseAzure(repoName string, backupLocation storkapi.BackupLocationItem) (*Repository, error) {
 	if backupLocation.AzureConfig == nil {
-		return "", nil, fmt.Errorf("failed to parse azure config from BackupLocation")
+		return nil, fmt.Errorf("failed to parse azure config from BackupLocation")
 	}
 	envs := make([]string, 0)
 	envs = append(envs, fmt.Sprintf("AZURE_ACCOUNT_NAME=%s", backupLocation.AzureConfig.StorageAccountName))
 	envs = append(envs, fmt.Sprintf("AZURE_ACCOUNT_KEY=%s", backupLocation.AzureConfig.StorageAccountKey))
-	return "azure:" + backupLocation.Path + "/", envs, nil
+
+	if repoName == "" {
+		repoName = backupLocation.Path
+	}
+	return &Repository{
+		Name:    repoName,
+		Path:    "azure:" + repoName + "/",
+		AuthEnv: envs,
+	}, nil
 }
 
-func parseGce(backupLocation storkapi.BackupLocationItem) (string, []string, error) {
+func parseGce(repoName string, backupLocation storkapi.BackupLocationItem) (*Repository, error) {
 	if backupLocation.GoogleConfig == nil {
-		return "", nil, fmt.Errorf("failed to parse google config from BackupLocation")
+		return nil, fmt.Errorf("failed to parse google config from BackupLocation")
 	}
 
 	if err := ioutil.WriteFile(
@@ -89,12 +114,19 @@ func parseGce(backupLocation storkapi.BackupLocationItem) (string, []string, err
 		[]byte(backupLocation.GoogleConfig.AccountKey),
 		0644,
 	); err != nil {
-		return "", nil, fmt.Errorf("failed to parse google account key: %v", err)
+		return nil, fmt.Errorf("failed to parse google account key: %v", err)
 	}
 
 	envs := make([]string, 0)
 	envs = append(envs, fmt.Sprintf("GOOGLE_PROJECT_ID=%s", backupLocation.GoogleConfig.ProjectID))
 	envs = append(envs, fmt.Sprintf("GOOGLE_APPLICATION_CREDENTIALS=%s", googleAccountFilePath))
 
-	return "gs:" + backupLocation.Path + "/", envs, nil
+	if repoName == "" {
+		repoName = backupLocation.Path
+	}
+	return &Repository{
+		Name:    repoName,
+		Path:    "gs:" + repoName + "/",
+		AuthEnv: envs,
+	}, nil
 }
