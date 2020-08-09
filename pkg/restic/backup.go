@@ -29,8 +29,9 @@ func GetBackupCommand(
 		Name:           "backup",
 		RepositoryName: repoName,
 		SecretFilePath: secretFilePath,
+		Dir:            srcPath,
 		Flags:          defaultFlags(),
-		Args:           []string{srcPath},
+		Args:           []string{"."},
 	}, nil
 }
 
@@ -113,6 +114,9 @@ func (b *backupExecutor) Run() error {
 		defer b.responseLock.Unlock()
 		if err != nil {
 			b.lastError = fmt.Errorf("failed to run the backup command: %v", err)
+			if err = parseStdErr(b.errBuf.Bytes()); err != nil {
+				b.lastError = err
+			}
 			return
 		}
 

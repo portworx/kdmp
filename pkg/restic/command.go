@@ -20,6 +20,8 @@ type Command struct {
 	// SecretFilePath is the file path which has the password
 	// for the restic repository.
 	SecretFilePath string
+	// Dir specifies the working directory of the command.
+	Dir string
 	// Args is a list of arguments to the restic command.
 	Args []string
 	// Flags is a list of flags provided to the restic command.
@@ -65,6 +67,7 @@ func (c *Command) Cmd() *exec.Cmd {
 	if len(c.Env) > 0 {
 		cmd.Env = append(os.Environ(), c.Env...)
 	}
+	cmd.Dir = c.Dir
 	return cmd
 }
 
