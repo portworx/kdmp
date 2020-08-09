@@ -15,6 +15,8 @@ type JobOpts struct {
 	Namespace               string
 	BackupLocationName      string
 	BackupLocationNamespace string
+	VolumeBackupName        string
+	VolumeBackupNamespace   string
 	Labels                  map[string]string
 }
 
@@ -60,6 +62,22 @@ func WithBackupLocationName(name string) JobOption {
 func WithBackupLocationNamespace(ns string) JobOption {
 	return func(opts *JobOpts) error {
 		opts.BackupLocationNamespace = strings.TrimSpace(ns)
+		return nil
+	}
+}
+
+// WithVolumeBackupName is job parameter.
+func WithVolumeBackupName(name string) JobOption {
+	return func(opts *JobOpts) error {
+		opts.VolumeBackupName = strings.TrimSpace(name)
+		return nil
+	}
+}
+
+// WithVolumeBackupNamespace is job parameter.
+func WithVolumeBackupNamespace(ns string) JobOption {
+	return func(opts *JobOpts) error {
+		opts.VolumeBackupNamespace = strings.TrimSpace(ns)
 		return nil
 	}
 }

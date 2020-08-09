@@ -1,11 +1,10 @@
-package resticbackup
+package resticrestore
 
 import (
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
 
 	"github.com/portworx/kdmp/pkg/drivers"
 	"github.com/portworx/kdmp/pkg/drivers/utils"
@@ -18,12 +17,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// Driver is a resticbackup implementation of the data export interface.
+// Driver is a resticrestore implementation of the data export interface.
 type Driver struct{}
 
 // Name returns a name of the driver.
 func (d Driver) Name() string {
-	return drivers.ResticBackup
+	return drivers.ResticRestore
 }
 
 // StartJob creates a job for data transfer between volumes.
@@ -41,26 +40,31 @@ func (d Driver) StartJob(opts ...drivers.JobOption) (id string, err error) {
 		return "", err
 	}
 
-	genName := toJobName(o.SourcePVCName)
+	vb, err := kdmpops.Instance().GetVolumeBackup(o.VolumeBackupName, o.VolumeBackupNamespace)
+	if err != nil {
+		return "", err
+	}
 
+	resticSecretName := toJobName(o.SourcePVCName)
 	if _, err := coreops.Instance().CreateSecret(&corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      genName,
+			Name:      resticSecretName,
 			Namespace: o.Namespace,
 		},
 		StringData: map[string]string{
 			drivers.SecretKey: drivers.SecretValue,
 		},
 	}); err != nil && !apierrors.IsAlreadyExists(err) {
-		return "", fmt.Errorf("create a secret for a restic password: %s", err)
+		return "", fmt.Errorf("create a secret with a restic password: %s", err)
 	}
 
 	job, err := jobFor(
-		genName,
 		o.Namespace,
-		o.SourcePVCName,
-		o.BackupLocationName,
-		o.BackupLocationNamespace,
+		o.DestinationPVCName,
+		vb.Spec.BackupLocation.Name,
+		vb.Spec.BackupLocation.Namespace,
+		vb.Spec.Repository,
+		resticSecretName,
 		o.Labels)
 	if err != nil {
 		return "", err
@@ -105,32 +109,31 @@ func (d Driver) JobStatus(id string) (*drivers.JobStatus, error) {
 		errMsg := fmt.Sprintf("check %s/%s job for details: %s", namespace, name, drivers.ErrJobFailed)
 		return utils.ToJobStatus(0, errMsg), nil
 	}
-
-	// restic executor updates a volumebackup object with a progress details
-	vb, err := kdmpops.Instance().GetVolumeBackup(name, namespace)
-	if err != nil {
-		return nil, err
+	if !utils.IsJobCompleted(job) {
+		// TODO: update progress
+		return utils.ToJobStatus(0, ""), nil
 	}
 
-	return utils.ToJobStatus(vb.Status.ProgressPercentage, vb.Status.LastKnownError), nil
+	return utils.ToJobStatus(drivers.TransferProgressCompleted, ""), nil
 }
 
 func (d Driver) validate(o drivers.JobOpts) error {
-	if o.BackupLocationName == "" {
-		return fmt.Errorf("backuplocation name should be set")
+	if o.VolumeBackupName == "" {
+		return fmt.Errorf("volumebackup name should be set")
 	}
-	if o.BackupLocationNamespace == "" {
-		return fmt.Errorf("backuplocation namespace should be set")
+	if o.VolumeBackupNamespace == "" {
+		return fmt.Errorf("volumebackup namespace should be set")
 	}
 	return nil
 }
 
 func jobFor(
-	genName,
 	namespace,
 	pvcName,
 	backuplocationName,
-	backuplocationNamespace string,
+	backuplocationNamespace,
+	repository,
+	secretName string,
 	labels map[string]string) (*batchv1.Job, error) {
 	labels = addJobLabels(labels)
 
@@ -144,24 +147,22 @@ func jobFor(
 
 	cmd := strings.Join([]string{
 		"/resticexecutor",
-		"backup",
+		"restore",
 		"--backup-location",
 		backuplocationName,
 		"--namespace",
 		backuplocationNamespace,
-		"--volume-backup-name",
-		genName,
 		"--repository",
-		toRepoName(pvcName, namespace),
+		repository,
 		"--secret-file-path",
 		filepath.Join(drivers.SecretMount, drivers.SecretKey),
-		"--source-path",
+		"--target-path",
 		"/data",
 	}, " ")
 
 	return &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      genName,
+			Name:      toJobName(pvcName),
 			Namespace: namespace,
 			Labels:    labels,
 		},
@@ -209,7 +210,7 @@ func jobFor(
 							Name: "secret",
 							VolumeSource: corev1.VolumeSource{
 								Secret: &corev1.SecretVolumeSource{
-									SecretName: genName,
+									SecretName: secretName,
 								},
 							},
 						},
@@ -221,11 +222,7 @@ func jobFor(
 }
 
 func toJobName(id string) string {
-	return fmt.Sprintf("resticbackup-%s-%d", id, time.Now().Unix())
-}
-
-func toRepoName(pvcName, pvcNamespace string) string {
-	return fmt.Sprintf("restic/%s-%s", pvcNamespace, pvcName)
+	return fmt.Sprintf("resticrestore-%s", id)
 }
 
 func addJobLabels(labels map[string]string) map[string]string {
@@ -233,6 +230,6 @@ func addJobLabels(labels map[string]string) map[string]string {
 		labels = make(map[string]string)
 	}
 
-	labels[drivers.DriverNameLabel] = drivers.ResticBackup
+	labels[drivers.DriverNameLabel] = drivers.ResticRestore
 	return labels
 }
