@@ -10,10 +10,12 @@ type JobOption func(opts *JobOpts) error
 
 // JobOpts defines all job parameters.
 type JobOpts struct {
-	SourcePVCName      string
-	DestinationPVCName string
-	Namespace          string
-	Labels             map[string]string
+	SourcePVCName           string
+	DestinationPVCName      string
+	Namespace               string
+	BackupLocationName      string
+	BackupLocationNamespace string
+	Labels                  map[string]string
 }
 
 // WithSourcePVC is job parameter.
@@ -22,7 +24,7 @@ func WithSourcePVC(name string) JobOption {
 		if strings.TrimSpace(name) == "" {
 			return fmt.Errorf("source pvc name should be set")
 		}
-		opts.SourcePVCName = name
+		opts.SourcePVCName = strings.TrimSpace(name)
 		return nil
 	}
 }
@@ -30,10 +32,7 @@ func WithSourcePVC(name string) JobOption {
 // WithDestinationPVC is job parameter.
 func WithDestinationPVC(name string) JobOption {
 	return func(opts *JobOpts) error {
-		if strings.TrimSpace(name) == "" {
-			return fmt.Errorf("destination pvc name should be set")
-		}
-		opts.DestinationPVCName = name
+		opts.DestinationPVCName = strings.TrimSpace(name)
 		return nil
 	}
 }
@@ -44,7 +43,23 @@ func WithNamespace(ns string) JobOption {
 		if strings.TrimSpace(ns) == "" {
 			return fmt.Errorf("namespace should be set")
 		}
-		opts.Namespace = ns
+		opts.Namespace = strings.TrimSpace(ns)
+		return nil
+	}
+}
+
+// WithBackupLocationName is job parameter.
+func WithBackupLocationName(name string) JobOption {
+	return func(opts *JobOpts) error {
+		opts.BackupLocationName = strings.TrimSpace(name)
+		return nil
+	}
+}
+
+// WithBackupLocationNamespace is job parameter.
+func WithBackupLocationNamespace(ns string) JobOption {
+	return func(opts *JobOpts) error {
+		opts.BackupLocationNamespace = strings.TrimSpace(ns)
 		return nil
 	}
 }

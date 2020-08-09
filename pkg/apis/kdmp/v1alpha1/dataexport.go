@@ -18,6 +18,9 @@ const (
 	// DataExportRsync means that data will be copied between two PVCs directly.
 	// Rsync supports both local and remote file copy.
 	DataExportRsync DataExportType = "rsync"
+	// DataExportRestic means that data will be backed up to or restored from a restic
+	// repository.
+	DataExportRestic DataExportType = "restic"
 )
 
 // DataExportStatus defines a status of DataExport.

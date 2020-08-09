@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"reflect"
 
+	storkapi "github.com/libopenstorage/stork/pkg/apis/stork/v1alpha1"
 	"github.com/libopenstorage/stork/pkg/controllers"
 	kdmpapi "github.com/portworx/kdmp/pkg/apis/kdmp/v1alpha1"
 	"github.com/portworx/kdmp/pkg/drivers"
@@ -12,6 +13,7 @@ import (
 	"github.com/portworx/kdmp/pkg/snapshots"
 	"github.com/portworx/kdmp/pkg/snapshots/snapshotsinstance"
 	"github.com/portworx/sched-ops/k8s/core"
+	"github.com/portworx/sched-ops/k8s/stork"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/utils/pointer"
@@ -38,11 +40,11 @@ func (c *Controller) sync(ctx context.Context, in *kdmpapi.DataExport) (bool, er
 	}
 	// TODO: set defaults
 	if dataExport.Spec.Type == "" {
-		dataExport.Spec.Type = drivers.Rsync
+		dataExport.Spec.Type = kdmpapi.DataExportRsync
 	}
 
 	// TODO: validate DataExport resource & update status?
-	driver, err := driversinstance.Get(string(dataExport.Spec.Type))
+	driver, err := driversinstance.Get(getDriverType(dataExport))
 	if err != nil {
 		return false, err
 	}
@@ -67,22 +69,7 @@ func (c *Controller) sync(ctx context.Context, in *kdmpapi.DataExport) (bool, er
 
 	switch dataExport.Status.Stage {
 	case kdmpapi.DataExportStageInitial:
-		if dataExport.Status.Status == kdmpapi.DataExportStatusSuccessful {
-			// set to the next stage
-			dataExport.Status.Stage = kdmpapi.DataExportStageTransferScheduled
-			if hasSnapshotStage(dataExport) {
-				dataExport.Status.Stage = kdmpapi.DataExportStageSnapshotScheduled
-			}
-			return true, c.client.Update(ctx, setStatus(dataExport, kdmpapi.DataExportStatusInitial, ""))
-		}
-
-		// ensure srd/dst volumes are available
-		if err := c.checkClaims(dataExport); err != nil {
-			msg := fmt.Sprintf("failed to check volume claims: %s", err)
-			return false, c.updateStatus(dataExport, kdmpapi.DataExportStatusFailed, msg)
-		}
-
-		return true, c.client.Update(ctx, setStatus(dataExport, kdmpapi.DataExportStatusSuccessful, ""))
+		return c.stageInitial(ctx, snapshotter, dataExport)
 	// TODO: 'merge' scheduled&inProgress&restore stages
 	case kdmpapi.DataExportStageSnapshotScheduled:
 		return c.stageSnapshotScheduled(ctx, snapshotter, dataExport)
@@ -97,9 +84,8 @@ func (c *Controller) sync(ctx context.Context, in *kdmpapi.DataExport) (bool, er
 			return true, c.client.Update(ctx, setStatus(dataExport, kdmpapi.DataExportStatusInitial, ""))
 		}
 
-		srcPVCName := dataExport.Spec.Source.Name
-
 		// use snapshot pvc in the dst namespace if it's available
+		srcPVCName := dataExport.Spec.Source.Name
 		if dataExport.Status.SnapshotPVCName != "" {
 			srcPVCName = dataExport.Status.SnapshotPVCName
 		}
@@ -107,8 +93,12 @@ func (c *Controller) sync(ctx context.Context, in *kdmpapi.DataExport) (bool, er
 		// start data transfer
 		id, err := driver.StartJob(
 			drivers.WithSourcePVC(srcPVCName),
-			drivers.WithDestinationPVC(dataExport.Spec.Destination.Name),
 			drivers.WithNamespace(dataExport.Spec.Destination.Namespace),
+			// pvc will be used in case of a rsync driver
+			drivers.WithDestinationPVC(dataExport.Spec.Destination.Name),
+			// backuplocation will be used in case of a resticbackup driver
+			drivers.WithBackupLocationName(dataExport.Spec.Destination.Name),
+			drivers.WithBackupLocationNamespace(dataExport.Spec.Destination.Namespace),
 			drivers.WithLabels(jobLabels(dataExport.GetName())),
 		)
 		if err != nil {
@@ -153,6 +143,31 @@ func (c *Controller) sync(ctx context.Context, in *kdmpapi.DataExport) (bool, er
 	}
 
 	return false, nil
+}
+
+func (c *Controller) stageInitial(ctx context.Context, snapshotter snapshots.Driver, dataExport *kdmpapi.DataExport) (bool, error) {
+	if dataExport.Status.Status == kdmpapi.DataExportStatusSuccessful {
+		// set to the next stage
+		dataExport.Status.Stage = kdmpapi.DataExportStageTransferScheduled
+		if hasSnapshotStage(dataExport) {
+			dataExport.Status.Stage = kdmpapi.DataExportStageSnapshotScheduled
+		}
+		return true, c.client.Update(ctx, setStatus(dataExport, kdmpapi.DataExportStatusInitial, ""))
+	}
+
+	var err error
+	switch dataExport.Spec.Type {
+	case drivers.Rsync:
+		err = c.checkClaims(dataExport)
+	case drivers.ResticBackup:
+		err = c.checkResticBackup(dataExport)
+	}
+	if err != nil {
+		msg := fmt.Sprintf("failed to check volume claims: %s", err)
+		return false, c.updateStatus(dataExport, kdmpapi.DataExportStatusFailed, msg)
+	}
+
+	return true, c.client.Update(ctx, setStatus(dataExport, kdmpapi.DataExportStatusSuccessful, ""))
 }
 
 func (c *Controller) stageSnapshotScheduled(ctx context.Context, snapshotter snapshots.Driver, dataExport *kdmpapi.DataExport) (bool, error) {
@@ -313,12 +328,12 @@ func (c *Controller) checkClaims(de *kdmpapi.DataExport) error {
 	}
 
 	// ignore a check for mounted pods if a source pvc has a snapshot (data will be copied from the snapshot)
-	srcPVC, err := c.checkPVC(de.Spec.Source, !hasSnapshotStage(de))
+	srcPVC, err := checkPVC(de.Spec.Source, !hasSnapshotStage(de))
 	if err != nil {
 		return fmt.Errorf("source pvc: %v", err)
 	}
 
-	dstPVC, err := c.checkPVC(de.Spec.Destination, true)
+	dstPVC, err := checkPVC(de.Spec.Destination, true)
 	if err != nil {
 		return fmt.Errorf("destination pvc: %v", err)
 	}
@@ -333,9 +348,27 @@ func (c *Controller) checkClaims(de *kdmpapi.DataExport) error {
 	return nil
 }
 
-func (c *Controller) checkPVC(in kdmpapi.DataExportObjectReference, checkMounts bool) (*corev1.PersistentVolumeClaim, error) {
-	if in.Name == "" || in.Namespace == "" {
-		return nil, fmt.Errorf("name and namespace should be provided")
+func (c *Controller) checkResticBackup(de *kdmpapi.DataExport) error {
+	if !isPVCRef(de.Spec.Source) && !isUnknownRef(de.Spec.Source) {
+		return fmt.Errorf("source is expected to be PersistentVolumeClaim")
+	}
+	if _, err := checkPVC(de.Spec.Source, !hasSnapshotStage(de)); err != nil {
+		return fmt.Errorf("source: %s", err)
+	}
+
+	if !isBackupLocationRef(de.Spec.Destination) {
+		return fmt.Errorf("source is expected to be Backuplocation")
+	}
+	if _, err := checkBackupLocation(de.Spec.Destination); err != nil {
+		return fmt.Errorf("destination: %s", err)
+	}
+
+	return nil
+}
+
+func checkPVC(in kdmpapi.DataExportObjectReference, checkMounts bool) (*corev1.PersistentVolumeClaim, error) {
+	if err := checkNameNamespace(in); err != nil {
+		return nil, err
 	}
 	pvc, err := core.Instance().GetPersistentVolumeClaim(in.Name, in.Namespace)
 	if err != nil {
@@ -356,6 +389,13 @@ func (c *Controller) checkPVC(in kdmpapi.DataExportObjectReference, checkMounts 
 	}
 
 	return pvc, nil
+}
+
+func checkBackupLocation(ref kdmpapi.DataExportObjectReference) (*storkapi.BackupLocation, error) {
+	if err := checkNameNamespace(ref); err != nil {
+		return nil, err
+	}
+	return stork.Instance().GetBackupLocation(ref.Name, ref.Namespace)
 }
 
 func toPodNames(objs []corev1.Pod) []string {
@@ -389,4 +429,40 @@ func jobLabels(DataExportName string) map[string]string {
 		LabelController:     DataExportName,
 		LabelControllerName: DataExportName,
 	}
+}
+
+func getDriverType(de *kdmpapi.DataExport) string {
+	switch de.Spec.Type {
+	case kdmpapi.DataExportRsync:
+	case kdmpapi.DataExportRestic:
+		src := de.Spec.Source
+		dst := de.Spec.Destination
+
+		if (isPVCRef(src) || isUnknownRef(src)) && isBackupLocationRef(dst) {
+			return drivers.ResticBackup
+		}
+	}
+	return string(de.Spec.Type)
+}
+
+func isPVCRef(ref kdmpapi.DataExportObjectReference) bool {
+	return ref.Kind == "PersistentVolumeClaim" && ref.APIVersion == "v1"
+}
+
+func isBackupLocationRef(ref kdmpapi.DataExportObjectReference) bool {
+	return ref.Kind == "BackupLocation" && ref.APIVersion == "stork.libopenstorage.org/v1alpha1"
+}
+
+func isUnknownRef(ref kdmpapi.DataExportObjectReference) bool {
+	return ref.Kind == "" && ref.APIVersion == ""
+}
+
+func checkNameNamespace(ref kdmpapi.DataExportObjectReference) error {
+	if ref.Name == "" {
+		return fmt.Errorf("name has to be set")
+	}
+	if ref.Namespace == "" {
+		return fmt.Errorf("namespace has to be set")
+	}
+	return nil
 }

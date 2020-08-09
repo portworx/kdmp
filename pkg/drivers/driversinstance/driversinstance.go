@@ -5,13 +5,15 @@ import (
 	"sync"
 
 	"github.com/portworx/kdmp/pkg/drivers"
+	"github.com/portworx/kdmp/pkg/drivers/resticbackup"
 	"github.com/portworx/kdmp/pkg/drivers/rsync"
 )
 
 var (
 	mu         sync.Mutex
 	driversMap = map[string]drivers.Interface{
-		drivers.Rsync: rsync.Driver{},
+		drivers.Rsync:        rsync.Driver{},
+		drivers.ResticBackup: resticbackup.Driver{},
 	}
 )
 
