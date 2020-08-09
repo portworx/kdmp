@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"os"
 	"os/exec"
 	"sync"
 )
@@ -135,6 +136,7 @@ func (b *backupExecutor) Status() (*Status, error) {
 	defer b.responseLock.Unlock()
 
 	if b.lastError != nil {
+		fmt.Fprintln(os.Stderr, b.errBuf.String())
 		return &Status{
 			LastKnownError: b.lastError,
 			Done:           true,

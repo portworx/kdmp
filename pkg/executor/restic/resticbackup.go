@@ -2,11 +2,17 @@ package restic
 
 import (
 	"fmt"
+	"reflect"
 	"time"
 
+	kdmpapi "github.com/portworx/kdmp/pkg/apis/kdmp/v1alpha1"
 	"github.com/portworx/kdmp/pkg/executor"
 	"github.com/portworx/kdmp/pkg/restic"
+	kdmpops "github.com/portworx/kdmp/pkg/util/ops"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+	"k8s.io/apimachinery/pkg/api/errors"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubectl/pkg/cmd/util"
 )
 
@@ -30,119 +36,172 @@ func newBackupCommand() *cobra.Command {
 				util.CheckErr(fmt.Errorf("source-path argument is required for restic backups"))
 				return
 			}
-			runBackup(sourcePath)
+
+			handleErr(runBackup(sourcePath))
 		},
 	}
 	backupCommand.Flags().StringVar(&sourcePath, "source-path", "", "Source for restic backup")
+	backupCommand.Flags().StringVar(&volumeBackupName, "volume-backup-name", "", "Provided VolumeBackup CRD will be updated with the latest backup progress details")
 	return backupCommand
 }
 
-func runBackup(sourcePath string) {
-	repositoryName, envs, err := executor.ParseBackupLocation(backupLocationName, namespace, backupLocationFile)
+func runBackup(sourcePath string) error {
+	repo, err := executor.ParseBackupLocation(resticRepo, backupLocationName, namespace, backupLocationFile)
 	if err != nil {
-		//updateDataExportStatusOnError(err)
-		util.CheckErr(err)
-		return
+		if statusErr := writeVolumeBackupStatus(&restic.Status{LastKnownError: err}); statusErr != nil {
+			return statusErr
+		}
+		return fmt.Errorf("parse backuplocation: %s", err)
 	}
 
+	if volumeBackupName != "" {
+		if err = createVolumeBackup(volumeBackupName, namespace, repo.Name); err != nil {
+			return err
+		}
+	}
+
+	if err = runResticInit(repo.Path, repo.AuthEnv); err != nil {
+		return fmt.Errorf("run restic init: %s", err)
+	}
+
+	if err = runResticBackup(sourcePath, repo.Path, repo.AuthEnv); err != nil {
+		return fmt.Errorf("run restic backup: %s", err)
+	}
+
+	fmt.Println("Backup has been successfully created")
+	return nil
+}
+
+func runResticInit(repositoryName string, env []string) error {
 	initCmd, err := restic.GetInitCommand(repositoryName, secretFilePath)
 	if err != nil {
-		//updateDataExportStatusOnError(err)
-		util.CheckErr(err)
-		return
+		return err
 	}
-	initCmd.AddEnv(envs)
+	initCmd.AddEnv(env)
 	initExecutor := restic.NewInitExecutor(initCmd)
 	if err := initExecutor.Run(); err != nil {
 		err = fmt.Errorf("failed to run backup command: %v", err)
-		//updateDataExportStatusOnError(err)
-		util.CheckErr(err)
-		return
+		return err
 	}
 	for {
 		time.Sleep(progressCheckInterval)
 		status, err := initExecutor.Status()
 		if err != nil {
-			util.CheckErr(status.LastKnownError)
-			return
+			return err
 		}
-		//updateDataExportStatus(status)
-		if status.LastKnownError != nil && status.LastKnownError != restic.ErrAlreadyInitialized {
-			util.CheckErr(status.LastKnownError)
-			return
+		if status.LastKnownError != nil {
+			if status.LastKnownError != restic.ErrAlreadyInitialized {
+				return status.LastKnownError
+			}
+			status.LastKnownError = nil
+		}
+		if err = writeVolumeBackupStatus(status); err != nil {
+			logrus.Errorf("failed to write a VolumeBackup status: %v", err)
+			continue
 		}
 		if status.Done {
 			break
 		}
 	}
 
+	return nil
+}
+
+func runResticBackup(sourcePath, repositoryName string, env []string) error {
 	backupCmd, err := restic.GetBackupCommand(repositoryName, secretFilePath, sourcePath)
 	if err != nil {
-		//updateDataExportStatusOnError(err)
-		util.CheckErr(err)
-		return
+		return err
 	}
-	backupCmd.AddEnv(envs)
+	backupCmd.AddEnv(env)
 	backupExecutor := restic.NewBackupExecutor(backupCmd)
 	if err := backupExecutor.Run(); err != nil {
 		err = fmt.Errorf("failed to run backup command: %v", err)
-		//updateDataExportStatusOnError(err)
-		util.CheckErr(err)
-		return
+		return err
 	}
 	for {
 		time.Sleep(progressCheckInterval)
 		status, err := backupExecutor.Status()
 		if err != nil {
-			util.CheckErr(status.LastKnownError)
-			return
+			return err
 		}
-		//updateDataExportStatus(status)
 		if status.LastKnownError != nil {
-			util.CheckErr(status.LastKnownError)
-			return
+			return status.LastKnownError
+		}
+		if err = writeVolumeBackupStatus(status); err != nil {
+			logrus.Errorf("failed to write a VolumeBackup status: %v", err)
+			continue
 		}
 		if status.Done {
-			return
+			break
 		}
 	}
+
+	return nil
 }
 
-// Update the ExportProgress object
-/*func updateDataExportStatus(status *restic.Status) {
-	de, err := utils.Instance().GetDataExport(dataExportName, namespace)
-	if err != nil {
-		logrus.Errorf("failed to update status for DataExport %v object with error: %v", dataExportName, err)
-		return
+// writeVolumeBackupStatus writes a restic status to the VolumeBackup crd.
+func writeVolumeBackupStatus(status *restic.Status) error {
+	if volumeBackupName == "" {
+		return nil
 	}
-	if status.Done {
-		if status.LastKnownError != nil {
-			de.Status.Status = kdmpv1alpha1.DataExportStatusFailed
-			de.Status.Reason = status.LastKnownError.Error()
-		} else {
-			de.Status.Status = kdmpv1alpha1.DataExportStatusSuccessful
-			de.Status.ProgressPercentage = int(status.ProgressPercentage)
-		}
+
+	vb, err := kdmpops.Instance().GetVolumeBackup(volumeBackupName, namespace)
+	if err != nil {
+		return fmt.Errorf("get %s/%s VolumeBackup: %v", volumeBackupName, namespace, err)
+	}
+
+	vb.Status.ProgressPercentage = status.ProgressPercentage
+	vb.Status.TotalBytes = status.TotalBytes
+	vb.Status.TotalBytesProcessed = status.TotalBytesProcessed
+	vb.Status.SnapshotID = status.SnapshotID
+	if status.LastKnownError != nil {
+		vb.Status.LastKnownError = status.LastKnownError.Error()
 	} else {
-		de.Status.Status = kdmpv1alpha1.DataExportStatusInProgress
-		de.Status.ProgressPercentage = int(status.ProgressPercentage)
+		vb.Status.LastKnownError = ""
 	}
-	if _, err = utils.Instance().UpdateDataExportStatus(de); err != nil {
-		logrus.Errorf("failed to update status for DataExport %v object with error: %v", dataExportName, err)
+
+	if _, err = kdmpops.Instance().UpdateVolumeBackup(vb); err != nil {
+		return fmt.Errorf("update %s/%s VolumeBackup: %v", volumeBackupName, namespace, err)
 	}
-	return
+	return nil
 }
 
-func updateDataExportStatusOnError(exportErr error) {
-	de, err := utils.Instance().GetDataExport(dataExportName, namespace)
+func createVolumeBackup(name, namespace, repository string) error {
+	new := &kdmpapi.VolumeBackup{
+		ObjectMeta: v1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+		},
+		Spec: kdmpapi.VolumeBackupSpec{
+			Repository: repository,
+			BackupLocation: kdmpapi.DataExportObjectReference{
+				Name:      backupLocationName,
+				Namespace: namespace,
+			},
+		},
+	}
+
+	vb, err := kdmpops.Instance().GetVolumeBackup(name, namespace)
 	if err != nil {
-		logrus.Errorf("failed to update status for DataExport %v object with error: %v", dataExportName, err)
-		return
+		if errors.IsNotFound(err) {
+			_, err = kdmpops.Instance().CreateVolumeBackup(new)
+		}
+		return err
 	}
-	de.Status.Status = kdmpv1alpha1.DataExportStatusFailed
-	de.Status.Reason = exportErr.Error()
-	if _, err = utils.Instance().UpdateDataExportStatus(de); err != nil {
-		logrus.Errorf("failed to update status for DataExport %v object with error: %v", dataExportName, err)
+
+	if !reflect.DeepEqual(vb.Spec, new.Spec) {
+		return fmt.Errorf("volumebackup %s/%s with different spec already exists", namespace, name)
 	}
-	return
-}*/
+
+	if vb.Status.SnapshotID != "" {
+		return fmt.Errorf("volumebackup %s/%s with snapshot id already exists", namespace, name)
+	}
+
+	return nil
+}
+
+func handleErr(err error) {
+	if err != nil {
+		util.CheckErr(err)
+	}
+}
