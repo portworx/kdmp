@@ -87,6 +87,10 @@ func (d Driver) DeleteJob(id string) error {
 		return err
 	}
 
+	if err := utils.CleanServiceAccount(name, namespace); err != nil {
+		return err
+	}
+
 	if err = batch.Instance().DeleteJob(name, namespace); err != nil && !apierrors.IsNotFound(err) {
 		return err
 	}
@@ -137,8 +141,10 @@ func jobFor(
 	labels map[string]string) (*batchv1.Job, error) {
 	labels = addJobLabels(labels)
 
-	// create role & rolebinding
-	serviceAccountName := "kdmp-admin" // TODO: create a service account - pod requires permissions to get backuplocation and update volumebackup
+	genName := toJobName(pvcName)
+	if err := utils.SetupServiceAccount(genName, namespace); err != nil {
+		return nil, err
+	}
 
 	image := "portworx/resticexecutor"
 	if customImage := strings.TrimSpace(os.Getenv("RESTICEXECUTOR_IMAGE")); customImage != "" {
@@ -162,7 +168,7 @@ func jobFor(
 
 	return &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      toJobName(pvcName),
+			Name:      genName,
 			Namespace: namespace,
 			Labels:    labels,
 		},
@@ -173,7 +179,7 @@ func jobFor(
 				},
 				Spec: corev1.PodSpec{
 					RestartPolicy:      corev1.RestartPolicyOnFailure,
-					ServiceAccountName: serviceAccountName,
+					ServiceAccountName: genName,
 					Containers: []corev1.Container{
 						{
 							Name:  "resticexecutor",

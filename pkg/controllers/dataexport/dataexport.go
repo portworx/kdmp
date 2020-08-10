@@ -97,6 +97,23 @@ func (c *Controller) Reconcile(request reconcile.Request) (reconcile.Result, err
 }
 
 func (c *Controller) createCRD() error {
+	// volumebackups is used by this controller - ensure it's registered
+	vb := apiextensions.CustomResource{
+		Name:    kdmpapi.VolumeBackupResourceName,
+		Plural:  kdmpapi.VolumeBackupResourcePlural,
+		Group:   kdmpapi.SchemeGroupVersion.Group,
+		Version: kdmpapi.SchemeGroupVersion.Version,
+		Scope:   apiextensionsv1beta1.NamespaceScoped,
+		Kind:    reflect.TypeOf(kdmpapi.VolumeBackup{}).Name(),
+	}
+	err := apiextensions.Instance().CreateCRD(vb)
+	if err != nil && !errors.IsAlreadyExists(err) {
+		return err
+	}
+	if err := apiextensions.Instance().ValidateCRD(vb, 10*time.Second, 2*time.Minute); err != nil {
+		return err
+	}
+
 	resource := apiextensions.CustomResource{
 		Name:    kdmpapi.DataExportResourceName,
 		Plural:  kdmpapi.DataExportResourcePlural,
@@ -105,7 +122,7 @@ func (c *Controller) createCRD() error {
 		Scope:   apiextensionsv1beta1.NamespaceScoped,
 		Kind:    reflect.TypeOf(kdmpapi.DataExport{}).Name(),
 	}
-	err := apiextensions.Instance().CreateCRD(resource)
+	err = apiextensions.Instance().CreateCRD(resource)
 	if err != nil && !errors.IsAlreadyExists(err) {
 		return err
 	}
