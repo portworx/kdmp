@@ -5,12 +5,12 @@ import (
 	"strings"
 
 	"github.com/portworx/kdmp/pkg/drivers"
+	"github.com/portworx/kdmp/pkg/drivers/utils"
 	"github.com/portworx/sched-ops/k8s/batch"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 )
 
 // Driver is a rsync implementation of the data export interface.
@@ -44,12 +44,12 @@ func (d Driver) StartJob(opts ...drivers.JobOption) (id string, err error) {
 		return "", err
 	}
 
-	return namespacedName(rsyncJob.Namespace, rsyncJob.Name), nil
+	return utils.NamespacedName(rsyncJob.Namespace, rsyncJob.Name), nil
 }
 
 // DeleteJob stops data transfer between volumes.
 func (d Driver) DeleteJob(id string) error {
-	namespace, name, err := parseJobID(id)
+	namespace, name, err := utils.ParseJobID(id)
 	if err != nil {
 		return err
 	}
@@ -62,26 +62,27 @@ func (d Driver) DeleteJob(id string) error {
 }
 
 // JobStatus returns a progress status for a data transfer.
-func (d Driver) JobStatus(id string) (progress int, err error) {
-	namespace, name, err := parseJobID(id)
+func (d Driver) JobStatus(id string) (*drivers.JobStatus, error) {
+	namespace, name, err := utils.ParseJobID(id)
 	if err != nil {
-		return -1, err
+		return utils.ToJobStatus(0, err.Error()), nil
 	}
 
 	job, err := batch.Instance().GetJob(name, namespace)
 	if err != nil {
-		return -1, err
+		return nil, err
 	}
-	if !isJobCompleted(job) {
+	if utils.IsJobFailed(job) {
+		errMsg := fmt.Sprintf("check %s/%s job for details: %s", namespace, name, drivers.ErrJobFailed)
+		return utils.ToJobStatus(0, errMsg), nil
+	}
+
+	if !utils.IsJobCompleted(job) {
 		// TODO: update progress
-		return 0, nil
+		return utils.ToJobStatus(0, ""), nil
 	}
 
-	if isJobFailed(job) {
-		return -1, fmt.Errorf("transfer is failed, check %s/%s job for details", namespace, name)
-	}
-
-	return drivers.TransferProgressCompleted, nil
+	return utils.ToJobStatus(drivers.TransferProgressCompleted, ""), nil
 }
 
 func (d Driver) validate(o drivers.JobOpts) error {
@@ -147,22 +148,6 @@ func jobFor(srcVol, dstVol, namespace string, labels map[string]string) (*batchv
 	}, nil
 }
 
-func namespacedName(namespace, name string) string {
-	v := types.NamespacedName{
-		Name:      name,
-		Namespace: namespace,
-	}
-	return v.String()
-}
-
-func parseJobID(id string) (namespace, name string, err error) {
-	v := strings.Split(id, string(types.Separator))
-	if len(v) != 2 {
-		return "", "", fmt.Errorf("invalid job id")
-	}
-	return v[0], v[1], nil
-}
-
 func toJobName(id string) string {
 	return fmt.Sprintf("import-rsync-%s", id)
 }
@@ -174,22 +159,4 @@ func addJobLabels(labels map[string]string) map[string]string {
 
 	labels[drivers.DriverNameLabel] = drivers.Rsync
 	return labels
-}
-
-func isJobCompleted(j *batchv1.Job) bool {
-	for _, c := range j.Status.Conditions {
-		if c.Type == batchv1.JobComplete && c.Status == corev1.ConditionTrue {
-			return true
-		}
-	}
-	return false
-}
-
-func isJobFailed(j *batchv1.Job) bool {
-	for _, c := range j.Status.Conditions {
-		if c.Type == batchv1.JobFailed && c.Status == corev1.ConditionTrue {
-			return true
-		}
-	}
-	return false
 }
