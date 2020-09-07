@@ -116,6 +116,7 @@ github.com/portworx/sched-ops/k8s/common
 github.com/portworx/sched-ops/k8s/core
 github.com/portworx/sched-ops/k8s/errors
 github.com/portworx/sched-ops/k8s/externalstorage
+github.com/portworx/sched-ops/k8s/rbac
 github.com/portworx/sched-ops/k8s/stork
 github.com/portworx/sched-ops/task
 # github.com/prometheus/client_golang v0.9.3-0.20190127221311-3c4408c8b829

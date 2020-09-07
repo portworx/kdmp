@@ -5,7 +5,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
 
 	"github.com/portworx/kdmp/pkg/drivers"
 	"github.com/portworx/kdmp/pkg/drivers/utils"
@@ -41,11 +40,11 @@ func (d Driver) StartJob(opts ...drivers.JobOption) (id string, err error) {
 		return "", err
 	}
 
-	genName := toJobName(o.SourcePVCName)
+	jobName := toJobName(o.SourcePVCName)
 
 	if _, err := coreops.Instance().CreateSecret(&corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      genName,
+			Name:      jobName,
 			Namespace: o.Namespace,
 		},
 		StringData: map[string]string{
@@ -56,7 +55,7 @@ func (d Driver) StartJob(opts ...drivers.JobOption) (id string, err error) {
 	}
 
 	job, err := jobFor(
-		genName,
+		jobName,
 		o.Namespace,
 		o.SourcePVCName,
 		o.BackupLocationName,
@@ -80,6 +79,10 @@ func (d Driver) DeleteJob(id string) error {
 	}
 
 	if err := coreops.Instance().DeleteSecret(name, namespace); err != nil && !apierrors.IsNotFound(err) {
+		return err
+	}
+
+	if err := utils.CleanServiceAccount(name, namespace); err != nil {
 		return err
 	}
 
@@ -126,16 +129,19 @@ func (d Driver) validate(o drivers.JobOpts) error {
 }
 
 func jobFor(
-	genName,
+	jobName,
 	namespace,
 	pvcName,
 	backuplocationName,
 	backuplocationNamespace string,
 	labels map[string]string) (*batchv1.Job, error) {
-	labels = addJobLabels(labels)
+	if err := utils.SetupServiceAccount(jobName, namespace); err != nil {
+		return nil, err
+	}
 
-	// create role & rolebinding
-	serviceAccountName := "kdmp-admin" // TODO: create a service account - pod requires permissions to get backuplocation and update volumebackup
+	backupName := jobName
+
+	labels = addJobLabels(labels)
 
 	image := "portworx/resticexecutor"
 	if customImage := strings.TrimSpace(os.Getenv("RESTICEXECUTOR_IMAGE")); customImage != "" {
@@ -150,7 +156,7 @@ func jobFor(
 		"--namespace",
 		backuplocationNamespace,
 		"--volume-backup-name",
-		genName,
+		backupName,
 		"--repository",
 		toRepoName(pvcName, namespace),
 		"--secret-file-path",
@@ -161,7 +167,7 @@ func jobFor(
 
 	return &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      genName,
+			Name:      jobName,
 			Namespace: namespace,
 			Labels:    labels,
 		},
@@ -172,7 +178,7 @@ func jobFor(
 				},
 				Spec: corev1.PodSpec{
 					RestartPolicy:      corev1.RestartPolicyOnFailure,
-					ServiceAccountName: serviceAccountName,
+					ServiceAccountName: jobName,
 					Containers: []corev1.Container{
 						{
 							Name:  "resticexecutor",
@@ -209,7 +215,7 @@ func jobFor(
 							Name: "secret",
 							VolumeSource: corev1.VolumeSource{
 								Secret: &corev1.SecretVolumeSource{
-									SecretName: genName,
+									SecretName: jobName,
 								},
 							},
 						},
@@ -221,7 +227,7 @@ func jobFor(
 }
 
 func toJobName(id string) string {
-	return fmt.Sprintf("resticbackup-%s-%d", id, time.Now().Unix())
+	return fmt.Sprintf("resticbackup-%s", id)
 }
 
 func toRepoName(pvcName, pvcNamespace string) string {
