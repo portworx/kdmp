@@ -2,7 +2,6 @@ package resticbackup
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
 
@@ -54,13 +53,7 @@ func (d Driver) StartJob(opts ...drivers.JobOption) (id string, err error) {
 		return "", fmt.Errorf("create a secret for a restic password: %s", err)
 	}
 
-	job, err := jobFor(
-		jobName,
-		o.Namespace,
-		o.SourcePVCName,
-		o.BackupLocationName,
-		o.BackupLocationNamespace,
-		o.Labels)
+	job, err := buildJob(jobName, o)
 	if err != nil {
 		return "", err
 	}
@@ -135,18 +128,9 @@ func jobFor(
 	backuplocationName,
 	backuplocationNamespace string,
 	labels map[string]string) (*batchv1.Job, error) {
-	if err := utils.SetupServiceAccount(jobName, namespace); err != nil {
-		return nil, err
-	}
-
 	backupName := jobName
 
 	labels = addJobLabels(labels)
-
-	image := "portworx/resticexecutor"
-	if customImage := strings.TrimSpace(os.Getenv("RESTICEXECUTOR_IMAGE")); customImage != "" {
-		image = customImage
-	}
 
 	cmd := strings.Join([]string{
 		"/resticexecutor",
@@ -182,7 +166,7 @@ func jobFor(
 					Containers: []corev1.Container{
 						{
 							Name:  "resticexecutor",
-							Image: image,
+							Image: utils.ResticExecutorImage(),
 							Command: []string{
 								"/bin/sh",
 								"-x",
@@ -241,4 +225,36 @@ func addJobLabels(labels map[string]string) map[string]string {
 
 	labels[drivers.DriverNameLabel] = drivers.ResticBackup
 	return labels
+}
+
+func buildJob(jobName string, o drivers.JobOpts) (*batchv1.Job, error) {
+	if err := utils.SetupServiceAccount(jobName, o.Namespace); err != nil {
+		return nil, err
+	}
+	pods, err := coreops.Instance().GetPodsUsingPVC(o.SourcePVCName, o.Namespace)
+	if err != nil {
+		return nil, err
+	}
+
+	// run a "live" backup if a pvc is mounted (mount a kubelet directory with pod volumes)
+	if len(pods) > 0 {
+		return jobForLiveBackup(
+			jobName,
+			o.Namespace,
+			o.SourcePVCName,
+			o.BackupLocationName,
+			o.BackupLocationNamespace,
+			pods[0],
+			o.Labels,
+		)
+	}
+
+	return jobFor(
+		jobName,
+		o.Namespace,
+		o.SourcePVCName,
+		o.BackupLocationName,
+		o.BackupLocationNamespace,
+		o.Labels,
+	)
 }

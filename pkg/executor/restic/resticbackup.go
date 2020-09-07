@@ -2,6 +2,7 @@ package restic
 
 import (
 	"fmt"
+	"path/filepath"
 	"reflect"
 	"time"
 
@@ -22,7 +23,8 @@ const (
 
 func newBackupCommand() *cobra.Command {
 	var (
-		sourcePath string
+		sourcePath     string
+		sourcePathGlob string
 	)
 	backupCommand := &cobra.Command{
 		Use:   "backup",
@@ -32,15 +34,17 @@ func newBackupCommand() *cobra.Command {
 				util.CheckErr(fmt.Errorf("backup-location or backup-location-file has to be provided for restic backups"))
 				return
 			}
-			if len(sourcePath) == 0 {
-				util.CheckErr(fmt.Errorf("source-path argument is required for restic backups"))
+			srcPath, err := getSourcPath(sourcePath, sourcePathGlob)
+			if err != nil {
+				util.CheckErr(err)
 				return
 			}
 
-			handleErr(runBackup(sourcePath))
+			handleErr(runBackup(srcPath))
 		},
 	}
 	backupCommand.Flags().StringVar(&sourcePath, "source-path", "", "Source for restic backup")
+	backupCommand.Flags().StringVar(&sourcePathGlob, "source-path-glob", "", "The regexp should match only one path that will be used for backup")
 	backupCommand.Flags().StringVar(&volumeBackupName, "volume-backup-name", "", "Provided VolumeBackup CRD will be updated with the latest backup progress details")
 	return backupCommand
 }
@@ -198,6 +202,27 @@ func createVolumeBackup(name, namespace, repository string) error {
 	}
 
 	return nil
+}
+
+func getSourcPath(path, glob string) (string, error) {
+	if len(path) == 0 && len(glob) == 0 {
+		return "", fmt.Errorf("source-path argument is required for restic backups")
+	}
+
+	if len(path) > 0 {
+		return path, nil
+	}
+
+	matches, err := filepath.Glob(glob)
+	if err != nil {
+		return "", fmt.Errorf("parse source-path-glob: %s", err)
+	}
+
+	if len(matches) != 1 {
+		return "", fmt.Errorf("parse source-path-glob: invalid amount of matches: %v", matches)
+	}
+
+	return matches[0], nil
 }
 
 func handleErr(err error) {
