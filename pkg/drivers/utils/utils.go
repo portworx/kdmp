@@ -2,6 +2,7 @@ package utils
 
 import (
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/portworx/kdmp/pkg/drivers"
@@ -69,4 +70,13 @@ func ToJobStatus(progress float64, errMsg string) *drivers.JobStatus {
 		State:            drivers.JobStateInProgress,
 		ProgressPercents: progress,
 	}
+}
+
+// ResticExecutorImage return a docker image that contains resticexecutor binary.
+func ResticExecutorImage() string {
+	image := "portworx/resticexecutor"
+	if customImage := strings.TrimSpace(os.Getenv("RESTICEXECUTOR_IMAGE")); customImage != "" {
+		image = customImage
+	}
+	return image
 }

@@ -350,7 +350,8 @@ func (c *Controller) checkResticBackup(de *kdmpapi.DataExport) error {
 	if !isPVCRef(de.Spec.Source) && !isAPIVersionKindNotSetRef(de.Spec.Source) {
 		return fmt.Errorf("source is expected to be PersistentVolumeClaim")
 	}
-	if _, err := checkPVC(de.Spec.Source, !hasSnapshotStage(de)); err != nil {
+	// restic supports "live" backups so there is not need to check if it's mounted
+	if _, err := checkPVC(de.Spec.Source, false); err != nil {
 		return fmt.Errorf("source: %s", err)
 	}
 

@@ -2,7 +2,6 @@ package resticrestore
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
 
@@ -146,11 +145,6 @@ func jobFor(
 		return nil, err
 	}
 
-	image := "portworx/resticexecutor"
-	if customImage := strings.TrimSpace(os.Getenv("RESTICEXECUTOR_IMAGE")); customImage != "" {
-		image = customImage
-	}
-
 	cmd := strings.Join([]string{
 		"/resticexecutor",
 		"restore",
@@ -183,7 +177,7 @@ func jobFor(
 					Containers: []corev1.Container{
 						{
 							Name:  "resticexecutor",
-							Image: image,
+							Image: utils.ResticExecutorImage(),
 							Command: []string{
 								"/bin/sh",
 								"-x",
