@@ -75,7 +75,16 @@ func ToJobStatus(progress float64, errMsg string) *drivers.JobStatus {
 // ResticExecutorImage return a docker image that contains resticexecutor binary.
 func ResticExecutorImage() string {
 	image := "portworx/resticexecutor"
-	if customImage := strings.TrimSpace(os.Getenv("RESTICEXECUTOR_IMAGE")); customImage != "" {
+	if customImage := strings.TrimSpace(os.Getenv("KDMP_RESTICEXECUTOR_IMAGE")); customImage != "" {
+		image = customImage
+	}
+	return image
+}
+
+// RsyncImage return a docker image that contains rsync binary.
+func RsyncImage() string {
+	image := "eeacms/rsync"
+	if customImage := strings.TrimSpace(os.Getenv("KDMP_RSYNC_IMAGE")); customImage != "" {
 		image = customImage
 	}
 	return image
