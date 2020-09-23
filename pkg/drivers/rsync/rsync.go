@@ -110,7 +110,7 @@ func jobFor(srcVol, dstVol, namespace string, labels map[string]string) (*batchv
 					Containers: []corev1.Container{
 						{
 							Name:    "rsync",
-							Image:   "eeacms/rsync",
+							Image:   utils.RsyncImage(),
 							Command: []string{"/bin/sh", "-x", "-c", "ls -la /src; ls -la /dst/; rsync -avz /src/ /dst"},
 							VolumeMounts: []corev1.VolumeMount{
 								{
