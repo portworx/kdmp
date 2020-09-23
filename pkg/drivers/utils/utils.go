@@ -72,7 +72,7 @@ func ToJobStatus(progress float64, errMsg string) *drivers.JobStatus {
 	}
 }
 
-// ResticExecutorImage return a docker image that contains resticexecutor binary.
+// ResticExecutorImage returns a docker image that contains resticexecutor binary.
 func ResticExecutorImage() string {
 	image := "portworx/resticexecutor"
 	if customImage := strings.TrimSpace(os.Getenv("KDMP_RESTICEXECUTOR_IMAGE")); customImage != "" {
@@ -81,11 +81,40 @@ func ResticExecutorImage() string {
 	return image
 }
 
-// RsyncImage return a docker image that contains rsync binary.
+// ResticExecutorImageSecret returns an image pull secret for the resticexecutor image.
+func ResticExecutorImageSecret() string {
+	if secret := strings.TrimSpace(os.Getenv("KDMP_RESTICEXECUTOR_IMAGE_SECRET")); secret != "" {
+		return secret
+	}
+	return ""
+}
+
+// RsyncImage returns a docker image that contains rsync binary.
 func RsyncImage() string {
 	image := "eeacms/rsync"
 	if customImage := strings.TrimSpace(os.Getenv("KDMP_RSYNC_IMAGE")); customImage != "" {
 		image = customImage
 	}
 	return image
+}
+
+// RsyncImageSecret returns an image pull secret for the rsync image.
+func RsyncImageSecret() string {
+	if secret := strings.TrimSpace(os.Getenv("KDMP_RSYNC_IMAGE_SECRET")); secret != "" {
+		return secret
+	}
+	return ""
+}
+
+// ToImagePullSecret converts a secret name to the ImagePullSecret struct.
+func ToImagePullSecret(name string) []corev1.LocalObjectReference {
+	if name == "" {
+		return nil
+	}
+	return []corev1.LocalObjectReference{
+		{
+			Name: name,
+		},
+	}
+
 }

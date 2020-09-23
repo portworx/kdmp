@@ -70,6 +70,7 @@ func jobForLiveBackup(
 				},
 				Spec: corev1.PodSpec{
 					RestartPolicy:      corev1.RestartPolicyOnFailure,
+					ImagePullSecrets:   utils.ToImagePullSecret(utils.ResticExecutorImageSecret()),
 					ServiceAccountName: jobName,
 					NodeName:           mountPod.Spec.NodeName,
 					Containers: []corev1.Container{
