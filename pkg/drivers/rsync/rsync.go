@@ -106,7 +106,8 @@ func jobFor(srcVol, dstVol, namespace string, labels map[string]string) (*batchv
 					Labels: labels,
 				},
 				Spec: corev1.PodSpec{
-					RestartPolicy: corev1.RestartPolicyOnFailure,
+					RestartPolicy:    corev1.RestartPolicyOnFailure,
+					ImagePullSecrets: utils.ToImagePullSecret(utils.RsyncImageSecret()),
 					Containers: []corev1.Container{
 						{
 							Name:    "rsync",

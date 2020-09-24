@@ -173,6 +173,7 @@ func jobFor(
 				},
 				Spec: corev1.PodSpec{
 					RestartPolicy:      corev1.RestartPolicyOnFailure,
+					ImagePullSecrets:   utils.ToImagePullSecret(utils.ResticExecutorImageSecret()),
 					ServiceAccountName: genName,
 					Containers: []corev1.Container{
 						{
