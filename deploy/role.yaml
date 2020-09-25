@@ -10,15 +10,25 @@ rules:
       - persistentvolumeclaims
       - configmaps
       - events
+      - secrets
+      - serviceaccounts
     verbs:
       - '*'
   - apiGroups:
       - ""
     resources:
+      - persistentvolumes
       - pods
     verbs:
       - get
       - list
+  - apiGroups:
+      - rbac.authorization.k8s.io
+    resources:
+      - roles
+      - rolebindings
+    verbs:
+      - '*'
   - apiGroups:
       - batch
     resources:
@@ -37,6 +47,13 @@ rules:
       - kdmp.portworx.com
     resources:
       - dataexports
+      - volumebackups
+    verbs:
+      - '*'
+  - apiGroups:
+      - stork.libopenstorage.org
+    resources:
+      - backuplocations
     verbs:
       - '*'
   - apiGroups:

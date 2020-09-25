@@ -35,25 +35,45 @@ func (c *Controller) sync(ctx context.Context, in *kdmpapi.DataExport) (bool, er
 
 	// set the initial stage
 	if dataExport.Status.Stage == "" {
+		// TODO: set defaults
+		if dataExport.Spec.Type == "" {
+			dataExport.Spec.Type = kdmpapi.DataExportRsync
+		}
+
 		dataExport.Status.Stage = kdmpapi.DataExportStageInitial
 		dataExport.Status.Status = kdmpapi.DataExportStatusInitial
 		return true, c.client.Update(ctx, dataExport)
 	}
-	// TODO: set defaults
-	if dataExport.Spec.Type == "" {
-		dataExport.Spec.Type = kdmpapi.DataExportRsync
+
+	// delete an object on the init stage without cleanup
+	if dataExport.DeletionTimestamp != nil && dataExport.Status.Stage == kdmpapi.DataExportStageInitial {
+		if !controllers.ContainsFinalizer(dataExport, cleanupFinalizer) {
+			return false, nil
+		}
+
+		if err := c.client.Delete(ctx, dataExport); err != nil {
+			return true, fmt.Errorf("failed to delete dataexport object: %s", err)
+		}
+
+		controllers.RemoveFinalizer(dataExport, cleanupFinalizer)
+		return true, c.client.Update(ctx, dataExport)
 	}
 
 	// TODO: validate DataExport resource & update status?
-	driver, err := driversinstance.Get(getDriverType(dataExport))
+	driverName, err := getDriverType(dataExport)
 	if err != nil {
-		msg := fmt.Sprintf("get a driver for a %s type", dataExport.Spec.Type)
+		msg := fmt.Sprintf("failed to get a driver type for %s: %s", dataExport.Spec.Type, err)
+		return false, c.client.Update(ctx, setStatus(dataExport, kdmpapi.DataExportStatusFailed, msg))
+	}
+	driver, err := driversinstance.Get(driverName)
+	if err != nil {
+		msg := fmt.Sprintf("failed to get a driver for a %s type: %s", dataExport.Spec.Type, err)
 		return false, c.client.Update(ctx, setStatus(dataExport, kdmpapi.DataExportStatusFailed, msg))
 	}
 
 	snapshotter, err := snapshotsinstance.Get(snapshots.ExternalStorage)
 	if err != nil {
-		return false, fmt.Errorf("get snapshotter for a storage provider: %s", err)
+		return false, fmt.Errorf("failed to get snapshotter for a storage provider: %s", err)
 	}
 
 	if dataExport.DeletionTimestamp != nil {
@@ -151,8 +171,12 @@ func (c *Controller) stageInitial(ctx context.Context, snapshotter snapshots.Dri
 		return true, c.client.Update(ctx, setStatus(dataExport, kdmpapi.DataExportStatusInitial, ""))
 	}
 
-	var err error
-	switch getDriverType(dataExport) {
+	driverName, err := getDriverType(dataExport)
+	if err != nil {
+		msg := fmt.Sprintf("check failed: %s", err)
+		return false, c.updateStatus(dataExport, kdmpapi.DataExportStatusFailed, msg)
+	}
+	switch driverName {
 	case drivers.Rsync:
 		err = c.checkClaims(dataExport)
 	case drivers.ResticBackup:
@@ -489,22 +513,30 @@ func jobLabels(DataExportName string) map[string]string {
 	}
 }
 
-func getDriverType(de *kdmpapi.DataExport) string {
+func getDriverType(de *kdmpapi.DataExport) (string, error) {
 	switch de.Spec.Type {
 	case kdmpapi.DataExportRsync:
 	case kdmpapi.DataExportRestic:
 		src := de.Spec.Source
 		dst := de.Spec.Destination
 
-		if (isPVCRef(src) || isAPIVersionKindNotSetRef(src)) && isBackupLocationRef(dst) {
-			return drivers.ResticBackup
+		switch {
+		case isPVCRef(src) || isAPIVersionKindNotSetRef(src):
+			if isBackupLocationRef(dst) {
+				return drivers.ResticBackup, nil
+			}
+			return "", fmt.Errorf("invalid kind for restic backup destination: expected BackupLocation")
+		case isVolumeBackupRef(src):
+			if isPVCRef(dst) || (isAPIVersionKindNotSetRef(dst)) {
+				return drivers.ResticRestore, nil
+			}
+			return "", fmt.Errorf("invalid kind for restic restore destination: expected PersistentVolumeClaim")
 		}
 
-		if isVolumeBackupRef(src) && (isPVCRef(dst) || (isAPIVersionKindNotSetRef(dst))) {
-			return drivers.ResticRestore
-		}
+		return "", fmt.Errorf("invalid kind for restic source: expected PersistentVolumeClaim or VolumeBackup")
 	}
-	return string(de.Spec.Type)
+
+	return string(de.Spec.Type), nil
 }
 
 func isPVCRef(ref kdmpapi.DataExportObjectReference) bool {
