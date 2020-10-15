@@ -15,6 +15,11 @@ const (
 )
 
 const (
+	// OpenshiftSCCAnnotation used to set a openshift securit context contraint.
+	OpenshiftSCCAnnotation = "openshift.io/scc"
+)
+
+const (
 	// TransferProgressCompleted is a status for a data transfer.
 	TransferProgressCompleted float64 = 100
 )
