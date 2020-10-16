@@ -83,10 +83,7 @@ func ResticExecutorImage() string {
 
 // ResticExecutorImageSecret returns an image pull secret for the resticexecutor image.
 func ResticExecutorImageSecret() string {
-	if secret := strings.TrimSpace(os.Getenv("KDMP_RESTICEXECUTOR_IMAGE_SECRET")); secret != "" {
-		return secret
-	}
-	return ""
+	return strings.TrimSpace(os.Getenv("KDMP_RESTICEXECUTOR_IMAGE_SECRET"))
 }
 
 // RsyncImage returns a docker image that contains rsync binary.
@@ -98,12 +95,19 @@ func RsyncImage() string {
 	return image
 }
 
+// RsyncCommandFlags allows to change rsync command flags.
+func RsyncCommandFlags() string {
+	return strings.TrimSpace(os.Getenv("KDMP_RSYNC_FLAGS"))
+}
+
+// RsyncOpenshiftSCC is used to set a custom openshift security context constraints for a rsync deployment.
+func RsyncOpenshiftSCC() string {
+	return strings.TrimSpace(os.Getenv("KDMP_RSYNC_OPENSHIFT_SCC"))
+}
+
 // RsyncImageSecret returns an image pull secret for the rsync image.
 func RsyncImageSecret() string {
-	if secret := strings.TrimSpace(os.Getenv("KDMP_RSYNC_IMAGE_SECRET")); secret != "" {
-		return secret
-	}
-	return ""
+	return strings.TrimSpace(os.Getenv("KDMP_RSYNC_IMAGE_SECRET"))
 }
 
 // ToImagePullSecret converts a secret name to the ImagePullSecret struct.

@@ -94,6 +94,13 @@ func (d Driver) validate(o drivers.JobOpts) error {
 
 func jobFor(srcVol, dstVol, namespace string, labels map[string]string) (*batchv1.Job, error) {
 	labels = addJobLabels(labels)
+
+	rsyncFlags := "-avz"
+	if custom := utils.RsyncCommandFlags(); custom != "" {
+		rsyncFlags = custom
+	}
+	cmd := fmt.Sprintf("ls -la /src; ls -la /dst/; rsync %s /src/ /dst", rsyncFlags)
+
 	return &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      toJobName(srcVol),
@@ -103,7 +110,8 @@ func jobFor(srcVol, dstVol, namespace string, labels map[string]string) (*batchv
 		Spec: batchv1.JobSpec{
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels: labels,
+					Labels:      labels,
+					Annotations: jobAnnotations(),
 				},
 				Spec: corev1.PodSpec{
 					RestartPolicy:    corev1.RestartPolicyOnFailure,
@@ -112,7 +120,7 @@ func jobFor(srcVol, dstVol, namespace string, labels map[string]string) (*batchv
 						{
 							Name:    "rsync",
 							Image:   utils.RsyncImage(),
-							Command: []string{"/bin/sh", "-x", "-c", "ls -la /src; ls -la /dst/; rsync -avz /src/ /dst"},
+							Command: []string{"/bin/sh", "-x", "-c", cmd},
 							VolumeMounts: []corev1.VolumeMount{
 								{
 									Name:      "src-vol",
@@ -160,4 +168,15 @@ func addJobLabels(labels map[string]string) map[string]string {
 
 	labels[drivers.DriverNameLabel] = drivers.Rsync
 	return labels
+}
+
+func jobAnnotations() map[string]string {
+	scc := utils.RsyncOpenshiftSCC()
+	if scc == "" {
+		return nil
+	}
+
+	return map[string]string{
+		drivers.OpenshiftSCCAnnotation: scc,
+	}
 }
