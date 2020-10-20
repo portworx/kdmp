@@ -64,6 +64,8 @@ func (d Driver) StartJob(opts ...drivers.JobOption) (id string, err error) {
 		vb.Spec.BackupLocation.Namespace,
 		vb.Spec.Repository,
 		resticSecretName,
+		o.JobServiceAccountName,
+		o.JobImage,
 		o.Labels)
 	if err != nil {
 		return "", err
@@ -136,13 +138,19 @@ func jobFor(
 	backuplocationName,
 	backuplocationNamespace,
 	repository,
-	secretName string,
+	secretName,
+	serviceAccountName,
+	image string,
 	labels map[string]string) (*batchv1.Job, error) {
 	labels = addJobLabels(labels)
 
 	genName := toJobName(pvcName)
-	if err := utils.SetupServiceAccount(genName, namespace); err != nil {
-		return nil, err
+
+	if serviceAccountName == "" {
+		if err := utils.SetupServiceAccount(genName, namespace); err != nil {
+			return nil, err
+		}
+		serviceAccountName = genName
 	}
 
 	cmd := strings.Join([]string{
@@ -178,7 +186,7 @@ func jobFor(
 					Containers: []corev1.Container{
 						{
 							Name:  "resticexecutor",
-							Image: utils.ResticExecutorImage(),
+							Image: utils.CustomOrDefault(image, utils.ResticExecutorImage()),
 							Command: []string{
 								"/bin/sh",
 								"-x",

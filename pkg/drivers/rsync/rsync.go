@@ -36,7 +36,14 @@ func (d Driver) StartJob(opts ...drivers.JobOption) (id string, err error) {
 		return "", err
 	}
 
-	rsyncJob, err := jobFor(o.SourcePVCName, o.DestinationPVCName, o.Namespace, o.Labels)
+	rsyncJob, err := jobFor(
+		o.SourcePVCName,
+		o.DestinationPVCName,
+		o.Namespace,
+		o.JobServiceAccountName,
+		o.JobImage,
+		o.Labels,
+	)
 	if err != nil {
 		return "", err
 	}
@@ -92,7 +99,14 @@ func (d Driver) validate(o drivers.JobOpts) error {
 	return nil
 }
 
-func jobFor(srcVol, dstVol, namespace string, labels map[string]string) (*batchv1.Job, error) {
+func jobFor(
+	srcVol,
+	dstVol,
+	namespace,
+	serviceAccountName,
+	image string,
+	labels map[string]string,
+) (*batchv1.Job, error) {
 	labels = addJobLabels(labels)
 
 	rsyncFlags := "-avz"
@@ -114,12 +128,13 @@ func jobFor(srcVol, dstVol, namespace string, labels map[string]string) (*batchv
 					Annotations: jobAnnotations(),
 				},
 				Spec: corev1.PodSpec{
-					RestartPolicy:    corev1.RestartPolicyOnFailure,
-					ImagePullSecrets: utils.ToImagePullSecret(utils.RsyncImageSecret()),
+					RestartPolicy:      corev1.RestartPolicyOnFailure,
+					ImagePullSecrets:   utils.ToImagePullSecret(utils.RsyncImageSecret()),
+					ServiceAccountName: serviceAccountName,
 					Containers: []corev1.Container{
 						{
 							Name:    "rsync",
-							Image:   utils.RsyncImage(),
+							Image:   utils.CustomOrDefault(image, utils.RsyncImage()),
 							Command: []string{"/bin/sh", "-x", "-c", cmd},
 							VolumeMounts: []corev1.VolumeMount{
 								{

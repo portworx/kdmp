@@ -83,8 +83,15 @@ type DataExportSpec struct {
 	Type                 DataExportType            `json:"type,omitempty"`
 	ClusterPair          string                    `json:"clusterPair,omitempty"`
 	SnapshotStorageClass string                    `json:"snapshotStorageClass,omitempty"`
+	JobSpec              JobSpec                   `json:"jobSpec,omitempty"`
 	Source               DataExportObjectReference `json:"source,omitempty"`
 	Destination          DataExportObjectReference `json:"destination,omitempty"`
+}
+
+// JobSpec allows to run a data transfer job with custom parameters.
+type JobSpec struct {
+	Image              string `json:"image,omitempty"`
+	ServiceAccountName string `json:"serviceAccountName,omitempty"`
 }
 
 // DataExportObjectReference contains enough information to let you inspect the referred object.

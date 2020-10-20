@@ -127,6 +127,8 @@ func jobFor(
 	pvcName,
 	backuplocationName,
 	backuplocationNamespace string,
+	serviceAccountName,
+	image string,
 	labels map[string]string) (*batchv1.Job, error) {
 	backupName := jobName
 
@@ -163,11 +165,11 @@ func jobFor(
 				Spec: corev1.PodSpec{
 					RestartPolicy:      corev1.RestartPolicyOnFailure,
 					ImagePullSecrets:   utils.ToImagePullSecret(utils.ResticExecutorImageSecret()),
-					ServiceAccountName: jobName,
+					ServiceAccountName: serviceAccountName,
 					Containers: []corev1.Container{
 						{
 							Name:  "resticexecutor",
-							Image: utils.ResticExecutorImage(),
+							Image: image,
 							Command: []string{
 								"/bin/sh",
 								"-x",
@@ -229,13 +231,19 @@ func addJobLabels(labels map[string]string) map[string]string {
 }
 
 func buildJob(jobName string, o drivers.JobOpts) (*batchv1.Job, error) {
-	if err := utils.SetupServiceAccount(jobName, o.Namespace); err != nil {
-		return nil, err
+	if o.JobServiceAccountName == "" {
+		if err := utils.SetupServiceAccount(jobName, o.Namespace); err != nil {
+			return nil, err
+		}
+		o.JobServiceAccountName = jobName
 	}
+
 	pods, err := coreops.Instance().GetPodsUsingPVC(o.SourcePVCName, o.Namespace)
 	if err != nil {
 		return nil, err
 	}
+
+	o.JobImage = utils.CustomOrDefault(o.JobImage, utils.ResticExecutorImage())
 
 	// run a "live" backup if a pvc is mounted (mount a kubelet directory with pod volumes)
 	if len(pods) > 0 {
@@ -245,6 +253,8 @@ func buildJob(jobName string, o drivers.JobOpts) (*batchv1.Job, error) {
 			o.SourcePVCName,
 			o.BackupLocationName,
 			o.BackupLocationNamespace,
+			o.JobServiceAccountName,
+			o.JobImage,
 			pods[0],
 			o.Labels,
 		)
@@ -256,6 +266,8 @@ func buildJob(jobName string, o drivers.JobOpts) (*batchv1.Job, error) {
 		o.SourcePVCName,
 		o.BackupLocationName,
 		o.BackupLocationNamespace,
+		o.JobServiceAccountName,
+		o.JobImage,
 		o.Labels,
 	)
 }

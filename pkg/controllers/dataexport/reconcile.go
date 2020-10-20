@@ -418,6 +418,8 @@ func startTransferJob(drv drivers.Interface, srcPVCName string, dataExport *kdmp
 			drivers.WithSourcePVC(srcPVCName),
 			drivers.WithNamespace(dataExport.Spec.Destination.Namespace),
 			drivers.WithDestinationPVC(dataExport.Spec.Destination.Name),
+			drivers.WithJobServiceAccountName(dataExport.Spec.JobSpec.ServiceAccountName),
+			drivers.WithJobImage(dataExport.Spec.JobSpec.Image),
 			drivers.WithLabels(jobLabels(dataExport.GetName())),
 		)
 	case drivers.ResticBackup:
@@ -426,6 +428,8 @@ func startTransferJob(drv drivers.Interface, srcPVCName string, dataExport *kdmp
 			drivers.WithNamespace(dataExport.Spec.Destination.Namespace),
 			drivers.WithBackupLocationName(dataExport.Spec.Destination.Name),
 			drivers.WithBackupLocationNamespace(dataExport.Spec.Destination.Namespace),
+			drivers.WithJobServiceAccountName(dataExport.Spec.JobSpec.ServiceAccountName),
+			drivers.WithJobImage(dataExport.Spec.JobSpec.Image),
 			drivers.WithLabels(jobLabels(dataExport.GetName())),
 		)
 	case drivers.ResticRestore:
@@ -434,6 +438,8 @@ func startTransferJob(drv drivers.Interface, srcPVCName string, dataExport *kdmp
 			drivers.WithNamespace(dataExport.Spec.Destination.Namespace),
 			drivers.WithVolumeBackupName(dataExport.Spec.Source.Name),
 			drivers.WithVolumeBackupNamespace(dataExport.Spec.Source.Namespace),
+			drivers.WithJobServiceAccountName(dataExport.Spec.JobSpec.ServiceAccountName),
+			drivers.WithJobImage(dataExport.Spec.JobSpec.Image),
 			drivers.WithLabels(jobLabels(dataExport.GetName())),
 		)
 	}

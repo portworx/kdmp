@@ -22,7 +22,9 @@ func jobForLiveBackup(
 	namespace,
 	pvcName,
 	backuplocationName,
-	backuplocationNamespace string,
+	backuplocationNamespace,
+	serviceAccountName,
+	image string,
 	mountPod corev1.Pod,
 	labels map[string]string) (*batchv1.Job, error) {
 	volDir, err := getVolumeDirectory(pvcName, namespace)
@@ -71,12 +73,12 @@ func jobForLiveBackup(
 				Spec: corev1.PodSpec{
 					RestartPolicy:      corev1.RestartPolicyOnFailure,
 					ImagePullSecrets:   utils.ToImagePullSecret(utils.ResticExecutorImageSecret()),
-					ServiceAccountName: jobName,
+					ServiceAccountName: serviceAccountName,
 					NodeName:           mountPod.Spec.NodeName,
 					Containers: []corev1.Container{
 						{
 							Name:  "resticexecutor",
-							Image: utils.ResticExecutorImage(),
+							Image: image,
 							Command: []string{
 								"/bin/sh",
 								"-x",

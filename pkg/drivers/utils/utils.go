@@ -122,3 +122,11 @@ func ToImagePullSecret(name string) []corev1.LocalObjectReference {
 	}
 
 }
+
+// CustomOrDefault returns a custom non-empty value or use default one.
+func CustomOrDefault(customValue, defaultValue string) string {
+	if customValue != "" {
+		return customValue
+	}
+	return defaultValue
+}
