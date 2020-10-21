@@ -12,6 +12,7 @@ import (
 	coreops "github.com/portworx/sched-ops/k8s/core"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -229,7 +230,7 @@ func addJobLabels(labels map[string]string) map[string]string {
 }
 
 func buildJob(jobName string, o drivers.JobOpts) (*batchv1.Job, error) {
-	if err := utils.SetupServiceAccount(jobName, o.Namespace); err != nil {
+	if err := utils.SetupServiceAccount(jobName, o.Namespace, roleFor()); err != nil {
 		return nil, err
 	}
 	pods, err := coreops.Instance().GetPodsUsingPVC(o.SourcePVCName, o.Namespace)
@@ -258,4 +259,21 @@ func buildJob(jobName string, o drivers.JobOpts) (*batchv1.Job, error) {
 		o.BackupLocationNamespace,
 		o.Labels,
 	)
+}
+
+func roleFor() *rbacv1.Role {
+	return &rbacv1.Role{
+		Rules: []rbacv1.PolicyRule{
+			{
+				APIGroups: []string{"stork.libopenstorage.org"},
+				Resources: []string{"backuplocations"},
+				Verbs:     []string{"get", "list"},
+			},
+			{
+				APIGroups: []string{"kdmp.portworx.com"},
+				Resources: []string{"volumebackups"},
+				Verbs:     []string{rbacv1.VerbAll},
+			},
+		},
+	}
 }

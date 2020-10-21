@@ -9,6 +9,7 @@ import (
 	"github.com/portworx/sched-ops/k8s/batch"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -58,6 +59,10 @@ func (d Driver) DeleteJob(id string) error {
 		return err
 	}
 
+	if err = utils.CleanServiceAccount(name, namespace); err != nil && !errors.IsNotFound(err) {
+		return err
+	}
+
 	return nil
 }
 
@@ -101,21 +106,26 @@ func jobFor(srcVol, dstVol, namespace string, labels map[string]string) (*batchv
 	}
 	cmd := fmt.Sprintf("ls -la /src; ls -la /dst/; rsync %s /src/ /dst", rsyncFlags)
 
+	jobName := toJobName(srcVol)
+	if err := utils.SetupServiceAccount(jobName, namespace, roleFor(utils.RsyncOpenshiftSCC())); err != nil {
+		return nil, err
+	}
+
 	return &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      toJobName(srcVol),
+			Name:      jobName,
 			Namespace: namespace,
 			Labels:    labels,
 		},
 		Spec: batchv1.JobSpec{
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels:      labels,
-					Annotations: jobAnnotations(),
+					Labels: labels,
 				},
 				Spec: corev1.PodSpec{
-					RestartPolicy:    corev1.RestartPolicyOnFailure,
-					ImagePullSecrets: utils.ToImagePullSecret(utils.RsyncImageSecret()),
+					RestartPolicy:      corev1.RestartPolicyOnFailure,
+					ImagePullSecrets:   utils.ToImagePullSecret(utils.RsyncImageSecret()),
+					ServiceAccountName: jobName,
 					Containers: []corev1.Container{
 						{
 							Name:    "rsync",
@@ -170,13 +180,19 @@ func addJobLabels(labels map[string]string) map[string]string {
 	return labels
 }
 
-func jobAnnotations() map[string]string {
-	scc := utils.RsyncOpenshiftSCC()
-	if scc == "" {
-		return nil
+func roleFor(constrainName string) *rbacv1.Role {
+	if constrainName == "" {
+		return &rbacv1.Role{}
 	}
 
-	return map[string]string{
-		drivers.OpenshiftSCCAnnotation: scc,
+	return &rbacv1.Role{
+		Rules: []rbacv1.PolicyRule{
+			{
+				APIGroups:     []string{"security.openshift.io"},
+				Resources:     []string{"securitycontextconstraints"},
+				ResourceNames: []string{constrainName},
+				Verbs:         []string{"use"},
+			},
+		},
 	}
 }

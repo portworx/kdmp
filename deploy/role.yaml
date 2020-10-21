@@ -71,6 +71,12 @@ rules:
       - volumesnapshots
     verbs:
       - '*'
+  - apiGroups:
+      - security.openshift.io
+    resources:
+      - securitycontextconstraints
+    verbs:
+      - use
 ---
 kind: ClusterRoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
