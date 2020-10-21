@@ -11,54 +11,35 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// SetupServiceAccount create a serviceaccount with enough permissions for resticexecutor.
-// (read for BackupLocation, read/write for VolumeBackup)
-func SetupServiceAccount(name, namespace string) error {
-	if _, err := rbacops.Instance().CreateRole(roleFor(name, namespace)); err != nil && !errors.IsAlreadyExists(err) {
-		return fmt.Errorf("create %s/%s role: %s", name, namespace, err)
-	}
-	if _, err := rbacops.Instance().CreateRoleBinding(roleBindingFor(name, namespace)); err != nil && !errors.IsAlreadyExists(err) {
-		return fmt.Errorf("create %s/%s rolebinding: %s", name, namespace, err)
+// SetupServiceAccount create a service account and bind it to a provided role.
+func SetupServiceAccount(name, namespace string, role *rbacv1.Role) error {
+	if role != nil {
+		role.Name, role.Namespace = name, namespace
+		if _, err := rbacops.Instance().CreateRole(role); err != nil && !errors.IsAlreadyExists(err) {
+			return fmt.Errorf("create %s/%s role: %s", namespace, name, err)
+		}
+		if _, err := rbacops.Instance().CreateRoleBinding(roleBindingFor(name, namespace)); err != nil && !errors.IsAlreadyExists(err) {
+			return fmt.Errorf("create %s/%s rolebinding: %s", namespace, name, err)
+		}
 	}
 	if _, err := coreops.Instance().CreateServiceAccount(serviceAccountFor(name, namespace)); err != nil && !errors.IsAlreadyExists(err) {
-		return fmt.Errorf("create %s/%s serviceaccount: %s", name, namespace, err)
+		return fmt.Errorf("create %s/%s serviceaccount: %s", namespace, name, err)
 	}
 	return nil
 }
 
-// CleanServiceAccount removes a serviceaccount with a corresponding role and rolebinding.
+// CleanServiceAccount removes a service account with a corresponding role and rolebinding.
 func CleanServiceAccount(name, namespace string) error {
 	if err := rbacops.Instance().DeleteRole(name, namespace); err != nil && !errors.IsNotFound(err) {
-		return fmt.Errorf("delete %s/%s role: %s", name, namespace, err)
+		return fmt.Errorf("delete %s/%s role: %s", namespace, name, err)
 	}
 	if err := rbacops.Instance().DeleteRoleBinding(name, namespace); err != nil && !errors.IsNotFound(err) {
-		return fmt.Errorf("delete %s/%s rolebinding: %s", name, namespace, err)
+		return fmt.Errorf("delete %s/%s rolebinding: %s", namespace, name, err)
 	}
 	if err := coreops.Instance().DeleteServiceAccount(name, namespace); err != nil && !errors.IsNotFound(err) {
-		return fmt.Errorf("delete %s/%s serviceaccount: %s", name, namespace, err)
+		return fmt.Errorf("delete %s/%s serviceaccount: %s", namespace, name, err)
 	}
 	return nil
-}
-
-func roleFor(name, namespace string) *rbacv1.Role {
-	return &rbacv1.Role{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: namespace,
-		},
-		Rules: []rbacv1.PolicyRule{
-			{
-				APIGroups: []string{"stork.libopenstorage.org"},
-				Resources: []string{"backuplocations"},
-				Verbs:     []string{"get", "list"},
-			},
-			{
-				APIGroups: []string{"kdmp.portworx.com"},
-				Resources: []string{"volumebackups"},
-				Verbs:     []string{rbacv1.VerbAll},
-			},
-		},
-	}
 }
 
 func roleBindingFor(name, namespace string) *rbacv1.RoleBinding {

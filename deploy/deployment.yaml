@@ -27,6 +27,6 @@ spec:
     spec:
       containers:
       - name: portworx-operator
-        image: portworx/kdmp:0.1.0
+        image: portworx/kdmp
         imagePullPolicy: Always
       serviceAccountName: kdmp-operator
