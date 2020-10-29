@@ -31,6 +31,16 @@ const (
 	SecretMount = "/tmp/resticsecret"
 )
 
+// Driver job options.
+const (
+	RsyncFlags                   = "KDMP_RSYNC_FLAGS"
+	RsyncOpenshiftSCC            = "KDMP_RSYNC_OPENSHIFT_SCC"
+	RsyncImageKey                = "KDMP_RSYNC_IMAGE"
+	RsyncImageSecretKey          = "KDMP_RSYNC_IMAGE_SECRET"
+	ResticExecutorImageKey       = "KDMP_RESTICEXECUTOR_IMAGE"
+	ResticExecutorImageSecretKey = "KDMP_RESTICEXECUTOR_IMAGE_SECRET"
+)
+
 // JobState represents a data transfer job state.
 type JobState string
 

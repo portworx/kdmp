@@ -1,0 +1,13 @@
+---
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: kdmp-operator
+subjects:
+  - kind: ServiceAccount
+    name: kdmp-operator
+    namespace: kube-system
+roleRef:
+  kind: ClusterRole
+  name: kdmp-operator
+  apiGroup: rbac.authorization.k8s.io
