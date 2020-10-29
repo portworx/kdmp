@@ -26,7 +26,7 @@ type Info struct {
 
 // String returns info as a human-friendly version string.
 func (info Info) String() string {
-	return info.GitVersion
+	return fmt.Sprintf("%s-%s", info.GitVersion, info.GitCommit)
 }
 
 // Get returns the overall codebase version.

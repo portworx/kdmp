@@ -67,7 +67,7 @@ func run(c *cli.Context) {
 	log.SetLevel(log.DebugLevel)
 
 	v := version.Get()
-	log.Infof("Starting kdmp: %s-%s, build date %s", v.GitVersion, v.GitCommit, v.BuildDate)
+	log.Infof("Starting kdmp: %s, build date %s", v.String(), v.BuildDate)
 
 	mgrOpts := manager.Options{}
 	if c.BoolT("leader-elect") {

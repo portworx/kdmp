@@ -77,7 +77,7 @@ func TestGetCmd(t *testing.T) {
 				"namespace": "n1",
 			},
 			createJob:   true,
-			expectedOut: "Data export jobs:\nn1/job-name: Final/Successful\n",
+			expectedOut: "NAMESPACE DATA EXPORT NAME STAGE STATUS\nn1        job-name         Final Successful\n",
 		},
 	}
 

@@ -58,12 +58,12 @@ func TestListCmd(t *testing.T) {
 				"namespace": "namespace",
 			},
 			createJob:   true,
-			expectedOut: "Data export jobs:\nnamespace/job: Final/Successful\n",
+			expectedOut: "NAMESPACE DATA EXPORT NAME STAGE STATUS\nnamespace job              Final Successful\n",
 		},
 		{
 			name:        "all-namespaces",
 			createJob:   true,
-			expectedOut: "Data export jobs:\nnamespace/job: Final/Successful\n",
+			expectedOut: "NAMESPACE DATA EXPORT NAME STAGE STATUS\nnamespace job              Final Successful\n",
 		},
 	}
 

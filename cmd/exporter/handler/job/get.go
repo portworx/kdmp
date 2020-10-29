@@ -1,9 +1,11 @@
 package job
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"os"
+	"text/tabwriter"
 
 	"github.com/portworx/kdmp/pkg/apis/kdmp/v1alpha1"
 	kdmpops "github.com/portworx/kdmp/pkg/util/ops"
@@ -134,8 +136,12 @@ func getCmdMessage(format string, job *v1alpha1.DataExport) (string, error) {
 }
 
 func getCmdTableMessage(j *v1alpha1.DataExport) (string, error) {
-	// TODO: add table printer?
-	o := "Data export jobs:\n"
-	o += fmt.Sprintf("%s/%s: %s/%s\n", j.Namespace, j.Name, j.Status.Stage, j.Status.Status)
-	return o, nil
+	w := bytes.NewBufferString("")
+	tw := tabwriter.NewWriter(w, 1, 1, 1, ' ', 0)
+	fmt.Fprintln(tw, "NAMESPACE\tDATA EXPORT NAME\tSTAGE\tSTATUS")
+	fmt.Fprintf(tw, "%s\t%s\t%s\t%s\n", j.Namespace, j.Name, j.Status.Stage, j.Status.Status)
+	if err := tw.Flush(); err != nil {
+		return "", err
+	}
+	return w.String(), nil
 }
