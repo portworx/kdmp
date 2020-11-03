@@ -75,7 +75,7 @@ func ToJobStatus(progress float64, errMsg string) *drivers.JobStatus {
 // ResticExecutorImage returns a docker image that contains resticexecutor binary.
 func ResticExecutorImage() string {
 	image := "portworx/resticexecutor"
-	if customImage := strings.TrimSpace(os.Getenv("KDMP_RESTICEXECUTOR_IMAGE")); customImage != "" {
+	if customImage := strings.TrimSpace(os.Getenv(drivers.ResticExecutorImageKey)); customImage != "" {
 		image = customImage
 	}
 	return image
@@ -83,31 +83,31 @@ func ResticExecutorImage() string {
 
 // ResticExecutorImageSecret returns an image pull secret for the resticexecutor image.
 func ResticExecutorImageSecret() string {
-	return strings.TrimSpace(os.Getenv("KDMP_RESTICEXECUTOR_IMAGE_SECRET"))
+	return strings.TrimSpace(os.Getenv(drivers.ResticExecutorImageSecretKey))
 }
 
 // RsyncImage returns a docker image that contains rsync binary.
 func RsyncImage() string {
 	image := "eeacms/rsync"
-	if customImage := strings.TrimSpace(os.Getenv("KDMP_RSYNC_IMAGE")); customImage != "" {
+	if customImage := strings.TrimSpace(os.Getenv(drivers.RsyncImageKey)); customImage != "" {
 		image = customImage
 	}
 	return image
 }
 
+// RsyncImageSecret returns an image pull secret for the rsync image.
+func RsyncImageSecret() string {
+	return strings.TrimSpace(os.Getenv(drivers.RsyncImageSecretKey))
+}
+
 // RsyncCommandFlags allows to change rsync command flags.
 func RsyncCommandFlags() string {
-	return strings.TrimSpace(os.Getenv("KDMP_RSYNC_FLAGS"))
+	return strings.TrimSpace(os.Getenv(drivers.RsyncFlags))
 }
 
 // RsyncOpenshiftSCC is used to set a custom openshift security context constraints for a rsync deployment.
 func RsyncOpenshiftSCC() string {
-	return strings.TrimSpace(os.Getenv("KDMP_RSYNC_OPENSHIFT_SCC"))
-}
-
-// RsyncImageSecret returns an image pull secret for the rsync image.
-func RsyncImageSecret() string {
-	return strings.TrimSpace(os.Getenv("KDMP_RSYNC_IMAGE_SECRET"))
+	return strings.TrimSpace(os.Getenv(drivers.RsyncOpenshiftSCC))
 }
 
 // ToImagePullSecret converts a secret name to the ImagePullSecret struct.

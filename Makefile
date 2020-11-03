@@ -1,7 +1,7 @@
 RELEASE_VER := master
 BUILD_DATE  := $(shell date -u +'%Y-%m-%dT%H:%M:%SZ')
 BASE_DIR    := $(shell git rev-parse --show-toplevel)
-GIT_SHA     := $(shell git rev-parse HEAD)
+GIT_SHA     := $(shell git rev-parse --short HEAD)
 BIN         := $(BASE_DIR)/bin
 
 DOCKER_IMAGE_REPO?=portworx
@@ -86,8 +86,8 @@ staticcheck:
 
 errcheck:
 	GO111MODULE=off go get -u github.com/kisielk/errcheck
-	errcheck -ignoregenerated -verbose -blank $(PKGS)
-	errcheck -ignoregenerated -verbose -blank -tags unittest $(PKGS)
+	errcheck -ignoregenerated -ignorepkg fmt -verbose -blank $(PKGS)
+	errcheck -ignoregenerated -ignorepkg fmt -verbose -blank -tags unittest $(PKGS)
 	#errcheck -ignoregenerated -verbose -blank -tags integrationtest github.com/portworx/kdmp/test/integration_test
 
 
@@ -107,6 +107,9 @@ codegen:
 	@echo "Generating CRD"
 	@hack/update-codegen.sh
 
+gogen:
+	go generate ./...
+
 vendor-sync:
 	go mod tidy
 	go mod vendor
@@ -125,3 +128,6 @@ deploy:
 	docker push $(DOCKER_IMAGE)
 
 release: build container deploy
+
+build-pxc-exporter: gogen
+	go build -o ${BIN}/pxc-exporter ./cmd/exporter

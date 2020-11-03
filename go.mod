@@ -3,17 +3,22 @@ module github.com/portworx/kdmp
 go 1.13
 
 require (
+	github.com/cheynewallace/tabby v1.1.0 // indirect
 	github.com/kubernetes-incubator/external-storage v0.0.0-00010101000000-000000000000
+	github.com/libopenstorage/openstorage-sdk-clients v0.69.27 // indirect
 	github.com/libopenstorage/stork v1.3.0-beta1.0.20200410032049-df8bcecf8f71
+	github.com/portworx/pxc v0.31.1
 	github.com/portworx/sched-ops v0.0.0-20200226052527-b624a2f22d6c
 	github.com/sirupsen/logrus v1.4.2
 	github.com/spf13/cobra v0.0.5
+	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.4.0
 	github.com/urfave/cli v1.22.2
 	golang.org/x/tools v0.0.0-20200408132156-9ee5ef7a2c0d // indirect
 	k8s.io/api v0.17.0
 	k8s.io/apiextensions-apiserver v0.16.6
 	k8s.io/apimachinery v0.17.1-beta.0
+	k8s.io/cli-runtime v0.16.6
 	k8s.io/client-go v11.0.1-0.20190409021438-1a26190bd76a+incompatible
 	k8s.io/code-generator v0.16.6
 	k8s.io/kubectl v0.0.0

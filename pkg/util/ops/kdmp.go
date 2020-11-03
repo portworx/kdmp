@@ -7,7 +7,6 @@ import (
 
 	kdmpclientset "github.com/portworx/kdmp/pkg/client/clientset/versioned"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 )
@@ -21,6 +20,7 @@ var (
 
 // Ops is an interface to KDMP operations.
 type Ops interface {
+	DataExportOps
 	VolumeBackupOps
 
 	// SetConfig sets the config and resets the client
@@ -43,27 +43,20 @@ func SetInstance(i Ops) {
 }
 
 // New creates a new kdmp client.
-func New(kube kubernetes.Interface, kdmp kdmpclientset.Interface) *Client {
+func New(kdmp kdmpclientset.Interface) *Client {
 	return &Client{
-		kube: kube,
 		kdmp: kdmp,
 	}
 }
 
 // NewForConfig creates a new kdmp client for the given config.
 func NewForConfig(c *rest.Config) (*Client, error) {
-	kclient, err := kubernetes.NewForConfig(c)
-	if err != nil {
-		return nil, err
-	}
-
 	kdmpClient, err := kdmpclientset.NewForConfig(c)
 	if err != nil {
 		return nil, err
 	}
 
 	return &Client{
-		kube: kclient,
 		kdmp: kdmpClient,
 	}, nil
 }
@@ -82,7 +75,6 @@ func NewInstanceFromConfigFile(config string) (Ops, error) {
 // Client is a wrapper for the kdmp operator client.
 type Client struct {
 	config *rest.Config
-	kube   kubernetes.Interface
 	kdmp   kdmpclientset.Interface
 }
 
@@ -90,13 +82,12 @@ type Client struct {
 func (c *Client) SetConfig(cfg *rest.Config) {
 	c.config = cfg
 
-	c.kube = nil
 	c.kdmp = nil
 }
 
 // initClient initialize kdmp clients.
 func (c *Client) initClient() error {
-	if c.kdmp != nil && c.kube != nil {
+	if c.kdmp != nil {
 		return nil
 	}
 
@@ -149,11 +140,6 @@ func (c *Client) loadClient() error {
 	}
 
 	var err error
-
-	c.kube, err = kubernetes.NewForConfig(c.config)
-	if err != nil {
-		return err
-	}
 
 	c.kdmp, err = kdmpclientset.NewForConfig(c.config)
 	if err != nil {

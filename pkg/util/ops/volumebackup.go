@@ -14,25 +14,25 @@ import (
 // VolumeBackupOps is an interface to perform k8s VolumeBackup operations
 type VolumeBackupOps interface {
 	// CreateVolumeBackup creates the VolumeBackup
-	CreateVolumeBackup(*kdmpv1alpha1.VolumeBackup) (*kdmpv1alpha1.VolumeBackup, error)
+	CreateVolumeBackup(volumeBackup *kdmpv1alpha1.VolumeBackup) (*kdmpv1alpha1.VolumeBackup, error)
 	// GetVolumeBackup gets the VolumeBackup
-	GetVolumeBackup(string, string) (*kdmpv1alpha1.VolumeBackup, error)
+	GetVolumeBackup(name string, namespace string) (*kdmpv1alpha1.VolumeBackup, error)
 	// ListVolumeBackups lists all the VolumeBackups
-	ListVolumeBackups(string) (*kdmpv1alpha1.VolumeBackupList, error)
+	ListVolumeBackups(namespace string) (*kdmpv1alpha1.VolumeBackupList, error)
 	// UpdateVolumeBackup updates the VolumeBackup
 	UpdateVolumeBackup(*kdmpv1alpha1.VolumeBackup) (*kdmpv1alpha1.VolumeBackup, error)
 	// DeleteVolumeBackup deletes the VolumeBackup
-	DeleteVolumeBackup(string, string) error
+	DeleteVolumeBackup(name string, namespace string) error
 	// ValidateVolumeBackup validates the VolumeBackup
-	ValidateVolumeBackup(string, string, time.Duration, time.Duration) error
+	ValidateVolumeBackup(name string, namespace string, timeout, retryInterval time.Duration) error
 }
 
 // CreateVolumeBackup creates the VolumeBackup
-func (c *Client) CreateVolumeBackup(backupLocation *kdmpv1alpha1.VolumeBackup) (*kdmpv1alpha1.VolumeBackup, error) {
+func (c *Client) CreateVolumeBackup(volumeBackup *kdmpv1alpha1.VolumeBackup) (*kdmpv1alpha1.VolumeBackup, error) {
 	if err := c.initClient(); err != nil {
 		return nil, err
 	}
-	return c.kdmp.KdmpV1alpha1().VolumeBackups(backupLocation.Namespace).Create(backupLocation)
+	return c.kdmp.KdmpV1alpha1().VolumeBackups(volumeBackup.Namespace).Create(volumeBackup)
 }
 
 // GetVolumeBackup gets the VolumeBackup
@@ -52,14 +52,14 @@ func (c *Client) ListVolumeBackups(namespace string) (*kdmpv1alpha1.VolumeBackup
 }
 
 // UpdateVolumeBackup updates the VolumeBackup
-func (c *Client) UpdateVolumeBackup(backupLocation *kdmpv1alpha1.VolumeBackup) (*kdmpv1alpha1.VolumeBackup, error) {
+func (c *Client) UpdateVolumeBackup(volumeBackup *kdmpv1alpha1.VolumeBackup) (*kdmpv1alpha1.VolumeBackup, error) {
 	if err := c.initClient(); err != nil {
 		return nil, err
 	}
-	return c.kdmp.KdmpV1alpha1().VolumeBackups(backupLocation.Namespace).Update(backupLocation)
+	return c.kdmp.KdmpV1alpha1().VolumeBackups(volumeBackup.Namespace).Update(volumeBackup)
 }
 
-// PatchVolumeBackup applies a patch for a given volumebackup.
+// PatchVolumeBackup applies a patch for a given volumeBackup.
 func (c *Client) PatchVolumeBackup(name, ns string, pt types.PatchType, jsonPatch []byte) (*kdmpv1alpha1.VolumeBackup, error) {
 	if err := c.initClient(); err != nil {
 		return nil, err
