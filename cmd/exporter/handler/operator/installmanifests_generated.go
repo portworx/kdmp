@@ -24,6 +24,8 @@ kind: Deployment
 metadata:
   name: kdmp-operator
   namespace: kube-system
+  labels:
+    name: kdmp-operator
 spec:
   strategy:
     rollingUpdate:

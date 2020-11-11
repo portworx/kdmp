@@ -19,17 +19,17 @@ func TestCopyCmdFlags(t *testing.T) {
 	expectedFlags := []testFlag{
 		{
 			Name:      "destination",
-			Shorthand: "d",
+			Shorthand: "",
 			Usage:     "name of the destination PVC",
 		},
 		{
 			Name:      "namespace",
-			Shorthand: "n",
+			Shorthand: "",
 			Usage:     "namespace of the PVCs",
 		},
 		{
 			Name:      "source",
-			Shorthand: "s",
+			Shorthand: "",
 			Usage:     "name of the source PVC",
 		},
 	}
