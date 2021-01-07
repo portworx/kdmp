@@ -1,4 +1,4 @@
-RELEASE_VER := master
+RELEASE_VER := v0.3.0
 BUILD_DATE  := $(shell date -u +'%Y-%m-%dT%H:%M:%SZ')
 BASE_DIR    := $(shell git rev-parse --show-toplevel)
 GIT_SHA     := $(shell git rev-parse --short HEAD)
