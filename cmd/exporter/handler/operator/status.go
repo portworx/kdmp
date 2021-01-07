@@ -1,14 +1,17 @@
 package operator
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"os"
+	"text/tabwriter"
 
 	appsops "github.com/portworx/sched-ops/k8s/apps"
 	"github.com/spf13/cobra"
 	v1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubectl/pkg/util/templates"
 )
 
@@ -60,7 +63,9 @@ func (o *StatusOptions) complete(args []string) error {
 }
 
 func (o *StatusOptions) run() error {
-	deploy, err := appsops.Instance().GetDeployment("kdmp-operator", "")
+	deployList, err := appsops.Instance().ListDeployments("", metav1.ListOptions{
+		LabelSelector: "name=kdmp-operator",
+	})
 	if err != nil {
 		if errors.IsNotFound(err) {
 			return o.printNotFound()
@@ -68,9 +73,18 @@ func (o *StatusOptions) run() error {
 		return err
 	}
 
-	status := getDeploymentStatus(deploy)
-	_, err = fmt.Fprintf(o.out, "operator status: deployment %s/%s is %s\n", deploy.Namespace, deploy.Name, status)
-	return err
+	w := bytes.NewBufferString("")
+	tw := tabwriter.NewWriter(w, 1, 1, 1, ' ', 0)
+	fmt.Fprintln(tw, "DEPLOYMENT\tNAMESPACE\tSTATUS")
+	for _, deploy := range deployList.Items {
+		fmt.Fprintf(tw, "%s\t%s\t%s\n", deploy.Name, deploy.Namespace, getDeploymentStatus(&deploy))
+	}
+	if err = tw.Flush(); err != nil {
+		return fmt.Errorf("failed to parse table print: %s", err)
+	}
+
+	fmt.Fprint(o.out, w.String())
+	return nil
 }
 
 func (o *StatusOptions) printNotFound() error {
@@ -79,7 +93,7 @@ func (o *StatusOptions) printNotFound() error {
 }
 
 func getDeploymentStatus(deploy *v1.Deployment) string {
-	if deploy == nil && deploy.Status.ReadyReplicas > 0 {
+	if deploy != nil && deploy.Status.ReadyReplicas > 0 {
 		return "ready"
 	}
 	return "not ready"

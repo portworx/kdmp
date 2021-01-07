@@ -21,10 +21,7 @@ var (
 		kubectl pxc exporter copy --source src-pvc --destination dst-pvc --namespaces ns1 copy-src-pvc
 
 		# Start a job with a generated name
-		kubectl pxc exporter copy --source src-pvc --destination dst-pvc --namespaces ns1
-
-		# Use flag aliases
-		kubectl pxc exporter copy -s src-pvc -d dst-pvc -n ns1`)
+		kubectl pxc exporter copy --source src-pvc --destination dst-pvc --namespaces ns1`)
 )
 
 // Register this command
@@ -61,9 +58,9 @@ func newCopyCmd(out, errOut io.Writer) *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVarP(&o.source, "source", "s", "", "name of the source PVC")
-	cmd.Flags().StringVarP(&o.destination, "destination", "d", "", "name of the destination PVC")
-	cmd.Flags().StringVarP(&o.namespace, "namespace", "n", "", "namespace of the PVCs")
+	cmd.Flags().StringVarP(&o.source, "source", "", "", "name of the source PVC")
+	cmd.Flags().StringVarP(&o.destination, "destination", "", "", "name of the destination PVC")
+	cmd.Flags().StringVarP(&o.namespace, "namespace", "", "", "namespace of the PVCs")
 	return cmd
 }
 

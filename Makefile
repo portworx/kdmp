@@ -37,13 +37,18 @@ GO_FILES := $(shell find . -name '*.go' | grep -v 'vendor' | \
 all: pretest test build container
 
 test:
-	sudo docker run --rm -it -v ${GOPATH}:/go: $(KDMP_UNITTEST_IMG) make unittest
+	docker run --rm -it -v ${GOPATH}:/go: $(KDMP_UNITTEST_IMG) make unittest
 
 test-container:
 	@echo "Building container: docker build --tag $(KDMP_UNITTEST_IMG) -f Dockerfile.unittest ."
-	sudo docker build --tag $(KDMP_UNITTEST_IMG) -f Dockerfile.unittest .
+	docker build --tag $(KDMP_UNITTEST_IMG) -f Dockerfile.unittest .
 
+pretest: check-fmt lint vet errcheck staticcheck
+build: build-kdmp build-restic-executor build-pxc-exporter
+container: container-kdmp container-restic-executor container-pxc-exporter
+deploy: deploy-kdmp deploy-restic-executor deploy-pxc-exporter
 
+### util targets ###
 unittest:
 	echo "mode: atomic" > coverage.txt
 	for pkg in $(PKGS); do \
@@ -53,14 +58,6 @@ unittest:
 			rm profile.out; \
 		fi; \
 	done
-
-restic:
-	@echo "Building resticexecutor"
-	@go build -o $(BIN)/resticexecutor $(BASE_DIR)/cmd/executor/restic.go
-
-restic-container:
-	@echo "Building resticexecutor docker image"
-	docker build --tag $(RESTICEXECUTOR_DOCKER_IMAGE) -f Dockerfile.resticexecutor .
 
 lint:
 	GO111MODULE=off go get -u golang.org/x/lint/golint
@@ -90,7 +87,6 @@ errcheck:
 	errcheck -ignoregenerated -ignorepkg fmt -verbose -blank -tags unittest $(PKGS)
 	#errcheck -ignoregenerated -verbose -blank -tags integrationtest github.com/portworx/kdmp/test/integration_test
 
-
 check-fmt:
 	bash -c "diff -u <(echo -n) <(gofmt -l -d -s -e $(GO_FILES))"
 
@@ -101,33 +97,60 @@ gocyclo:
 	go get -u github.com/fzipp/gocyclo
 	gocyclo -over 15 $(GO_FILES)
 
-pretest: check-fmt lint vet errcheck staticcheck
-
 codegen:
 	@echo "Generating CRD"
-	@hack/update-codegen.sh
+	hack/update-codegen.sh
 
-gogen:
+gogenerate:
 	go generate ./...
 
 vendor-sync:
 	go mod tidy
 	go mod vendor
 
-build:
+### kdmp-operator targets ###
+build-kdmp:
+	@echo "Build kdmp"
 	go build -o ${BIN}/kdmp -ldflags="-s -w \
 	-X github.com/portworx/kdmp/pkg/version.gitVersion=${RELEASE_VER} \
 	-X github.com/portworx/kdmp/pkg/version.gitCommit=${GIT_SHA} \
 	-X github.com/portworx/kdmp/pkg/version.buildDate=${BUILD_DATE}" \
-	./cmd/kdmp
+	$(BASE_DIR)/cmd/kdmp
 
-container:
+container-kdmp:
+	@echo "Build kdmp docker image"
 	docker build --tag $(DOCKER_IMAGE) .
 
-deploy:
+deploy-kdmp:
+	@echo "Deploy kdmp docker image"
 	docker push $(DOCKER_IMAGE)
 
-release: build container deploy
+### restic-executor targets ###
+build-restic-executor:
+	@echo "Build restic-executor"
+	go build -o $(BIN)/resticexecutor -ldflags="-s -w \
+	-X github.com/portworx/kdmp/pkg/version.gitVersion=${RELEASE_VER} \
+	-X github.com/portworx/kdmp/pkg/version.gitCommit=${GIT_SHA} \
+	-X github.com/portworx/kdmp/pkg/version.buildDate=${BUILD_DATE}" \
+	$(BASE_DIR)/cmd/executor
 
-build-pxc-exporter: gogen
-	go build -o ${BIN}/pxc-exporter ./cmd/exporter
+container-restic-executor:
+	@echo "Build restice-xecutor docker image"
+	docker build --tag $(RESTICEXECUTOR_DOCKER_IMAGE) -f Dockerfile.resticexecutor .
+
+deploy-restic-executor:
+	@echo "Deploy kdmp docker image"
+	docker push $(RESTICEXECUTOR_DOCKER_IMAGE)
+
+### pxc-exporter targets ###
+build-pxc-exporter: gogenerate
+	@echo "Build kdmp"
+	go build -o ${BIN}/pxc-exporter -ldflags="-s -w \
+	-X github.com/portworx/kdmp/pkg/version.gitVersion=${RELEASE_VER} \
+	-X github.com/portworx/kdmp/pkg/version.gitCommit=${GIT_SHA} \
+	-X github.com/portworx/kdmp/pkg/version.buildDate=${BUILD_DATE}" \
+	 $(BASE_DIR)/cmd/exporter
+
+container-pxc-exporter:
+deploy-pxc-exporter:
+

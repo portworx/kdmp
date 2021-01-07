@@ -31,7 +31,7 @@ var (
 		kubectl pxc exporter operator install -n ns1
 
 		# Install a kdmp operator
-		kubectl pxc exporter operator install | kubectl create -f -"`)
+		kubectl pxc exporter operator install | kubectl create -f -`)
 )
 
 // InstallOptions is used for the delete subcommand setup.
@@ -74,7 +74,7 @@ func newInstallCmd(out, errOut io.Writer) *cobra.Command {
 	cmd.Flags().StringVarP(&o.image, "image", "", "portworx/kdmp", "custom kdmp operator image")
 	cmd.Flags().StringVarP(&o.rsyncImage, "rsync-image", "", "", "custom rsync image")
 	cmd.Flags().StringVarP(&o.rsyncPullSecret, "rsync-pull-secret", "", "", "pull secret name for a custom rsync image")
-	cmd.Flags().StringVarP(&o.rsyncOpenshiftSCC, "rsync-openshift-scc", "", "", "openshift security context constraint name to use for a rsync jobs")
+	cmd.Flags().StringVarP(&o.rsyncOpenshiftSCC, "rsync-openshift-scc", "", "", "openshift security context constraint name to use for rsync jobs")
 	cmd.Flags().StringVarP(&o.resticExecutorImage, "resticexecutor-image", "", "", "custom resticexecutor image")
 	cmd.Flags().StringVarP(&o.resticExecutorPullSecret, "resticexecutor-pull-secret", "", "", "pull secret name for a custom resticexecutor image")
 
