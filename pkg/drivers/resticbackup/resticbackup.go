@@ -128,6 +128,7 @@ func jobFor(
 	pvcName,
 	backuplocationName,
 	backuplocationNamespace string,
+	resources corev1.ResourceRequirements,
 	labels map[string]string) (*batchv1.Job, error) {
 	backupName := jobName
 
@@ -175,6 +176,7 @@ func jobFor(
 								"-c",
 								cmd,
 							},
+							Resources: resources,
 							VolumeMounts: []corev1.VolumeMount{
 								{
 									Name:      "vol",
@@ -230,6 +232,11 @@ func addJobLabels(labels map[string]string) map[string]string {
 }
 
 func buildJob(jobName string, o drivers.JobOpts) (*batchv1.Job, error) {
+	resources, err := utils.ResticResourceRequirements()
+	if err != nil {
+		return nil, err
+	}
+
 	if err := utils.SetupServiceAccount(jobName, o.Namespace, roleFor()); err != nil {
 		return nil, err
 	}
@@ -247,6 +254,7 @@ func buildJob(jobName string, o drivers.JobOpts) (*batchv1.Job, error) {
 			o.BackupLocationName,
 			o.BackupLocationNamespace,
 			pods[0],
+			resources,
 			o.Labels,
 		)
 	}
@@ -257,6 +265,7 @@ func buildJob(jobName string, o drivers.JobOpts) (*batchv1.Job, error) {
 		o.SourcePVCName,
 		o.BackupLocationName,
 		o.BackupLocationNamespace,
+		resources,
 		o.Labels,
 	)
 }
