@@ -101,7 +101,7 @@ github.com/kubernetes-incubator/external-storage/snapshot/pkg/apis/crd/v1
 github.com/kubernetes-incubator/external-storage/snapshot/pkg/client
 # github.com/libopenstorage/openstorage-sdk-clients v0.69.27
 github.com/libopenstorage/openstorage-sdk-clients/sdk/golang
-# github.com/libopenstorage/stork v1.3.0-beta1.0.20200410032049-df8bcecf8f71
+# github.com/libopenstorage/stork v1.3.0-beta1.0.20200630005842-9255e7a98775
 github.com/libopenstorage/stork/pkg/apis/stork
 github.com/libopenstorage/stork/pkg/apis/stork/v1alpha1
 github.com/libopenstorage/stork/pkg/client/clientset/versioned
@@ -134,7 +134,7 @@ github.com/portworx/pxc/pkg/component
 github.com/portworx/pxc/pkg/config
 github.com/portworx/pxc/pkg/kubernetes
 github.com/portworx/pxc/pkg/util
-# github.com/portworx/sched-ops v0.0.0-20200226052527-b624a2f22d6c => github.com/saheienko/sched-ops v0.0.0-20200505104752-34ac8cc408af
+# github.com/portworx/sched-ops v0.0.0-20200226052527-b624a2f22d6c => github.com/portworx/sched-ops v0.0.0-20210129165423-2b83087e7388
 github.com/portworx/sched-ops/k8s/apiextensions
 github.com/portworx/sched-ops/k8s/apps
 github.com/portworx/sched-ops/k8s/batch

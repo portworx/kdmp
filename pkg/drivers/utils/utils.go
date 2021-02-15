@@ -5,6 +5,8 @@ import (
 	"os"
 	"strings"
 
+	"k8s.io/apimachinery/pkg/api/resource"
+
 	"github.com/portworx/kdmp/pkg/drivers"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -65,7 +67,6 @@ func ToJobStatus(progress float64, errMsg string) *drivers.JobStatus {
 		}
 	}
 
-	// TODO: require bounds [0, 100)?
 	return &drivers.JobStatus{
 		State:            drivers.JobStateInProgress,
 		ProgressPercents: progress,
@@ -121,4 +122,75 @@ func ToImagePullSecret(name string) []corev1.LocalObjectReference {
 		},
 	}
 
+}
+
+// ResticResourceRequirements returns ResourceRequirements for the restricexecutor container.
+func ResticResourceRequirements() (corev1.ResourceRequirements, error) {
+	requestCPU := drivers.DefaultResticExecutorRequestCPU
+	if customRequestCPU := os.Getenv(drivers.ResticExecutorRequestCPU); customRequestCPU != "" {
+		requestCPU = customRequestCPU
+	}
+	requestMem := drivers.DefaultResticExecutorRequestMemory
+	if customRequestMemory := os.Getenv(drivers.ResticExecutorRequestMemory); customRequestMemory != "" {
+		requestMem = customRequestMemory
+	}
+	limitCPU := drivers.DefaultResticExecutorLimitCPU
+	if customLimitCPU := os.Getenv(drivers.ResticExecutorLimitCPU); customLimitCPU != "" {
+		limitCPU = customLimitCPU
+	}
+	limitMem := drivers.DefaultResticExecutorLimitMemory
+	if customLimitMemory := os.Getenv(drivers.ResticExecutorLimitMemory); customLimitMemory != "" {
+		limitMem = customLimitMemory
+	}
+	return toResourceRequirements(requestCPU, requestMem, limitCPU, limitMem)
+}
+
+// RsyncResourceRequirements returns ResourceRequirements for the rsync container.
+func RsyncResourceRequirements() (corev1.ResourceRequirements, error) {
+	requestCPU := drivers.DefaultRsyncRequestCPU
+	if customRequestCPU := os.Getenv(drivers.RsyncRequestCPU); customRequestCPU != "" {
+		requestCPU = customRequestCPU
+	}
+	requestMem := drivers.DefaultRsyncRequestMemory
+	if customRequestMemory := os.Getenv(drivers.RsyncRequestMemory); customRequestMemory != "" {
+		requestMem = customRequestMemory
+	}
+	limitCPU := drivers.DefaultRsyncLimitCPU
+	if customLimitCPU := os.Getenv(drivers.RsyncLimitCPU); customLimitCPU != "" {
+		limitCPU = customLimitCPU
+	}
+	limitMem := drivers.DefaultRsyncLimitMemory
+	if customLimitMemory := os.Getenv(drivers.RsyncLimitMemory); customLimitMemory != "" {
+		limitMem = customLimitMemory
+	}
+	return toResourceRequirements(requestCPU, requestMem, limitCPU, limitMem)
+}
+
+func toResourceRequirements(requestCPU, requestMem, limitCPU, limitMem string) (corev1.ResourceRequirements, error) {
+	requestCPUQ, err := resource.ParseQuantity(requestCPU)
+	if err != nil {
+		return corev1.ResourceRequirements{}, fmt.Errorf("failed to parse %q requestCPU: %s", requestCPU, err)
+	}
+	requestMemQ, err := resource.ParseQuantity(requestMem)
+	if err != nil {
+		return corev1.ResourceRequirements{}, fmt.Errorf("failed to parse %q requestMemory: %s", requestMem, err)
+	}
+	limitCPUQ, err := resource.ParseQuantity(limitCPU)
+	if err != nil {
+		return corev1.ResourceRequirements{}, fmt.Errorf("failed to parse %q limitCPU: %s", limitCPU, err)
+	}
+	limitMemQ, err := resource.ParseQuantity(limitMem)
+	if err != nil {
+		return corev1.ResourceRequirements{}, fmt.Errorf("failed to parse %q limitMemory: %s", limitMem, err)
+	}
+	return corev1.ResourceRequirements{
+		Requests: map[corev1.ResourceName]resource.Quantity{
+			corev1.ResourceCPU:    requestCPUQ,
+			corev1.ResourceMemory: requestMemQ,
+		},
+		Limits: corev1.ResourceList{
+			corev1.ResourceCPU:    limitCPUQ,
+			corev1.ResourceMemory: limitMemQ,
+		},
+	}, nil
 }

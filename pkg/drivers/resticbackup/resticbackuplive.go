@@ -24,6 +24,7 @@ func jobForLiveBackup(
 	backuplocationName,
 	backuplocationNamespace string,
 	mountPod corev1.Pod,
+	resources corev1.ResourceRequirements,
 	labels map[string]string) (*batchv1.Job, error) {
 	volDir, err := getVolumeDirectory(pvcName, namespace)
 	if err != nil {
@@ -83,6 +84,7 @@ func jobForLiveBackup(
 								"-c",
 								cmd,
 							},
+							Resources: resources,
 							VolumeMounts: []corev1.VolumeMount{
 								{
 									Name:      "vol",

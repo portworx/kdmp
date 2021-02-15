@@ -141,6 +141,11 @@ func jobFor(
 	labels map[string]string) (*batchv1.Job, error) {
 	labels = addJobLabels(labels)
 
+	resources, err := utils.ResticResourceRequirements()
+	if err != nil {
+		return nil, err
+	}
+
 	genName := toJobName(pvcName)
 	if err := utils.SetupServiceAccount(genName, namespace, roleFor()); err != nil {
 		return nil, err
@@ -186,6 +191,7 @@ func jobFor(
 								"-c",
 								cmd,
 							},
+							Resources: resources,
 							VolumeMounts: []corev1.VolumeMount{
 								{
 									Name:      "vol",

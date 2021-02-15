@@ -106,6 +106,11 @@ func jobFor(srcVol, dstVol, namespace string, labels map[string]string) (*batchv
 	}
 	cmd := fmt.Sprintf("ls -la /src; ls -la /dst/; rsync %s /src/ /dst", rsyncFlags)
 
+	resources, err := utils.RsyncResourceRequirements()
+	if err != nil {
+		return nil, err
+	}
+
 	jobName := toJobName(srcVol)
 	if err := utils.SetupServiceAccount(jobName, namespace, roleFor(utils.RsyncOpenshiftSCC())); err != nil {
 		return nil, err
@@ -128,9 +133,10 @@ func jobFor(srcVol, dstVol, namespace string, labels map[string]string) (*batchv
 					ServiceAccountName: jobName,
 					Containers: []corev1.Container{
 						{
-							Name:    "rsync",
-							Image:   utils.RsyncImage(),
-							Command: []string{"/bin/sh", "-x", "-c", cmd},
+							Name:      "rsync",
+							Image:     utils.RsyncImage(),
+							Command:   []string{"/bin/sh", "-x", "-c", cmd},
+							Resources: resources,
 							VolumeMounts: []corev1.VolumeMount{
 								{
 									Name:      "src-vol",

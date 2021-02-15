@@ -45,6 +45,13 @@ spec:
       - name: kdmp-operator
         image: portworx/kdmp
         imagePullPolicy: Always
+        resources:
+          requests:
+            cpu: 0.5
+            memory: 200Mi
+          limits:
+            cpu: 1
+            memory: 500Mi
       serviceAccountName: kdmp-operator
 `
 

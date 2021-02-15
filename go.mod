@@ -6,7 +6,7 @@ require (
 	github.com/cheynewallace/tabby v1.1.0 // indirect
 	github.com/kubernetes-incubator/external-storage v0.0.0-00010101000000-000000000000
 	github.com/libopenstorage/openstorage-sdk-clients v0.69.27 // indirect
-	github.com/libopenstorage/stork v1.3.0-beta1.0.20200410032049-df8bcecf8f71
+	github.com/libopenstorage/stork v1.3.0-beta1.0.20200630005842-9255e7a98775
 	github.com/portworx/pxc v0.31.1
 	github.com/portworx/sched-ops v0.0.0-20200226052527-b624a2f22d6c
 	github.com/sirupsen/logrus v1.4.2
@@ -28,7 +28,7 @@ require (
 
 replace (
 	github.com/kubernetes-incubator/external-storage => github.com/libopenstorage/external-storage v5.3.0-alpha.1.0.20200130041458-d2b33d4448ea+incompatible
-	github.com/portworx/sched-ops => github.com/saheienko/sched-ops v0.0.0-20200505104752-34ac8cc408af
+	github.com/portworx/sched-ops => github.com/portworx/sched-ops v0.0.0-20210129165423-2b83087e7388
 	k8s.io/api => k8s.io/api v0.16.6
 	k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.16.6
 	k8s.io/apimachinery => k8s.io/apimachinery v0.16.6
