@@ -1,8 +1,9 @@
-RELEASE_VER := master
+RELEASE_VER := latest
 BUILD_DATE  := $(shell date -u +'%Y-%m-%dT%H:%M:%SZ')
 BASE_DIR    := $(shell git rev-parse --show-toplevel)
 GIT_SHA     := $(shell git rev-parse --short HEAD)
 BIN         := $(BASE_DIR)/bin
+export RELEASE_VER
 
 DOCKER_IMAGE_REPO?=portworx
 DOCKER_IMAGE_NAME?=kdmp
@@ -44,7 +45,7 @@ test-container:
 	docker build --tag $(KDMP_UNITTEST_IMG) -f Dockerfile.unittest .
 
 pretest: check-fmt lint vet errcheck staticcheck
-build: build-kdmp build-restic-executor build-pxc-exporter
+build: update-deployment build-kdmp build-restic-executor build-pxc-exporter
 container: container-kdmp container-restic-executor container-pxc-exporter
 deploy: deploy-kdmp deploy-restic-executor deploy-pxc-exporter
 
@@ -103,6 +104,10 @@ codegen:
 
 gogenerate:
 	go generate ./...
+
+update-deployment:
+	@echo "Updating deployment resources"
+	hack/generate-operator-deployment.sh
 
 vendor-sync:
 	go mod tidy

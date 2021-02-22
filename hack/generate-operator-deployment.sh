@@ -1,3 +1,13 @@
+#!/bin/bash
+
+set -o errexit
+set -o nounset
+set -o pipefail
+
+IMAGE_TAG=${RELEASE_VER:-latest}
+DEPLOYMENT_DIR=./deploy
+
+cat << EOF > ${DEPLOYMENT_DIR}/deployment.yaml
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -23,7 +33,7 @@ spec:
     spec:
       containers:
       - name: kdmp-operator
-        image: portworx/kdmp:latest
+        image: portworx/kdmp:${IMAGE_TAG}
         imagePullPolicy: Always
         resources:
           requests:
@@ -33,3 +43,4 @@ spec:
             cpu: 1
             memory: 500Mi
       serviceAccountName: kdmp-operator
+EOF

@@ -5,11 +5,11 @@ import (
 	"os"
 	"strings"
 
-	"k8s.io/apimachinery/pkg/api/resource"
-
 	"github.com/portworx/kdmp/pkg/drivers"
+	"github.com/portworx/kdmp/pkg/version"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
 )
 
@@ -75,11 +75,11 @@ func ToJobStatus(progress float64, errMsg string) *drivers.JobStatus {
 
 // ResticExecutorImage returns a docker image that contains resticexecutor binary.
 func ResticExecutorImage() string {
-	image := "portworx/resticexecutor"
 	if customImage := strings.TrimSpace(os.Getenv(drivers.ResticExecutorImageKey)); customImage != "" {
-		image = customImage
+		return customImage
 	}
-	return image
+	// use a versioned docker image
+	return strings.Join([]string{drivers.ResticExecutorImage, version.Get().GitVersion}, ":")
 }
 
 // ResticExecutorImageSecret returns an image pull secret for the resticexecutor image.
@@ -89,11 +89,10 @@ func ResticExecutorImageSecret() string {
 
 // RsyncImage returns a docker image that contains rsync binary.
 func RsyncImage() string {
-	image := "eeacms/rsync"
 	if customImage := strings.TrimSpace(os.Getenv(drivers.RsyncImageKey)); customImage != "" {
-		image = customImage
+		return customImage
 	}
-	return image
+	return drivers.RsyncImage
 }
 
 // RsyncImageSecret returns an image pull secret for the rsync image.
