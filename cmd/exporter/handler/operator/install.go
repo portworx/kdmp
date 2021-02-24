@@ -71,7 +71,7 @@ func newInstallCmd(out, errOut io.Writer) *cobra.Command {
 
 	cmd.Flags().StringVarP(&o.namespace, "namespace", "n", "kube-system", "namespace where to deploy a kdmp operator")
 	cmd.Flags().StringVarP(&o.format, "output", "o", "", "print in the provided format (yaml|json)")
-	cmd.Flags().StringVarP(&o.image, "image", "", "portworx/kdmp", "custom kdmp operator image")
+	cmd.Flags().StringVarP(&o.image, "image", "", "", "custom kdmp operator image")
 	cmd.Flags().StringVarP(&o.rsyncImage, "rsync-image", "", "", "custom rsync image")
 	cmd.Flags().StringVarP(&o.rsyncPullSecret, "rsync-pull-secret", "", "", "pull secret name for a custom rsync image")
 	cmd.Flags().StringVarP(&o.rsyncOpenshiftSCC, "rsync-openshift-scc", "", "", "openshift security context constraint name to use for rsync jobs")
@@ -171,7 +171,9 @@ func operatorDeployment(
 	for i := range deploy.Spec.Template.Spec.Containers {
 		container := deploy.Spec.Template.Spec.Containers[i]
 		if container.Name == kdmpOperatorName {
-			container.Image = image
+			if image != "" {
+				container.Image = image
+			}
 			container.Env = mergeEnvs(container.Env, envs)
 		}
 
