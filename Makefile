@@ -1,9 +1,8 @@
-RELEASE_VER := latest
+RELEASE_VER ?= latest
 BUILD_DATE  := $(shell date -u +'%Y-%m-%dT%H:%M:%SZ')
 BASE_DIR    := $(shell git rev-parse --show-toplevel)
 GIT_SHA     := $(shell git rev-parse --short HEAD)
 BIN         := $(BASE_DIR)/bin
-export RELEASE_VER
 
 DOCKER_IMAGE_REPO?=portworx
 DOCKER_IMAGE_NAME?=kdmp
