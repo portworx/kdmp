@@ -12,6 +12,9 @@ script:
       export RELEASE_VER=${TRAVIS_TAG}
     elif [ "${TRAVIS_BRANCH}" == "master" ]; then
       export DOCKER_IMAGE_TAG=master
+    else if [ -n "${TRAVIS_TAG}" ]; then
+      # use a release version as a docker image tag
+      export RELEASE_VER=${TRAVIS_TAG}
     else
       export RELEASE_VER=`git rev-parse --short HEAD`
     fi
