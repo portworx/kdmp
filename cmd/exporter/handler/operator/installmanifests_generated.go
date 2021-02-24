@@ -43,7 +43,7 @@ spec:
     spec:
       containers:
       - name: kdmp-operator
-        image: portworx/kdmp
+        image: portworx/kdmp:latest
         imagePullPolicy: Always
         resources:
           requests:

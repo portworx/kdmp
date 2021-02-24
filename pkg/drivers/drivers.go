@@ -9,14 +9,15 @@ const (
 	ResticRestore = "resticrestore"
 )
 
+// Docker images.
+const (
+	ResticExecutorImage = "portworx/resticexecutor"
+	RsyncImage          = "eeacms/rsync"
+)
+
 // Driver labels.
 const (
 	DriverNameLabel = "kdmp.portworx.com/driver-name"
-)
-
-const (
-	// OpenshiftSCCAnnotation used to set a openshift securit context contraint.
-	OpenshiftSCCAnnotation = "openshift.io/scc"
 )
 
 const (
