@@ -27,6 +27,7 @@ require (
 )
 
 replace (
+	github.com/kubernetes-csi/external-snapshotter/v2 => github.com/kubernetes-csi/external-snapshotter/v2 v2.1.1
 	github.com/kubernetes-incubator/external-storage => github.com/libopenstorage/external-storage v5.3.0-alpha.1.0.20200130041458-d2b33d4448ea+incompatible
 	github.com/portworx/sched-ops => github.com/portworx/sched-ops v0.0.0-20210129165423-2b83087e7388
 	k8s.io/api => k8s.io/api v0.16.6
