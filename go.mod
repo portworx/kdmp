@@ -15,6 +15,7 @@ require (
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.4.0
 	github.com/urfave/cli v1.22.2
+	golang.org/x/mod v0.4.2 // indirect
 	golang.org/x/tools v0.0.0-20200408132156-9ee5ef7a2c0d // indirect
 	k8s.io/api v0.17.0
 	k8s.io/apiextensions-apiserver v0.16.6
