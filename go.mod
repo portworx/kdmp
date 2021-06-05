@@ -5,6 +5,7 @@ go 1.13
 require (
 	github.com/cheynewallace/tabby v1.1.0 // indirect
 	github.com/kubernetes-incubator/external-storage v0.0.0-00010101000000-000000000000
+	github.com/libopenstorage/openstorage v8.0.0+incompatible
 	github.com/libopenstorage/openstorage-sdk-clients v0.69.27 // indirect
 	github.com/libopenstorage/stork v1.3.0-beta1.0.20200630005842-9255e7a98775
 	github.com/portworx/pxc v0.31.1
