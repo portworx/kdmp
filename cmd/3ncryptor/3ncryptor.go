@@ -416,7 +416,7 @@ func newEncryptCommand() *cobra.Command {
 			}
 
 			for _, vol := range volumes {
-				if vol.AttachedOn != "" {
+				if vol.AttachedOn != "" && vol.AttachedState != api.AttachState_ATTACH_STATE_INTERNAL {
 					logrus.Errorf("volume %v is attached, please make sure your apps are scaled down.", vol.Locator.Name)
 					return
 				}
