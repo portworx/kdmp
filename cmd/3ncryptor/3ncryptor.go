@@ -22,12 +22,23 @@ const (
 
 var (
 	namespace        string
+	port             string
 	auth_token       string
 	dryRun           bool
 	includeEncrypted bool
 	volume_ids       string
 	enc_secret       string
+	snapshot_suffix  string = "-encryptorsnap"
+	encrypted_suffix string = "-encrypted"
 )
+
+func getSnapName(volume_name string) string {
+	return volume_name + snapshot_suffix
+}
+
+func getEncryptedVolName(volume_name string) string {
+	return volume_name + encrypted_suffix
+}
 
 func listVolumes(namespace string) ([]*api.Volume, error) {
 	vd := sdk.GetVolumeDriver()
@@ -41,7 +52,7 @@ func inspectVolumes(volumeIds []string) ([]*api.Volume, error) {
 
 func getSnapshot(vol *api.Volume) (*api.Volume, error) {
 	vd := sdk.GetVolumeDriver()
-	snapName := vol.Locator.Name + "-encryptorsnap"
+	snapName := getSnapName(vol.Locator.Name)
 	snaps, err := vd.Inspect([]string{snapName})
 	if err != nil {
 		return nil, err
@@ -93,7 +104,7 @@ func snapVolume(vol *api.Volume, readonly bool, noRetry bool) (*api.Volume, erro
 	vd := sdk.GetVolumeDriver()
 
 	locator := &api.VolumeLocator{
-		Name:         vol.Locator.Name + "-encryptorsnap",
+		Name:         getSnapName(vol.Locator.Name),
 		VolumeLabels: vol.Locator.VolumeLabels,
 	}
 	locator.VolumeLabels["encryptor"] = "true"
@@ -180,6 +191,7 @@ func NewCommand() *cobra.Command {
 	}
 
 	cmds.PersistentFlags().StringVarP(&namespace, "namespace", "n", "", "Namespace for this command")
+	cmds.PersistentFlags().StringVarP(&port, "port", "p", "9001", "Port to talk (default: 9001)")
 	cmds.PersistentFlags().StringVarP(&auth_token, "auth_token", "t", "", "Auth token for this command")
 
 	cmds.AddCommand(
@@ -212,7 +224,7 @@ func newSnapCommand() *cobra.Command {
 				logrus.Infof("Using namespace: %s", namespace)
 			}
 
-			if err := sdk.InitVolDriver("127.0.0.1", "9001", auth_token); err != nil {
+			if err := sdk.InitVolDriver("127.0.0.1", port, auth_token); err != nil {
 				//util.CheckErr(err)
 				logrus.Errorf("failed to initialize SDK driver: %v", err)
 				return
@@ -280,7 +292,7 @@ func newRollbackCommand() *cobra.Command {
 				logrus.Infof("Using namespace: %s", namespace)
 			}
 
-			if err := sdk.InitVolDriver("127.0.0.1", "9001", auth_token); err != nil {
+			if err := sdk.InitVolDriver("127.0.0.1", port, auth_token); err != nil {
 				util.CheckErr(err)
 				return
 			}
@@ -306,21 +318,21 @@ func newRollbackCommand() *cobra.Command {
 					origVolName     string = vol.Locator.Name
 				)
 
-				if len(volume_ids) == 0 && strings.Contains(vol.Locator.Name, "-encryptorsnap") && strings.Contains(vol.Locator.Name, "-encrypted") {
+				if len(volume_ids) == 0 && strings.Contains(vol.Locator.Name, snapshot_suffix) && strings.Contains(vol.Locator.Name, encrypted_suffix) {
 					continue
 				}
 
-				if strings.Contains(vol.Locator.Name, "-encryptorsnap") {
-					origVolName = strings.Split(vol.Locator.Name, "-encryptorsnap")[0]
-				} else if strings.Contains(vol.Locator.Name, "-encrypted") {
-					origVolName = strings.Split(vol.Locator.Name, "-encrypted")[0]
+				if strings.Contains(vol.Locator.Name, snapshot_suffix) {
+					origVolName = strings.Split(vol.Locator.Name, snapshot_suffix)[0]
+				} else if strings.Contains(vol.Locator.Name, encrypted_suffix) {
+					origVolName = strings.Split(vol.Locator.Name, encrypted_suffix)[0]
 				}
 
 				logrus.Infof("Rolling back volume: %v", origVolName)
 
 				snapVol = nil
-				if !strings.Contains("-encryptorsnap", vol.Locator.Name) && !strings.Contains("-encrypted", vol.Locator.Name) {
-					snaps, err := inspectVolumes([]string{origVolName + "-encryptorsnap"})
+				if !strings.Contains(vol.Locator.Name, snapshot_suffix) && !strings.Contains(vol.Locator.Name, encrypted_suffix) {
+					snaps, err := inspectVolumes([]string{getSnapName(origVolName)})
 					if err != nil {
 						logrus.Errorf("Failed to find the encryptor snap for %v", origVolName)
 						return
@@ -331,7 +343,7 @@ func newRollbackCommand() *cobra.Command {
 					}
 				}
 				encVol = nil
-				encvols, err := inspectVolumes([]string{origVolName + "-encrypted"})
+				encvols, err := inspectVolumes([]string{getEncryptedVolName(origVolName)})
 				if err != nil {
 					logrus.Errorf("Failed to find the encrypted volume for: %v", origVolName)
 					return
@@ -379,7 +391,7 @@ func newEncryptCommand() *cobra.Command {
 				logrus.Infof("Using namespace: %s", namespace)
 			}
 
-			if err := sdk.InitVolDriver("127.0.0.1", "9001", auth_token); err != nil {
+			if err := sdk.InitVolDriver("127.0.0.1", port, auth_token); err != nil {
 				util.CheckErr(err)
 				return
 			}
@@ -405,7 +417,7 @@ func newEncryptCommand() *cobra.Command {
 
 			for _, vol := range volumes {
 				if vol.AttachedOn != "" {
-					logrus.Errorf("volume %v is attached, please make sure your apps are scaled down.")
+					logrus.Errorf("volume %v is attached, please make sure your apps are scaled down.", vol.Locator.Name)
 					return
 				}
 			}
@@ -416,7 +428,7 @@ func newEncryptCommand() *cobra.Command {
 					origVolName     string = vol.Locator.Name
 				)
 
-				if !includeEncrypted && vol.Spec.Encrypted || strings.Contains(vol.Locator.Name, "-encrypted") || strings.Contains(vol.Locator.Name, "-encryptorsnap") {
+				if !includeEncrypted && vol.Spec.Encrypted || strings.Contains(vol.Locator.Name, encrypted_suffix) || strings.Contains(vol.Locator.Name, snapshot_suffix) {
 					continue
 				}
 
@@ -429,7 +441,7 @@ func newEncryptCommand() *cobra.Command {
 
 				logrus.Infof("Creating encrypted volume for: %v", vol.Locator.Name)
 				locator := &api.VolumeLocator{
-					Name:         vol.Locator.Name + "-encrypted",
+					Name:         getEncryptedVolName(vol.Locator.Name),
 					VolumeLabels: vol.Locator.VolumeLabels,
 				}
 
