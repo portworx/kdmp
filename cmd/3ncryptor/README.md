@@ -3,6 +3,7 @@ make build-encryptor
 
 this will put a binary in the `bin` folder called `3ncryptor`
 
+Make sure to copy the binary to one of the px nodes.
 # Pre-requisites:
 
 First lets get the admin token from the kubernetes secrt
