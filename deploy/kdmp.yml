@@ -1,3 +1,8 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: kdmp-operator
+  namespace: kube-system
 ---
 kind: ClusterRole
 apiVersion: rbac.authorization.k8s.io/v1
@@ -77,3 +82,51 @@ rules:
       - securitycontextconstraints
     verbs:
       - use
+---
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: kdmp-operator
+subjects:
+  - kind: ServiceAccount
+    name: kdmp-operator
+    namespace: kube-system
+roleRef:
+  kind: ClusterRole
+  name: kdmp-operator
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kdmp-operator
+  namespace: kube-system
+  labels:
+    name: kdmp-operator
+spec:
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+    type: RollingUpdate
+  replicas: 1
+  selector:
+    matchLabels:
+      name: kdmp-operator
+  template:
+    metadata:
+      labels:
+        name: kdmp-operator
+    spec:
+      containers:
+      - name: kdmp-operator
+        image: portworx/kdmp:latest
+        imagePullPolicy: Always
+        resources:
+          requests:
+            cpu: 0.5
+            memory: 200Mi
+          limits:
+            cpu: 1
+            memory: 500Mi
+      serviceAccountName: kdmp-operator

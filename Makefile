@@ -129,6 +129,10 @@ deploy-kdmp:
 	@echo "Deploy kdmp docker image"
 	docker push $(DOCKER_IMAGE)
 
+kdmp: build-kdmp container-kdmp deploy-kdmp
+
+executor: build-restic-executor container-restic-executor deploy-restic-executor
+
 ### restic-executor targets ###
 build-restic-executor:
 	@echo "Build restic-executor"
