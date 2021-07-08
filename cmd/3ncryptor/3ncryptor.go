@@ -27,7 +27,8 @@ var (
 	dryRun           bool
 	includeEncrypted bool
 	volume_ids       string
-	enc_secret       string
+	secret           string
+	secretNamespace  string
 	snapshot_suffix  string = "-encryptorsnap"
 	encrypted_suffix string = "-encrypted"
 )
@@ -86,11 +87,16 @@ func unmountVol(vol *api.Volume, dir string, secret string) error {
 	return vd.Unmount(vol.Id, dir, map[string]string{})
 }
 
-func createVol(locator *api.VolumeLocator, spec *api.VolumeSpec) (*api.Volume, error) {
+func createVol(locator *api.VolumeLocator, spec *api.VolumeSpec, secretNamespace string) (*api.Volume, error) {
 	vd := sdk.GetVolumeDriver()
 
-	locator.VolumeLabels["encryptor"] = "true"
 	spec.Encrypted = true
+	locator.VolumeLabels["encryptor"] = "true"
+	locator.VolumeLabels["px/secret-name"] = spec.Passphrase
+
+	if secretNamespace != "" {
+		locator.VolumeLabels["px/secret-namespace"] = secretNamespace
+	}
 
 	vol_id, err := vd.Create(locator, nil, spec)
 	if err != nil {
@@ -161,14 +167,28 @@ func deleteVol(vol *api.Volume) error {
 	return vd.Delete(vol.Id)
 }
 
-func rsyncVol(src string, dest string) error {
-	cmd := exec.Command("rsync", "-actv", src, dest)
-	return cmd.Run()
+func addTrailingSlash(dir string) string {
+	return filepath.Join(dir, "/")
+}
+
+func rsyncVol(src string, dest string) (string, error) {
+	output, err := exec.Command("rsync", "-acv", addTrailingSlash(src), addTrailingSlash(dest)).Output()
+	return string(output), err
 }
 
 func rollBack(snapVol, encVol *api.Volume, origVolName string) error {
 	if encVol != nil {
 		logrus.Infof("Deleting created encrypted volume: %v", encVol.Locator.Name)
+		enc_dir := filepath.Join(baseMountPath, encVol.Locator.Name)
+
+		if err := unmountVol(encVol, enc_dir, secret); err != nil {
+			logrus.Errorf("unmountVol failed to unmount snapshot %v with: %v", snapVol.Locator.Name, err)
+		}
+
+		if err := detachVol(encVol, secret); err != nil {
+			logrus.Errorf("detachVol failed to detach snapshot %v with: %v", snapVol.Locator.Name, err)
+		}
+
 		if err := deleteVol(encVol); err != nil {
 			logrus.Errorf("delete failed for %s with: %v", encVol.Locator.Name, err)
 		}
@@ -451,10 +471,10 @@ func newEncryptCommand() *cobra.Command {
 				}
 
 				newSpec := vol.Spec
-				newSpec.Passphrase = enc_secret
+				newSpec.Passphrase = secret
 
 				if !dryRun {
-					encVol, err = createVol(locator, newSpec)
+					encVol, err = createVol(locator, newSpec, secretNamespace)
 					if err != nil {
 						logrus.Errorf("createVol failed with: %v", err)
 						return
@@ -463,7 +483,7 @@ func newEncryptCommand() *cobra.Command {
 
 				logrus.Infof("Attaching snapshot: %v", snapVol.Locator.Name)
 				if !dryRun {
-					if err := attachVol(snapVol, map[string]string{options.OptionsSecret: enc_secret}); err != nil {
+					if err := attachVol(snapVol, map[string]string{options.OptionsSecret: secret}); err != nil {
 						logrus.Errorf("attachVol failed to attach snapshot %v with: %v", snapVol.Locator.Name, err)
 						return
 					}
@@ -471,7 +491,7 @@ func newEncryptCommand() *cobra.Command {
 
 				logrus.Infof("Attaching encrypted volume: %v", encVol.Locator.Name)
 				if !dryRun {
-					if err := attachVol(encVol, map[string]string{options.OptionsSecret: enc_secret}); err != nil {
+					if err := attachVol(encVol, map[string]string{options.OptionsSecret: secret}); err != nil {
 						logrus.Errorf("attachVol failed to attach encrypted vol %v with: %v", encVol.Locator.Name, err)
 						return
 					}
@@ -488,7 +508,7 @@ func newEncryptCommand() *cobra.Command {
 
 				logrus.Infof("Mounting snapshot: %v at %v", snapVol.Locator.Name, dir)
 				if !dryRun {
-					if err := mountVol(snapVol, dir, enc_secret); err != nil {
+					if err := mountVol(snapVol, dir, secret); err != nil {
 						logrus.Errorf("mountVol failed to mount snapshot %v with: %v", snapVol.Locator.Name, err)
 						return
 					}
@@ -505,7 +525,7 @@ func newEncryptCommand() *cobra.Command {
 
 				logrus.Infof("Mounting volume: %v at %v", vol.Locator.Name, encDir)
 				if !dryRun {
-					if err := mountVol(encVol, encDir, enc_secret); err != nil {
+					if err := mountVol(encVol, encDir, secret); err != nil {
 						logrus.Errorf("mountVol failed to mount encrypted vol %v with: %v", encVol.Locator.Name, err)
 						return
 					}
@@ -513,19 +533,21 @@ func newEncryptCommand() *cobra.Command {
 
 				logrus.Infof("Rsync snapshot %v into encrypted volume: %v", snapVol.Locator.Name, encVol.Locator.Name)
 				if !dryRun {
-					if err := rsyncVol(dir, encDir); err != nil {
+					output, err := rsyncVol(dir, encDir)
+					if err != nil {
 						logrus.Errorf("rsyncVol failed to rsync data between '%s' and '%s'", dir, encDir)
+						logrus.Debug("Output: %v", output)
 						return
 					}
 				}
 
 				logrus.Infof("Detaching and unmounting snapshot: %v", snapVol.Locator.Name)
 				if !dryRun {
-					if err := unmountVol(snapVol, dir, enc_secret); err != nil {
+					if err := unmountVol(snapVol, dir, secret); err != nil {
 						logrus.Errorf("unmountVol failed to unmount snapshot %v with: %v", snapVol.Locator.Name, err)
 					}
 
-					if err := detachVol(snapVol, enc_secret); err != nil {
+					if err := detachVol(snapVol, secret); err != nil {
 						logrus.Errorf("detachVol failed to detach snapshot %v with: %v", snapVol.Locator.Name, err)
 						return
 					}
@@ -533,11 +555,11 @@ func newEncryptCommand() *cobra.Command {
 
 				logrus.Infof("Detaching and unmounting encrypted volume: %v", encVol.Locator.Name)
 				if !dryRun {
-					if err := unmountVol(encVol, encDir, enc_secret); err != nil {
+					if err := unmountVol(encVol, encDir, secret); err != nil {
 						logrus.Errorf("unmountVol failed to unmount encrypted volume %v with: %v", snapVol.Locator.Name, err)
 					}
 
-					if err := detachVol(encVol, enc_secret); err != nil {
+					if err := detachVol(encVol, secret); err != nil {
 						logrus.Errorf("detachVol failed to detach encrypted volume %v with: %v", encVol.Locator.Name, err)
 						return
 					}
@@ -569,9 +591,10 @@ func newEncryptCommand() *cobra.Command {
 			}
 		},
 	}
-	encCommand.PersistentFlags().StringVarP(&volume_ids, "volume_ids", "v", "", "if provided, will use volume id instead of namespace")
-	encCommand.PersistentFlags().StringVarP(&enc_secret, "enc_secret", "s", "", "(required) encryption secret")
-	encCommand.PersistentFlags().BoolVarP(&dryRun, "dryrun", "d", false, "if true, will dry-run operations")
-	encCommand.PersistentFlags().BoolVarP(&includeEncrypted, "include_encrypted", "i", false, "if true, will include secure volumes for re-encryption")
+	encCommand.PersistentFlags().StringVarP(&volume_ids, "volume_ids", "", "", "if provided, will use volume id instead of namespace")
+	encCommand.PersistentFlags().StringVarP(&secret, "secret", "", "", "(required) encryption secret")
+	encCommand.PersistentFlags().StringVarP(&secretNamespace, "secretNamespace", "", "", "namespace encryption secret lives in (vault enterprise)")
+	encCommand.PersistentFlags().BoolVarP(&dryRun, "dryrun", "", false, "if true, will dry-run operations")
+	encCommand.PersistentFlags().BoolVarP(&includeEncrypted, "include_encrypted", "", false, "if true, will include secure volumes for re-encryption")
 	return encCommand
 }

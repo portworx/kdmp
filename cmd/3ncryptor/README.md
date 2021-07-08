@@ -42,10 +42,10 @@ The steps this process walks through are as followed:
 We now have an encrypted version of the original volume and an unencrypted snapshot of the original volume.
 
 entire namespace:
-`3ncryptor encrypt --namespace kube-system --auth_token $token --enc_secret test-key`
+`3ncryptor encrypt --namespace kube-system --auth_token $token --secret test-key`
 
 specific volumes:
-`3ncryptor encrypt volume_ids="vol1,vol2" --auth_token $token --enc_secret test-key`
+`3ncryptor encrypt volume_ids="vol1,vol2" --auth_token $token --secret test-key`
 
 ### Rollback.
 The rollback feature allows for original volumes (if we might have encrypted it already) or snapshots of the original volume.
