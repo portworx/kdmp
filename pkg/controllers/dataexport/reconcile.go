@@ -431,6 +431,7 @@ func startTransferJob(drv drivers.Interface, srcPVCName string, dataExport *kdmp
 	case drivers.ResticRestore:
 		return drv.StartJob(
 			drivers.WithSourcePVC(srcPVCName),
+			drivers.WithDestinationPVC(dataExport.Spec.Destination.Name),
 			drivers.WithNamespace(dataExport.Spec.Destination.Namespace),
 			drivers.WithVolumeBackupName(dataExport.Spec.Source.Name),
 			drivers.WithVolumeBackupNamespace(dataExport.Spec.Source.Namespace),
