@@ -91,6 +91,11 @@ func createVol(locator *api.VolumeLocator, spec *api.VolumeSpec, secretNamespace
 	vd := sdk.GetVolumeDriver()
 
 	spec.Encrypted = true
+
+	if locator.VolumeLabels == nil {
+		locator.VolumeLabels = make(map[string]string)
+	}
+
 	locator.VolumeLabels["encryptor"] = "true"
 	locator.VolumeLabels["px/secret-name"] = spec.Passphrase
 
@@ -118,6 +123,11 @@ func snapVolume(vol *api.Volume, readonly bool, noRetry bool) (*api.Volume, erro
 		Name:         getSnapName(vol.Locator.Name),
 		VolumeLabels: vol.Locator.VolumeLabels,
 	}
+
+	if locator.VolumeLabels == nil {
+		locator.VolumeLabels = make(map[string]string)
+	}
+
 	locator.VolumeLabels["encryptor"] = "true"
 
 	snap_id, err := vd.Snapshot(vol.Id, readonly, locator, noRetry)
