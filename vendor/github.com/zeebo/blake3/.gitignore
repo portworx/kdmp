@@ -1,0 +1,4 @@
+*.pprof
+*.test
+*.txt
+*.out
