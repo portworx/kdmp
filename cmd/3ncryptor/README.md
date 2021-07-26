@@ -23,12 +23,13 @@ These are valid for all 3 commands.
 
 entire namespace:
 `3ncryptor snap --namespace kube-system --auth_token $token`
+
 specific volumes:
 `3ncryptor snap --volume_ids="vol1,vol2" --auth_token $token`
 
 ### Step 2. Encrypt the actual volumes.
 In this step we'll go through a couple steps to encrypt the actual volume.
-Also you'll see a --enc_secret parameter which requires the encryption secret.
+Also you'll see a --secret parameter which requires the encryption secret.
 
 The steps this process walks through are as followed:
 - Look for snapshots of the requested volume
