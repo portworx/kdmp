@@ -178,7 +178,7 @@ func deleteVol(vol *api.Volume) error {
 }
 
 func addTrailingSlash(dir string) string {
-	return filepath.Join(dir, "/")
+	return dir + "/"
 }
 
 func rsyncVol(src string, dest string) (string, error) {
@@ -544,9 +544,9 @@ func newEncryptCommand() *cobra.Command {
 				logrus.Infof("Rsync snapshot %v into encrypted volume: %v", snapVol.Locator.Name, encVol.Locator.Name)
 				if !dryRun {
 					output, err := rsyncVol(dir, encDir)
+					logrus.Debugf("Output: %v", output)
 					if err != nil {
 						logrus.Errorf("rsyncVol failed to rsync data between '%s' and '%s'", dir, encDir)
-						logrus.Debug("Output: %v", output)
 						return
 					}
 				}
