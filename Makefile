@@ -121,6 +121,10 @@ build-kdmp:
 	-X github.com/portworx/kdmp/pkg/version.buildDate=${BUILD_DATE}" \
 	$(BASE_DIR)/cmd/kdmp
 
+build-encryptor:
+	@echo "Build encryptor"
+	@cd cmd/3ncryptor/ && go build -o ../../bin/3ncryptor -ldflags="-s" .
+
 container-kdmp:
 	@echo "Build kdmp docker image"
 	docker build --tag $(DOCKER_IMAGE) .

@@ -5,6 +5,7 @@ go 1.13
 require (
 	github.com/cheynewallace/tabby v1.1.0 // indirect
 	github.com/kubernetes-incubator/external-storage v0.0.0-00010101000000-000000000000
+	github.com/libopenstorage/openstorage v8.0.0+incompatible
 	github.com/libopenstorage/openstorage-sdk-clients v0.69.27 // indirect
 	github.com/libopenstorage/stork v1.3.0-beta1.0.20200630005842-9255e7a98775
 	github.com/portworx/pxc v0.31.1
@@ -14,6 +15,7 @@ require (
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.4.0
 	github.com/urfave/cli v1.22.2
+	golang.org/x/mod v0.4.2 // indirect
 	golang.org/x/tools v0.0.0-20200408132156-9ee5ef7a2c0d // indirect
 	k8s.io/api v0.17.0
 	k8s.io/apiextensions-apiserver v0.16.6
