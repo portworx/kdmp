@@ -4,9 +4,12 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+
+	"github.com/sirupsen/logrus"
 )
 
 const (
+	//baseCmd = "ls"
 	baseCmd = "restic"
 )
 
@@ -54,11 +57,12 @@ func (c *Command) AddEnv(envs []string) *Command {
 func (c *Command) Cmd() *exec.Cmd {
 	// Get all the flags
 	argsSlice := []string{
-		c.Name,
-		"--repo",
-		c.RepositoryName,
-		"--password-file",
-		c.SecretFilePath,
+		//c.Name,
+		//"--repo",
+		//c.RepositoryName,
+		//"--password-file",
+		//c.SecretFilePath,
+		"--help",
 	}
 	argsSlice = append(argsSlice, c.Flags...)
 	// Get the cmd args
@@ -68,6 +72,7 @@ func (c *Command) Cmd() *exec.Cmd {
 		cmd.Env = append(os.Environ(), c.Env...)
 	}
 	cmd.Dir = c.Dir
+	logrus.Infof("line 73 cmd() : %+v", cmd)
 	return cmd
 }
 
@@ -117,5 +122,6 @@ type Executor interface {
 }
 
 func defaultFlags() []string {
-	return []string{"--host", "kdmp", "--json"}
+	//return []string{"--host", "kdmp", "--json"}
+	return []string{}
 }

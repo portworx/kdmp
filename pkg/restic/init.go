@@ -6,6 +6,8 @@ import (
 	"os"
 	"os/exec"
 	"sync"
+
+	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -25,7 +27,7 @@ func GetInitCommand(repoName string, secretFilePath string) (*Command, error) {
 	if secretFilePath == "" {
 		return nil, fmt.Errorf("secret file path cannot be empty")
 	}
-
+	
 	return &Command{
 		Name:           "init",
 		RepositoryName: repoName,
@@ -71,9 +73,17 @@ func (b *initExecutor) Run() error {
 	b.execCmd = b.cmd.Cmd()
 	b.execCmd.Stdout = b.outBuf
 	b.execCmd.Stderr = b.errBuf
-
+	logrus.Infof("line 76 Run() execCmd: %v", b.execCmd)
+	logrus.Infof("line 77 env: %v, args: %v", b.execCmd.Env, b.execCmd.Args)
+	/*tcmd := exec.Command("touch /tmp/restictemp")
+	nerr := tcmd.Run()
+	if nerr != nil {
+		logrus.Errorf("%v", nerr)
+	}
+	time.Sleep(5 * time.Minute)*/
 	if err := b.execCmd.Start(); err != nil {
 		b.lastError = err
+		logrus.Errorf("line 87 %v", err)
 		return err
 	}
 	b.isRunning = true
@@ -85,6 +95,7 @@ func (b *initExecutor) Run() error {
 		if err != nil {
 			b.lastError = fmt.Errorf("failed to run the init command: %v", err)
 			if err = parseStdErr(b.errBuf.Bytes()); err != nil {
+				logrus.Infof("line 98 err: %v", err)
 				b.lastError = err
 			}
 			return
@@ -93,10 +104,13 @@ func (b *initExecutor) Run() error {
 		summaryResponse, err := getInitSummary(b.outBuf.Bytes(), b.errBuf.Bytes())
 		if err != nil {
 			b.lastError = err
+			logrus.Infof("line 107 err: %v", err)
 			return
 		}
 		b.summaryResponse = summaryResponse
 	}()
+	logrus.Infof("line 110 b.execCmd.Stdout: %v", b.execCmd.Stdout)
+	logrus.Infof("line 113 b.execCmd.stderr: %v", b.execCmd.Stderr)
 	return nil
 }
 

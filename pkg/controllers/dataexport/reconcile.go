@@ -15,6 +15,7 @@ import (
 	kdmpopts "github.com/portworx/kdmp/pkg/util/ops"
 	"github.com/portworx/sched-ops/k8s/core"
 	"github.com/portworx/sched-ops/k8s/stork"
+	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/utils/pointer"
@@ -32,7 +33,7 @@ func (c *Controller) sync(ctx context.Context, in *kdmpapi.DataExport) (bool, er
 	}
 
 	dataExport := in.DeepCopy()
-
+	logrus.Infof("line 36 dataExport stage: %+v, status: %+v", dataExport.Status.Stage, dataExport.Status.Status)
 	// set the initial stage
 	if dataExport.Status.Stage == "" {
 		// TODO: set defaults
@@ -42,9 +43,10 @@ func (c *Controller) sync(ctx context.Context, in *kdmpapi.DataExport) (bool, er
 
 		dataExport.Status.Stage = kdmpapi.DataExportStageInitial
 		dataExport.Status.Status = kdmpapi.DataExportStatusInitial
+		logrus.Infof("line 46 sync")
 		return true, c.client.Update(ctx, dataExport)
 	}
-
+	logrus.Infof("line 49 DeletionTimestamp: %+v", dataExport.DeletionTimestamp)
 	// delete an object on the init stage without cleanup
 	if dataExport.DeletionTimestamp != nil && dataExport.Status.Stage == kdmpapi.DataExportStageInitial {
 		if !controllers.ContainsFinalizer(dataExport, cleanupFinalizer) {
@@ -61,6 +63,7 @@ func (c *Controller) sync(ctx context.Context, in *kdmpapi.DataExport) (bool, er
 
 	// TODO: validate DataExport resource & update status?
 	driverName, err := getDriverType(dataExport)
+	logrus.Infof("line 65 sync: driverName: %v", driverName)
 	if err != nil {
 		msg := fmt.Sprintf("failed to get a driver type for %s: %s", dataExport.Spec.Type, err)
 		return false, c.client.Update(ctx, setStatus(dataExport, kdmpapi.DataExportStatusFailed, msg))
@@ -89,20 +92,27 @@ func (c *Controller) sync(ctx context.Context, in *kdmpapi.DataExport) (bool, er
 		return true, c.client.Update(ctx, dataExport)
 	}
 
+	logrus.Infof("line 93 stage: %v", dataExport.Status.Stage)
 	switch dataExport.Status.Stage {
 	case kdmpapi.DataExportStageInitial:
+		logrus.Infof("line 97 sync")
 		return c.stageInitial(ctx, snapshotter, dataExport)
 	// TODO: 'merge' scheduled&inProgress&restore stages
 	case kdmpapi.DataExportStageSnapshotScheduled:
+		logrus.Infof("line 101 sync")
 		return c.stageSnapshotScheduled(ctx, snapshotter, dataExport)
 	case kdmpapi.DataExportStageSnapshotInProgress:
+		logrus.Infof("line 104 sync")
 		return c.stageSnapshotInProgress(ctx, snapshotter, dataExport)
 	case kdmpapi.DataExportStageSnapshotRestore:
+		logrus.Infof("line 107 sync")
 		return c.stageSnapshotRestore(ctx, snapshotter, dataExport)
 	case kdmpapi.DataExportStageTransferScheduled:
+		logrus.Infof("line 110 sync")
 		if dataExport.Status.Status == kdmpapi.DataExportStatusSuccessful {
 			// set to the next stage
 			dataExport.Status.Stage = kdmpapi.DataExportStageTransferInProgress
+			logrus.Infof("line 114 sync")
 			return true, c.client.Update(ctx, setStatus(dataExport, kdmpapi.DataExportStatusInitial, ""))
 		}
 
@@ -115,6 +125,7 @@ func (c *Controller) sync(ctx context.Context, in *kdmpapi.DataExport) (bool, er
 		// start data transfer
 		id, err := startTransferJob(driver, srcPVCName, dataExport)
 		if err != nil {
+			logrus.Infof("line 127 sync")
 			msg := fmt.Sprintf("failed to start a data transfer job: %s", err)
 			return false, c.updateStatus(dataExport, kdmpapi.DataExportStatusFailed, msg)
 		}
@@ -122,15 +133,18 @@ func (c *Controller) sync(ctx context.Context, in *kdmpapi.DataExport) (bool, er
 		dataExport.Status.TransferID = id
 		return true, c.client.Update(ctx, setStatus(dataExport, kdmpapi.DataExportStatusSuccessful, ""))
 	case kdmpapi.DataExportStageTransferInProgress:
+		logrus.Infof("line 135 sync")
 		if dataExport.Status.Status == kdmpapi.DataExportStatusSuccessful {
 			// set to the next stage
 			dataExport.Status.Stage = kdmpapi.DataExportStageFinal
+			logrus.Infof("line 139 sync")
 			return true, c.client.Update(ctx, setStatus(dataExport, kdmpapi.DataExportStatusInitial, ""))
 		}
 
 		// get transfer job status
 		progress, err := driver.JobStatus(dataExport.Status.TransferID)
 		if err != nil {
+			logrus.Infof("line 140 sync")
 			msg := fmt.Sprintf("failed to get %s job status: %s", dataExport.Status.TransferID, err)
 			return false, c.updateStatus(dataExport, kdmpapi.DataExportStatusFailed, msg)
 		}
@@ -149,11 +163,12 @@ func (c *Controller) sync(ctx context.Context, in *kdmpapi.DataExport) (bool, er
 		if dataExport.Status.Status == kdmpapi.DataExportStatusSuccessful {
 			return false, nil
 		}
-
-		if err := c.cleanUp(driver, snapshotter, dataExport); err != nil {
-			msg := fmt.Sprintf("failed to remove resources: %s", err)
-			return false, c.updateStatus(dataExport, kdmpapi.DataExportStatusFailed, msg)
-		}
+		// DBG: Temp commented
+		/*
+			if err := c.cleanUp(driver, snapshotter, dataExport); err != nil {
+				msg := fmt.Sprintf("failed to remove resources: %s", err)
+				return false, c.updateStatus(dataExport, kdmpapi.DataExportStatusFailed, msg)
+			}*/
 
 		return true, c.client.Update(ctx, setStatus(dataExport, kdmpapi.DataExportStatusSuccessful, ""))
 	}
@@ -164,13 +179,15 @@ func (c *Controller) sync(ctx context.Context, in *kdmpapi.DataExport) (bool, er
 func (c *Controller) stageInitial(ctx context.Context, snapshotter snapshots.Driver, dataExport *kdmpapi.DataExport) (bool, error) {
 	if dataExport.Status.Status == kdmpapi.DataExportStatusSuccessful {
 		// set to the next stage
+		logrus.Infof("line 182 stageInitial")
 		dataExport.Status.Stage = kdmpapi.DataExportStageTransferScheduled
 		if hasSnapshotStage(dataExport) {
+			logrus.Infof("line 185 stageInitial")
 			dataExport.Status.Stage = kdmpapi.DataExportStageSnapshotScheduled
 		}
 		return true, c.client.Update(ctx, setStatus(dataExport, kdmpapi.DataExportStatusInitial, ""))
 	}
-
+	logrus.Infof("line 190 stageInitial")
 	driverName, err := getDriverType(dataExport)
 	if err != nil {
 		msg := fmt.Sprintf("check failed: %s", err)
@@ -180,6 +197,7 @@ func (c *Controller) stageInitial(ctx context.Context, snapshotter snapshots.Dri
 	case drivers.Rsync:
 		err = c.checkClaims(dataExport)
 	case drivers.ResticBackup:
+		logrus.Infof("line 187 stageInitial ")
 		err = c.checkResticBackup(dataExport)
 	case drivers.ResticRestore:
 		err = c.checkResticRestore(dataExport)
@@ -188,7 +206,7 @@ func (c *Controller) stageInitial(ctx context.Context, snapshotter snapshots.Dri
 		msg := fmt.Sprintf("check failed: %s", err)
 		return false, c.updateStatus(dataExport, kdmpapi.DataExportStatusFailed, msg)
 	}
-
+	logrus.Infof("line 195 stageInitial ")
 	return true, c.client.Update(ctx, setStatus(dataExport, kdmpapi.DataExportStatusSuccessful, ""))
 }
 
@@ -371,6 +389,7 @@ func (c *Controller) checkClaims(de *kdmpapi.DataExport) error {
 }
 
 func (c *Controller) checkResticBackup(de *kdmpapi.DataExport) error {
+	//logrus.Infof("line 375 de: %+v", de)
 	if !isPVCRef(de.Spec.Source) && !isAPIVersionKindNotSetRef(de.Spec.Source) {
 		return fmt.Errorf("source is expected to be PersistentVolumeClaim")
 	}
@@ -421,6 +440,7 @@ func startTransferJob(drv drivers.Interface, srcPVCName string, dataExport *kdmp
 			drivers.WithLabels(jobLabels(dataExport.GetName())),
 		)
 	case drivers.ResticBackup:
+		logrus.Infof("line 430 startTransferJob")
 		return drv.StartJob(
 			drivers.WithSourcePVC(srcPVCName),
 			drivers.WithNamespace(dataExport.Spec.Destination.Namespace),
@@ -437,6 +457,15 @@ func startTransferJob(drv drivers.Interface, srcPVCName string, dataExport *kdmp
 			drivers.WithVolumeBackupNamespace(dataExport.Spec.Source.Namespace),
 			drivers.WithLabels(jobLabels(dataExport.GetName())),
 		)
+	case drivers.KopiaBackup:
+		logrus.Infof("line 452 startTransferJob")
+		return drv.StartJob(
+			drivers.WithSourcePVC(srcPVCName),
+			drivers.WithNamespace(dataExport.Spec.Destination.Namespace),
+			drivers.WithBackupLocationName(dataExport.Spec.Destination.Name),
+			drivers.WithBackupLocationNamespace(dataExport.Spec.Destination.Namespace),
+			drivers.WithLabels(jobLabels(dataExport.GetName())),
+		)
 	}
 
 	return "", fmt.Errorf("unknown data transfer driver: %s", drv.Name())
@@ -450,6 +479,7 @@ func checkPVC(in kdmpapi.DataExportObjectReference, checkMounts bool) (*corev1.P
 	if err != nil {
 		return nil, err
 	}
+	//logrus.Infof("line 455 pvc : %+v", pvc)
 	if pvc.Status.Phase != corev1.ClaimBound {
 		return nil, fmt.Errorf("status: expected %s, got %s", corev1.ClaimBound, pvc.Status.Phase)
 	}
@@ -515,28 +545,51 @@ func jobLabels(DataExportName string) map[string]string {
 }
 
 func getDriverType(de *kdmpapi.DataExport) (string, error) {
+	src := de.Spec.Source
+	dst := de.Spec.Destination
+	doBackup := false
+	doRestore := false
+
+	switch {
+	case isPVCRef(src) || isAPIVersionKindNotSetRef(src):
+		logrus.Infof("line 530")
+		if isBackupLocationRef(dst) {
+			doBackup = true
+		} else {
+			return "", fmt.Errorf("invalid kind for generic backup destination: expected BackupLocation")
+		}
+	case isVolumeBackupRef(src):
+		if isPVCRef(dst) || (isAPIVersionKindNotSetRef(dst)) {
+			doRestore = true
+		} else {
+			return "", fmt.Errorf("invalid kind for generic restore destination: expected PersistentVolumeClaim")
+		}
+	}
+
 	switch de.Spec.Type {
 	case kdmpapi.DataExportRsync:
 	case kdmpapi.DataExportRestic:
-		src := de.Spec.Source
-		dst := de.Spec.Destination
-
-		switch {
-		case isPVCRef(src) || isAPIVersionKindNotSetRef(src):
-			if isBackupLocationRef(dst) {
-				return drivers.ResticBackup, nil
-			}
-			return "", fmt.Errorf("invalid kind for restic backup destination: expected BackupLocation")
-		case isVolumeBackupRef(src):
-			if isPVCRef(dst) || (isAPIVersionKindNotSetRef(dst)) {
-				return drivers.ResticRestore, nil
-			}
-			return "", fmt.Errorf("invalid kind for restic restore destination: expected PersistentVolumeClaim")
+		if doBackup {
+			return drivers.ResticBackup, nil	
 		}
 
-		return "", fmt.Errorf("invalid kind for restic source: expected PersistentVolumeClaim or VolumeBackup")
-	}
+		if doRestore {
+			return drivers.ResticRestore, nil
+		}
+		return "", fmt.Errorf("invalid kind for generic source: expected PersistentVolumeClaim or VolumeBackup")
+	case kdmpapi.DataExportkopia:
+		logrus.Infof("line 557 getDriverType ")
+		if doBackup {
+			return drivers.KopiaBackup, nil	
+		}
 
+		if doRestore {
+			return drivers.KopiaRestore, nil
+		}
+		return "", fmt.Errorf("invalid kind for generic source: expected PersistentVolumeClaim or VolumeBackup")
+	}
+	
+	logrus.Infof("line 545")
 	return string(de.Spec.Type), nil
 }
 

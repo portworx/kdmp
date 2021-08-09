@@ -1,0 +1,26 @@
+FROM ubuntu
+
+MAINTAINER Portworx Inc. <support@portworx.com>
+
+RUN apt-get update && apt-get install bash curl vim make git wget gpg -y
+RUN curl -s https://kopia.io/signing-key | apt-key add -
+
+RUN echo "deb http://packages.kopia.io/apt/ stable main" |  tee /etc/apt/sources.list.d/kopia.list
+RUN apt-get update \
+    && apt-get dist-upgrade -y \
+    && apt-get install -y --no-install-recommends \
+        ca-certificates \
+    && apt-get clean -y \
+    && apt-get autoremove -y \
+    && rm -rf /tmp/* /var/tmp/* \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN apt update
+
+RUN apt install kopia
+WORKDIR /
+
+COPY ./bin/kopiaexecutor /
+RUN ls /
+
+ENTRYPOINT ["/kopiaexecutor"] 

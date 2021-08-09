@@ -1,0 +1,6 @@
+@startuml
+hide footbox
+box "Executor" #LightBlue
+'participant Executor
+[-> Executor: Job creates a \nnew executor command
+@enduml

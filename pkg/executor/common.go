@@ -8,11 +8,21 @@ import (
 	storkapi "github.com/libopenstorage/stork/pkg/apis/stork/v1alpha1"
 	storkops "github.com/portworx/sched-ops/k8s/stork"
 	"k8s.io/apimachinery/pkg/util/yaml"
+	"github.com/sirupsen/logrus"
 )
 
 const (
 	amazonS3Endpoint      = "s3.amazonaws.com"
 	googleAccountFilePath = "/root/.gce_credentials"
+)
+
+// BackupTool backup tool
+type  BackupTool int
+
+const (
+	// backupRestore resource
+	ResticType BackupTool = 0
+	KopiaType  BackupTool = 1
 )
 
 // Repository contains information used to connect the repository.
@@ -26,7 +36,7 @@ type Repository struct {
 }
 
 // ParseBackupLocation parses the provided backup location and returns the repository name
-func ParseBackupLocation(repoName, name, namespace, filePath string) (*Repository, error) {
+func ParseBackupLocation(repoName, name, namespace, filePath string, tool BackupTool) (*Repository, error) {
 	backupLocation, err := readBackupLocation(name, namespace, filePath)
 	if err != nil {
 		return nil, err
@@ -34,7 +44,7 @@ func ParseBackupLocation(repoName, name, namespace, filePath string) (*Repositor
 
 	switch backupLocation.Location.Type {
 	case storkapi.BackupLocationS3:
-		return parseS3(repoName, backupLocation.Location)
+		return parseS3(repoName, backupLocation.Location, tool)
 	case storkapi.BackupLocationAzure:
 		return parseAzure(repoName, backupLocation.Location)
 	case storkapi.BackupLocationGoogle:
@@ -64,7 +74,7 @@ func readBackupLocation(name, namespace, filePath string) (*storkapi.BackupLocat
 	return out, nil
 }
 
-func parseS3(repoName string, backupLocation storkapi.BackupLocationItem) (*Repository, error) {
+func parseS3(repoName string, backupLocation storkapi.BackupLocationItem, tool BackupTool) (*Repository, error) {
 	if backupLocation.S3Config == nil {
 		return nil, fmt.Errorf("failed to parse s3 config from BackupLocation")
 	}
@@ -75,15 +85,33 @@ func parseS3(repoName string, backupLocation storkapi.BackupLocationItem) (*Repo
 	if backupLocation.S3Config.Region != "" {
 		envs = append(envs, fmt.Sprintf("AWS_REGION=%s", backupLocation.S3Config.Region))
 	}
-
-	if repoName == "" {
+	// Fixme: This always needs to be from user provided backupLocation.Path
+	/*if repoName == "" {
 		repoName = backupLocation.Path
-	}
-	return &Repository{
+	}*/
+	repoName = backupLocation.Path
+	/*return &Repository{
 		Name:    repoName,
 		Path:    fmt.Sprintf("s3:%s/%s", backupLocation.S3Config.Endpoint, repoName),
 		AuthEnv: envs,
-	}, nil
+	}, nil*/
+	switch tool {
+	case ResticType:
+		return &Repository{
+			Name:    repoName,
+			Path:    fmt.Sprintf("s3:%s/%s", backupLocation.S3Config.Endpoint, repoName),
+			AuthEnv: envs,
+		}, nil
+	case KopiaType:
+		logrus.Infof("line 105 parseS3")
+		return &Repository{
+			Name:    repoName,
+			Path:    fmt.Sprintf("--endpoint=%s --bucket=%s", backupLocation.S3Config.Endpoint, repoName),
+			AuthEnv: envs,
+		}, nil
+	}
+
+	return &Repository{}, fmt.Errorf("error parsing s3 configuration")
 }
 
 func parseAzure(repoName string, backupLocation storkapi.BackupLocationItem) (*Repository, error) {

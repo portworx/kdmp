@@ -1,0 +1,17 @@
+@startuml
+participant PXBackup
+box "Stork" #LightBlue
+participant BackupRestoreController
+participant KDMPController
+end box
+autonumber
+PXBackup -> BackupRestoreController: Submit \nApplicationBackup CR
+BackupRestoreController -> KDMPController: Generate DataExport CR
+ref over KDMPController
+    1. Trigger Generic backup/restore
+    2. Update status of backup/restore in DataExport CR
+    3. Create Volumebackup CR and update live progress state
+end ref
+KDMPController -> BackupRestoreController: Report final backup \nstatus through \nDataExport CR
+BackupRestoreController -> PXBackup: Report backup \nstatus through \nApplicationBackup CR
+@enduml 

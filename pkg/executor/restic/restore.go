@@ -36,7 +36,7 @@ func newRestoreCommand() *cobra.Command {
 }
 
 func runRestore(snapshotID, targetPath string) error {
-	repo, err := executor.ParseBackupLocation(resticRepo, backupLocationName, namespace, backupLocationFile)
+	repo, err := executor.ParseBackupLocation(resticRepo, backupLocationName, namespace, backupLocationFile, executor.ResticType)
 	if err != nil {
 		return err
 	}

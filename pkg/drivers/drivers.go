@@ -7,12 +7,16 @@ const (
 	Rsync         = "rsync"
 	ResticBackup  = "resticbackup"
 	ResticRestore = "resticrestore"
+	KopiaBackup   = "kopiabackup"
+	KopiaRestore  = "kopiarestore"
 )
 
 // Docker images.
 const (
-	ResticExecutorImage = "portworx/resticexecutor"
+	//ResticExecutorImage = "portworx/resticexecutor"
+	ResticExecutorImage = "pkumarn/resticexecutor"
 	RsyncImage          = "eeacms/rsync"
+	KopiaExecutorImage  = "pkumarn/kopiaexecutor"
 )
 
 // Driver labels.
@@ -48,6 +52,9 @@ const (
 	ResticExecutorRequestMemory  = "KDMP_RESTICEXECUTOR_REQUEST_MEMORY"
 	ResticExecutorLimitCPU       = "KDMP_RESTICEXECUTOR_LIMIT_CPU"
 	ResticExecutorLimitMemory    = "KDMP_RESTICEXECUTOR_LIMIT_MEMORY"
+
+	KopiaExecutorImageKey       = "KDMP_KOPIAEXECUTOR_IMAGE"
+	KopiaExecutorImageSecretKey = "KDMP_KOPIAEXECUTOR_IMAGE_SECRET"
 )
 
 // Default parameters for job options.

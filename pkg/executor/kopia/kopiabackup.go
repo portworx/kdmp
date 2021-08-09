@@ -1,4 +1,4 @@
-package restic
+package kopia
 
 import (
 	"fmt"
@@ -8,7 +8,7 @@ import (
 
 	kdmpapi "github.com/portworx/kdmp/pkg/apis/kdmp/v1alpha1"
 	"github.com/portworx/kdmp/pkg/executor"
-	"github.com/portworx/kdmp/pkg/restic"
+	"github.com/portworx/kdmp/pkg/kopia"
 	kdmpops "github.com/portworx/kdmp/pkg/util/ops"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -28,13 +28,13 @@ func newBackupCommand() *cobra.Command {
 	)
 	backupCommand := &cobra.Command{
 		Use:   "backup",
-		Short: "Start a restic backup",
+		Short: "Start a kopia backup",
 		Run: func(c *cobra.Command, args []string) {
 			if len(backupLocationFile) == 0 && len(backupLocationName) == 0 {
-				util.CheckErr(fmt.Errorf("backup-location or backup-location-file has to be provided for restic backups"))
+				util.CheckErr(fmt.Errorf("backup-location or backup-location-file has to be provided for kopia backups"))
 				return
 			}
-			srcPath, err := getSourcPath(sourcePath, sourcePathGlob)
+			srcPath, err := getSourcePath(sourcePath, sourcePathGlob)
 			if err != nil {
 				util.CheckErr(err)
 				return
@@ -43,51 +43,57 @@ func newBackupCommand() *cobra.Command {
 			handleErr(runBackup(srcPath))
 		},
 	}
-	backupCommand.Flags().StringVar(&sourcePath, "source-path", "", "Source for restic backup")
+	backupCommand.Flags().StringVar(&sourcePath, "source-path", "", "Source for kopia backup")
 	backupCommand.Flags().StringVar(&sourcePathGlob, "source-path-glob", "", "The regexp should match only one path that will be used for backup")
 	backupCommand.Flags().StringVar(&volumeBackupName, "volume-backup-name", "", "Provided VolumeBackup CRD will be updated with the latest backup progress details")
 	return backupCommand
 }
 
 func runBackup(sourcePath string) error {
-	repo, err := executor.ParseBackupLocation(resticRepo, backupLocationName, namespace, backupLocationFile, executor.ResticType)
+	repo, err := executor.ParseBackupLocation(kopiaRepo, backupLocationName, namespace, backupLocationFile, executor.KopiaType)
+	logrus.Infof("line 54 runBackup - repo %+v", repo)
 	if err != nil {
-		if statusErr := writeVolumeBackupStatus(&restic.Status{LastKnownError: err}); statusErr != nil {
+		if statusErr := writeVolumeBackupStatus(&kopia.Status{LastKnownError: err}); statusErr != nil {
 			return statusErr
 		}
 		return fmt.Errorf("parse backuplocation: %s", err)
 	}
-
+	// Overriding path to match with kopia
+	// TODO: Can this be made generic instead of being as part of ParseBackupLocation()?
+	//repo.Path = fmt.Sprintf("%s --bucket=%s", "s3", )
 	if volumeBackupName != "" {
 		if err = createVolumeBackup(volumeBackupName, namespace, repo.Name); err != nil {
 			return err
 		}
 	}
-
-	if err = runResticInit(repo.Path, repo.AuthEnv); err != nil {
-		return fmt.Errorf("run restic init: %s", err)
+	// TODO: kopia doesn't have a way to know if repository is already initialzed.
+	// Repository create needs to run only first time. 
+	// One option is to check if the repo path exists, if not do a repository create
+	if err = runKopiaInit(repo.Path, repo.AuthEnv); err != nil {
+		return fmt.Errorf("run kopia init: %s", err)
 	}
 
-	if err = runResticBackup(sourcePath, repo.Path, repo.AuthEnv); err != nil {
+	/*if err = runResticBackup(sourcePath, repo.Path, repo.AuthEnv); err != nil {
 		return fmt.Errorf("run restic backup: %s", err)
-	}
+	}*/
 
 	fmt.Println("Backup has been successfully created")
 	return nil
 }
 
-func runResticInit(repositoryName string, env []string) error {
-	initCmd, err := restic.GetInitCommand(repositoryName, secretFilePath)
+func runKopiaInit(repositoryPath string, env []string) error {
+	initCmd, err := kopia.GetInitCommand(repositoryPath, secretFilePath)
+	logrus.Infof("line 84 runKopiaInit cmd: %+v", initCmd)
 	if err != nil {
 		return err
 	}
 	initCmd.AddEnv(env)
-	logrus.Infof("line 85 runResticInit : %+v", initCmd)
-	initExecutor := restic.NewInitExecutor(initCmd)
+	initExecutor := kopia.NewInitExecutor(initCmd)
 	if err := initExecutor.Run(); err != nil {
 		err = fmt.Errorf("failed to run backup command: %v", err)
 		return err
 	}
+	//TODO: Temp commented out
 	for {
 		time.Sleep(progressCheckInterval)
 		status, err := initExecutor.Status()
@@ -95,7 +101,7 @@ func runResticInit(repositoryName string, env []string) error {
 			return err
 		}
 		if status.LastKnownError != nil {
-			if status.LastKnownError != restic.ErrAlreadyInitialized {
+			if status.LastKnownError != kopia.ErrAlreadyInitialized {
 				return status.LastKnownError
 			}
 			status.LastKnownError = nil
@@ -112,40 +118,9 @@ func runResticInit(repositoryName string, env []string) error {
 	return nil
 }
 
-func runResticBackup(sourcePath, repositoryName string, env []string) error {
-	backupCmd, err := restic.GetBackupCommand(repositoryName, secretFilePath, sourcePath)
-	if err != nil {
-		return err
-	}
-	backupCmd.AddEnv(env)
-	backupExecutor := restic.NewBackupExecutor(backupCmd)
-	if err := backupExecutor.Run(); err != nil {
-		err = fmt.Errorf("failed to run backup command: %v", err)
-		return err
-	}
-	for {
-		time.Sleep(progressCheckInterval)
-		status, err := backupExecutor.Status()
-		if err != nil {
-			return err
-		}
-		if status.LastKnownError != nil {
-			return status.LastKnownError
-		}
-		if err = writeVolumeBackupStatus(status); err != nil {
-			logrus.Errorf("failed to write a VolumeBackup status: %v", err)
-			continue
-		}
-		if status.Done {
-			break
-		}
-	}
-
-	return nil
-}
-
+// TODO: Can this be made common?
 // writeVolumeBackupStatus writes a restic status to the VolumeBackup crd.
-func writeVolumeBackupStatus(status *restic.Status) error {
+func writeVolumeBackupStatus(status *kopia.Status) error {
 	if volumeBackupName == "" {
 		return nil
 	}
@@ -171,6 +146,7 @@ func writeVolumeBackupStatus(status *restic.Status) error {
 	return nil
 }
 
+// TODO: Can this be made common?
 func createVolumeBackup(name, namespace, repository string) error {
 	new := &kdmpapi.VolumeBackup{
 		ObjectMeta: v1.ObjectMeta{
@@ -205,9 +181,10 @@ func createVolumeBackup(name, namespace, repository string) error {
 	return nil
 }
 
-func getSourcPath(path, glob string) (string, error) {
+
+func getSourcePath(path, glob string) (string, error) {
 	if len(path) == 0 && len(glob) == 0 {
-		return "", fmt.Errorf("source-path argument is required for restic backups")
+		return "", fmt.Errorf("source-path argument is required for kopia backups")
 	}
 
 	if len(path) > 0 {
@@ -231,4 +208,3 @@ func handleErr(err error) {
 		util.CheckErr(err)
 	}
 }
-

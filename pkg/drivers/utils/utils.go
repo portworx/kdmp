@@ -87,6 +87,20 @@ func ResticExecutorImageSecret() string {
 	return strings.TrimSpace(os.Getenv(drivers.ResticExecutorImageSecretKey))
 }
 
+// KopiaExecutorImage returns a docker image that contains kopiaexecutor binary.
+func KopiaExecutorImage() string {
+	if customImage := strings.TrimSpace(os.Getenv(drivers.KopiaExecutorImageKey)); customImage != "" {
+		return customImage
+	}
+	// use a versioned docker image
+	return strings.Join([]string{drivers.KopiaExecutorImage, version.Get().GitVersion}, ":")
+}
+
+// KopiaExecutorImageSecret returns an image pull secret for the resticexecutor image.
+func KopiaExecutorImageSecret() string {
+	return strings.TrimSpace(os.Getenv(drivers.KopiaExecutorImageSecretKey))
+}
+
 // RsyncImage returns a docker image that contains rsync binary.
 func RsyncImage() string {
 	if customImage := strings.TrimSpace(os.Getenv(drivers.RsyncImageKey)); customImage != "" {
