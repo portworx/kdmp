@@ -3,6 +3,10 @@ package kopia
 import (
 	"flag"
 
+<<<<<<< HEAD
+=======
+	"github.com/sirupsen/logrus"
+>>>>>>> PB-1808: Adding kopia tool as executor
 	"github.com/spf13/cobra"
 
 	"k8s.io/kubectl/pkg/cmd/util"

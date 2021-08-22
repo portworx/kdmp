@@ -21,6 +21,8 @@ func jobForLiveBackup(
 	jobName,
 	namespace,
 	pvcName string,
+	//backuplocationName,
+	//backuplocationNamespace string,
 	mountPod corev1.Pod,
 	resources corev1.ResourceRequirements,
 	labels map[string]string) (*batchv1.Job, error) {
