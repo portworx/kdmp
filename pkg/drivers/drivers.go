@@ -7,11 +7,14 @@ const (
 	Rsync         = "rsync"
 	ResticBackup  = "resticbackup"
 	ResticRestore = "resticrestore"
+	KopiaBackup   = "kopiabackup"
+	KopiaRestore  = "kopiarestore"
 )
 
 // Docker images.
 const (
 	ResticExecutorImage = "portworx/resticexecutor"
+	KopiaExecutorImage  = "portworx/kopiaexecutor"
 	RsyncImage          = "eeacms/rsync"
 )
 
@@ -30,6 +33,11 @@ const (
 	SecretKey   = "secret"
 	SecretValue = "resticsecret"
 	SecretMount = "/tmp/resticsecret"
+	// TODO: This will change to use secret created by px-backup which is mounted
+	// by reconciler in later changes
+	KopiaSecretValue = "kopiasecret"
+	KopiaSecretMount = "/tmp/kopiasecret"
+	KopiaSecretKey   = "password"
 )
 
 // Driver job options.
@@ -48,6 +56,8 @@ const (
 	ResticExecutorRequestMemory  = "KDMP_RESTICEXECUTOR_REQUEST_MEMORY"
 	ResticExecutorLimitCPU       = "KDMP_RESTICEXECUTOR_LIMIT_CPU"
 	ResticExecutorLimitMemory    = "KDMP_RESTICEXECUTOR_LIMIT_MEMORY"
+	KopiaExecutorImageKey        = "KDMP_KOPIAEXECUTOR_IMAGE"
+	KopiaExecutorImageSecretKey  = "KDMP_KOPIAEXECUTOR_IMAGE_SECRET"
 )
 
 // Default parameters for job options.

@@ -1,0 +1,33 @@
+@startuml
+hide footbox
+box "KDMP Controller" #LightBlue
+participant Reconciler
+
+note right of Reconciler #aqua
+Watch on DataExport CR
+end note
+
+autonumber
+
+Reconciler -> Reconciler: Fetch driver type \n(restic/kopia)
+note left: Status and Stage are updated in \nDataExport CR
+
+alt DataExportStageInitial
+    Reconciler -> Reconciler: Check if PVC and BL exists
+    Reconciler -> Reconciler: Set stage = DataExportStageTransferScheduled
+else DataExportStageTransferScheduled
+    Reconciler -> Reconciler: Set Stage = DataExportStageTransferInProgress
+    create Job
+    Reconciler -> Job: Trigger a new k8s job for backup
+else DataExportStageTransferInProgress
+    Reconciler -> Job: Fetch Job status
+    alt Job Completed
+        Reconciler -> Reconciler: Status = DataExportStatusSuccessful \nStage = DataExportStageFinal
+    else Job Failed
+        Reconciler -> Reconciler: Status = DataExportStatusFailed
+    end
+else DataExportStageFinal
+    Reconciler -> Reconciler: Cleanup Job
+end
+participant Executor
+@enduml

@@ -21,6 +21,9 @@ const (
 	// DataExportRestic means that data will be backed up to or restored from a restic
 	// repository.
 	DataExportRestic DataExportType = "restic"
+	// DataExportKopia means that data will be backed up to or restored from a kopia
+	// repository.
+	DataExportKopia DataExportType = "kopia"
 )
 
 // DataExportStatus defines a status of DataExport.

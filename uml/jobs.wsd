@@ -1,0 +1,26 @@
+@startuml
+hide footbox
+box "Job" #LightBlue
+participant StartJob
+
+[-> StartJob: Request for Startjob \n from Reconciler
+    StartJob -> StartJob: Frame job name as kopia-backup-<ns>-<pvc name>
+    StartJob -> StartJob: Fetch password for backup repository \nfrom mounted secret
+    create BuildJob
+        StartJob -> BuildJob: Build k8s job
+            note over BuildJob
+                If PVC is used by pod
+                - /var/lib/kubelet path where the source PVC is mounted 
+                  will be bind mounted inside this job.
+                - Frame executor command (using kopiaexecutor)
+                - Submit the job to k8s 
+                - Job creates a pod using kopiaexectuor which
+                  performs the backup/restore
+                If PVC is not used by pod
+                - Bind mount the PVC into job
+                - Frame executor command (using kopiaexecutor)
+                - Submit the job to k8s 
+                - Job creates a pod using kopiaexectuor which
+                  performs the backup/restore
+            end note         
+@enduml
