@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"github.com/sirupsen/logrus"
 	"os"
 	"os/exec"
 	"sync"
@@ -102,7 +103,7 @@ func (b *backupExecutor) Run() error {
 	b.execCmd = b.cmd.Cmd()
 	b.execCmd.Stdout = b.outBuf
 	b.execCmd.Stderr = b.errBuf
-
+	logrus.Infof("line 105 execCmd: %+v", b.execCmd)
 	if err := b.execCmd.Start(); err != nil {
 		b.lastError = err
 		return err

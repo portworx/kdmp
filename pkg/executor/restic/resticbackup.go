@@ -67,7 +67,7 @@ func runBackup(sourcePath string) error {
 	if err = runResticInit(repo.Path, repo.AuthEnv); err != nil {
 		return fmt.Errorf("run restic init: %s", err)
 	}
-
+	logrus.Infof("line 71 runBackup sourcePath: %v", sourcePath)
 	if err = runResticBackup(sourcePath, repo.Path, repo.AuthEnv); err != nil {
 		return fmt.Errorf("run restic backup: %s", err)
 	}

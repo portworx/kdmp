@@ -13,8 +13,8 @@ const (
 
 // Docker images.
 const (
-	ResticExecutorImage = "portworx/resticexecutor"
-	KopiaExecutorImage  = "portworx/kopiaexecutor"
+	ResticExecutorImage = "pkumarn/resticexecutor"
+	KopiaExecutorImage  = "pkumarn/kopiaexecutor"
 	RsyncImage          = "eeacms/rsync"
 )
 
@@ -35,9 +35,10 @@ const (
 	SecretMount = "/tmp/resticsecret"
 	// TODO: This will change to use secret created by px-backup which is mounted
 	// by reconciler in later changes
-	KopiaSecretValue = "kopiasecret"
-	KopiaSecretMount = "/tmp/kopiasecret"
-	KopiaSecretKey   = "password"
+	KopiaSecretValue     = "kopiasecret"
+	KopiaSecretMount     = "/tmp/kopiasecret"
+	KopiaSecretKey       = "password"
+	KopiaCredSecretMount = "/tmp/cred-secret"
 )
 
 // Driver job options.

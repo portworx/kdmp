@@ -17,6 +17,7 @@ type JobOpts struct {
 	BackupLocationNamespace string
 	VolumeBackupName        string
 	VolumeBackupNamespace   string
+	DataExportName          string
 	Labels                  map[string]string
 }
 
@@ -86,6 +87,14 @@ func WithVolumeBackupNamespace(ns string) JobOption {
 func WithLabels(l map[string]string) JobOption {
 	return func(opts *JobOpts) error {
 		opts.Labels = l
+		return nil
+	}
+}
+
+// WithDataExportName is job parameter.
+func WithDataExportName(name string) JobOption {
+	return func(opts *JobOpts) error {
+		opts.DataExportName = name
 		return nil
 	}
 }
