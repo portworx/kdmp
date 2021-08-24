@@ -27,7 +27,7 @@ func newRestoreCommand() *cobra.Command {
 				util.CheckErr(fmt.Errorf("target-path argument is required for restic backups"))
 				return
 			}
-			handleErr(runRestore(snapshotID, targetPath))
+			executor.HandleErr(runRestore(snapshotID, targetPath))
 		},
 	}
 	restoreCommand.Flags().StringVar(&targetPath, "target-path", "", "Destination path for restic restore backup")

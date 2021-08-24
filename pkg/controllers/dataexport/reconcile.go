@@ -3,6 +3,7 @@ package dataexport
 import (
 	"context"
 	"fmt"
+	"os"
 	"reflect"
 
 	storkapi "github.com/libopenstorage/stork/pkg/apis/stork/v1alpha1"
@@ -10,20 +11,27 @@ import (
 	kdmpapi "github.com/portworx/kdmp/pkg/apis/kdmp/v1alpha1"
 	"github.com/portworx/kdmp/pkg/drivers"
 	"github.com/portworx/kdmp/pkg/drivers/driversinstance"
+	"github.com/portworx/kdmp/pkg/drivers/kopiabackup"
+	"github.com/portworx/kdmp/pkg/drivers/utils"
 	"github.com/portworx/kdmp/pkg/snapshots"
 	"github.com/portworx/kdmp/pkg/snapshots/snapshotsinstance"
 	kdmpopts "github.com/portworx/kdmp/pkg/util/ops"
 	"github.com/portworx/sched-ops/k8s/core"
 	"github.com/portworx/sched-ops/k8s/stork"
+	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/utils/pointer"
 )
 
 // Data export label names/keys.
 const (
-	LabelController     = "kdmp.portworx.com/controller"
-	LabelControllerName = "controller-name"
+	LabelController      = "kdmp.portworx.com/controller"
+	LabelControllerName  = "controller-name"
+	KopiaSecretName      = "generic-backup-repo"
+	KopiaSecretNamespace = "kube-system"
 )
 
 func (c *Controller) sync(ctx context.Context, in *kdmpapi.DataExport) (bool, error) {
@@ -111,11 +119,27 @@ func (c *Controller) sync(ctx context.Context, in *kdmpapi.DataExport) (bool, er
 		if dataExport.Status.SnapshotPVCName != "" {
 			srcPVCName = dataExport.Status.SnapshotPVCName
 		}
+		// Create the credential secret
+		logrus.Debugf("drivername: %v", driverName)
+		if driverName == drivers.KopiaBackup || driverName == drivers.KopiaRestore {
+			// This will create a unique secret per PVC being backed up
+			err = CreateCredentialsSecret(
+				utils.FrameCredSecretName(dataExport.Name, dataExport.Spec.Source.Name),
+				dataExport.Spec.Destination.Name,
+				dataExport.Spec.Destination.Namespace,
+			)
+			if err != nil {
+				msg := fmt.Sprintf("failed to create cloud credential secret: %s", err)
+				logrus.Error("%v", msg)
+				return false, c.updateStatus(dataExport, kdmpapi.DataExportStatusFailed, msg)
+			}
+		}
 
 		// start data transfer
 		id, err := startTransferJob(driver, srcPVCName, dataExport)
 		if err != nil {
 			msg := fmt.Sprintf("failed to start a data transfer job: %s", err)
+			logrus.Error("%v", msg)
 			return false, c.updateStatus(dataExport, kdmpapi.DataExportStatusFailed, msg)
 		}
 
@@ -444,6 +468,7 @@ func startTransferJob(drv drivers.Interface, srcPVCName string, dataExport *kdmp
 			drivers.WithBackupLocationName(dataExport.Spec.Destination.Name),
 			drivers.WithBackupLocationNamespace(dataExport.Spec.Destination.Namespace),
 			drivers.WithLabels(jobLabels(dataExport.GetName())),
+			drivers.WithDataExportName(dataExport.GetName()),
 		)
 	}
 
@@ -592,4 +617,69 @@ func checkNameNamespace(ref kdmpapi.DataExportObjectReference) error {
 		return fmt.Errorf("namespace has to be set")
 	}
 	return nil
+}
+
+// CreateCredentialsSecret parses the provided backup location and creates secret with cloud credentials
+func CreateCredentialsSecret(secretName, blName, namespace string) error {
+	backupLocation, err := readBackupLocation(blName, namespace, "")
+	if err != nil {
+		return err
+	}
+
+	// TODO: Add for other cloud providers
+	// Creating cloud cred secret
+	switch backupLocation.Location.Type {
+	case storkapi.BackupLocationS3:
+		return createS3Secret(secretName, backupLocation)
+	}
+	return fmt.Errorf("unsupported backup location: %v", backupLocation.Location.Type)
+}
+
+func readBackupLocation(name, namespace, filePath string) (*storkapi.BackupLocation, error) {
+	if name != "" {
+		if namespace == "" {
+			namespace = "default"
+		}
+		return stork.Instance().GetBackupLocation(name, namespace)
+	}
+
+	// TODO: This is needed for restic, we can think of removing it later
+	f, err := os.Open(filePath)
+	if err != nil {
+		return nil, err
+	}
+
+	out := &storkapi.BackupLocation{}
+	if err = yaml.NewYAMLOrJSONDecoder(f, 1024).Decode(out); err != nil {
+		return nil, err
+	}
+
+	return out, nil
+}
+
+func createS3Secret(secretName string, backupLocation *storkapi.BackupLocation) error {
+	credentialData := make(map[string][]byte)
+	credentialData["endpoint"] = []byte(backupLocation.Location.S3Config.Endpoint)
+	credentialData["accessKey"] = []byte(backupLocation.Location.S3Config.AccessKeyID)
+	credentialData["secretAccessKey"] = []byte(backupLocation.Location.S3Config.SecretAccessKey)
+	credentialData["region"] = []byte(backupLocation.Location.S3Config.Region)
+	credentialData["path"] = []byte(backupLocation.Location.Path)
+	credentialData["type"] = []byte(backupLocation.Location.Type)
+	credentialData["password"] = []byte(backupLocation.Location.RepositoryPassword)
+	secret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      secretName,
+			Namespace: backupLocation.Namespace,
+			Annotations: map[string]string{
+				kopiabackup.SkipResourceAnnotation: "true",
+			},
+		},
+		Data: credentialData,
+		Type: corev1.SecretTypeOpaque,
+	}
+	_, err := core.Instance().CreateSecret(secret)
+	if err != nil && errors.IsAlreadyExists(err) {
+		return nil
+	}
+	return err
 }

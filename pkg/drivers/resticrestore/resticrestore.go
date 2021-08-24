@@ -141,7 +141,7 @@ func jobFor(
 	labels map[string]string) (*batchv1.Job, error) {
 	labels = addJobLabels(labels)
 
-	resources, err := utils.ResticResourceRequirements()
+	resources, err := utils.JobResourceRequirements()
 	if err != nil {
 		return nil, err
 	}

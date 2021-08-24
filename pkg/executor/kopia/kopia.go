@@ -9,10 +9,10 @@ import (
 )
 
 var (
-	//namespace          string
-	secretFilePath string
-	credentials    string
-	kopiaRepo      string
+	namespace        string
+	volumeBackupName string
+	kopiaRepo        string
+	credentials      string
 )
 
 // NewCommand returns a kopia command wrapper
@@ -23,12 +23,13 @@ func NewCommand() *cobra.Command {
 	}
 
 	// TODO: More flags to be added in later changes
-	cmds.PersistentFlags().StringVar(&kopiaRepo, "repository", "", "Name of the kopia repository")
-	cmds.PersistentFlags().StringVarP(&secretFilePath, "secret-file-path", "s", "", "Path of the secret file used for locking/unlocking kopia repositories")
+	cmds.PersistentFlags().StringVarP(&namespace, "namespace", "n", "", "Namespace for this command")
+	cmds.PersistentFlags().StringVar(&kopiaRepo, "repository", "", "Name of the kopia repository. If provided it will overwrite the BackupLocation one")
 	cmds.PersistentFlags().StringVarP(&credentials, "credentials", "c", "", "Secret holding repository credentials")
 
-	// TODO: Add commands here for all kopiaexecutor operations like
-	// backup and restore
+	cmds.AddCommand(
+		newBackupCommand(),
+	)
 	cmds.PersistentFlags().AddGoFlagSet(flag.CommandLine)
 	err := flag.CommandLine.Parse([]string{})
 	if err != nil {

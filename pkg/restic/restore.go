@@ -6,6 +6,8 @@ import (
 	"os"
 	"os/exec"
 	"sync"
+
+	cmdexec "github.com/portworx/kdmp/pkg/executor"
 )
 
 const (
@@ -119,26 +121,26 @@ func (b *restoreExecutor) Run() error {
 	return nil
 }
 
-func (b *restoreExecutor) Status() (*Status, error) {
+func (b *restoreExecutor) Status() (*cmdexec.Status, error) {
 	b.responseLock.Lock()
 	defer b.responseLock.Unlock()
 
 	if b.lastError != nil {
 		fmt.Fprintln(os.Stderr, b.errBuf.String())
-		return &Status{
+		return &cmdexec.Status{
 			LastKnownError: b.lastError,
 			Done:           true,
 		}, nil
 	}
 
 	if b.summaryResponse != nil {
-		return &Status{
+		return &cmdexec.Status{
 			ProgressPercentage: 100,
 			Done:               true,
 		}, nil
 	}
 
-	return &Status{}, nil
+	return &cmdexec.Status{}, nil
 }
 
 func getRestoreSummary(outBytes []byte, errBytes []byte) (*RestoreSummaryResponse, error) {
