@@ -12,9 +12,9 @@ require (
 	github.com/sirupsen/logrus v1.4.2
 	github.com/spf13/cobra v0.0.5
 	github.com/spf13/pflag v1.0.5
-	github.com/stretchr/testify v1.4.0
+	github.com/stretchr/testify v1.6.1
 	github.com/urfave/cli v1.22.2
-	golang.org/x/tools v0.0.0-20200408132156-9ee5ef7a2c0d // indirect
+	gocloud.dev v0.23.0
 	k8s.io/api v0.17.0
 	k8s.io/apiextensions-apiserver v0.16.6
 	k8s.io/apimachinery v0.17.1-beta.0
