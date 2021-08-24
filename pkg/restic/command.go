@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+
+	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -68,6 +70,8 @@ func (c *Command) Cmd() *exec.Cmd {
 		cmd.Env = append(os.Environ(), c.Env...)
 	}
 	cmd.Dir = c.Dir
+	logrus.Infof("line 73 cmd: %+v", cmd)
+	logrus.Infof("line 74 args: %+v", argsSlice)
 	return cmd
 }
 

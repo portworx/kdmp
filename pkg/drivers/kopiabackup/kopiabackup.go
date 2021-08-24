@@ -10,6 +10,7 @@ import (
 	kdmpops "github.com/portworx/kdmp/pkg/util/ops"
 	"github.com/portworx/sched-ops/k8s/batch"
 	coreops "github.com/portworx/sched-ops/k8s/core"
+	"github.com/sirupsen/logrus"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -41,35 +42,22 @@ func (d Driver) StartJob(opts ...drivers.JobOption) (id string, err error) {
 	}
 
 	if err := d.validate(o); err != nil {
+		logrus.Infof("line 40 StartJob err: %v", err)
 		return "", err
 	}
 
-	jobName := toJobName(o.SourcePVCName)
-
-	if _, err := coreops.Instance().CreateSecret(&corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      jobName,
-			Namespace: o.Namespace,
-			Annotations: map[string]string{
-				skipResourceAnnotation: "true",
-			},
-		},
-		StringData: map[string]string{
-			drivers.SecretKey: drivers.SecretValue,
-		},
-	}); err != nil && !apierrors.IsAlreadyExists(err) {
-
-		return "", fmt.Errorf("create a secret for a kopia password: %v", err)
-	}
-
+	jobName := toJobName(o.DataExportName, o.Namespace, o.SourcePVCName)
+	logrus.Infof("line 63 startjonb jobname: %v", jobName)
 	job, err := buildJob(jobName, o)
 	if err != nil {
+		logrus.Infof("line 66 StartJob err: %v", err)
 		return "", err
 	}
 	if _, err = batch.Instance().CreateJob(job); err != nil && !apierrors.IsAlreadyExists(err) {
+		logrus.Infof("line 70 StartJob err: %v", err)
 		return "", err
 	}
-
+	logrus.Infof("line 73 StartJob")
 	return utils.NamespacedName(job.Namespace, job.Name), nil
 }
 
@@ -133,8 +121,8 @@ func (d Driver) validate(o drivers.JobOpts) error {
 func jobFor(
 	jobName,
 	namespace,
-	pvcName string,
-	//backuplocationName,
+	pvcName,
+	backuplocationName string,
 	//backuplocationNamespace string,
 	resources corev1.ResourceRequirements,
 	labels map[string]string) (*batchv1.Job, error) {
@@ -149,12 +137,14 @@ func jobFor(
 		backupName,
 		"--repository",
 		toRepoName(pvcName, namespace),
+		"--credentials",
+		backuplocationName,
 		"--secret-file-path",
 		filepath.Join(drivers.KopiaSecretMount, drivers.KopiaSecretKey),
 		"--source-path",
 		"/data",
 	}, " ")
-
+	logrus.Infof("line 150")
 	return &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      jobName,
@@ -188,8 +178,8 @@ func jobFor(
 									MountPath: "/data",
 								},
 								{
-									Name:      "secret",
-									MountPath: drivers.SecretMount,
+									Name:      "cred-secret",
+									MountPath: drivers.KopiaCredSecretMount,
 									ReadOnly:  true,
 								},
 							},
@@ -205,10 +195,10 @@ func jobFor(
 							},
 						},
 						{
-							Name: "secret",
+							Name: "cred-secret",
 							VolumeSource: corev1.VolumeSource{
 								Secret: &corev1.SecretVolumeSource{
-									SecretName: jobName,
+									SecretName: backuplocationName,
 								},
 							},
 						},
@@ -219,12 +209,12 @@ func jobFor(
 	}, nil
 }
 
-func toJobName(id string) string {
-	return fmt.Sprintf("kopiabackup-%s", id)
+func toJobName(dataExportName, ns, pvcName string) string {
+	return fmt.Sprintf("%s-%s-%s", dataExportName, ns, pvcName)
 }
 
 func toRepoName(pvcName, pvcNamespace string) string {
-	return fmt.Sprintf("kopia/%s-%s", pvcNamespace, pvcName)
+	return fmt.Sprintf("%s-%s", pvcNamespace, pvcName)
 }
 
 func addJobLabels(labels map[string]string) map[string]string {
@@ -245,6 +235,7 @@ func buildJob(jobName string, o drivers.JobOpts) (*batchv1.Job, error) {
 	if err := utils.SetupServiceAccount(jobName, o.Namespace, roleFor()); err != nil {
 		return nil, err
 	}
+	
 	pods, err := coreops.Instance().GetPodsUsingPVC(o.SourcePVCName, o.Namespace)
 	if err != nil {
 		return nil, err
@@ -256,8 +247,8 @@ func buildJob(jobName string, o drivers.JobOpts) (*batchv1.Job, error) {
 			jobName,
 			o.Namespace,
 			o.SourcePVCName,
-			//o.BackupLocationName,
-			//o.BackupLocationNamespace,
+			o.BackupLocationName,
+			o.BackupLocationNamespace,
 			pods[0],
 			resources,
 			o.Labels,
@@ -268,7 +259,7 @@ func buildJob(jobName string, o drivers.JobOpts) (*batchv1.Job, error) {
 		jobName,
 		o.Namespace,
 		o.SourcePVCName,
-		//o.BackupLocationName,
+		o.BackupLocationName,
 		//o.BackupLocationNamespace,
 		resources,
 		o.Labels,

@@ -8,6 +8,7 @@ import (
 	"github.com/portworx/kdmp/pkg/drivers"
 	"github.com/portworx/kdmp/pkg/drivers/utils"
 	coreops "github.com/portworx/sched-ops/k8s/core"
+	"github.com/sirupsen/logrus"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -20,17 +21,18 @@ var (
 func jobForLiveBackup(
 	jobName,
 	namespace,
-	pvcName string,
-	//backuplocationName,
-	//backuplocationNamespace string,
+	pvcName,
+	backuplocationName string,
+	backuplocationNamespace string,
 	mountPod corev1.Pod,
 	resources corev1.ResourceRequirements,
 	labels map[string]string) (*batchv1.Job, error) {
 	volDir, err := getVolumeDirectory(pvcName, namespace)
 	if err != nil {
+		logrus.Infof("line 32 jobForLiveBackup")
 		return nil, err
 	}
-
+	logrus.Infof("line 33 jobForLiveBackup")
 	// pod volumes reside under /var/lib/kubelet/pods/<podUID>/volumes/<volumePlugin>/<volumeName> directory.
 	// mount /var/lib/kubelet/pods/<podUID>/volumes as a /data directory to a resticexecutor job and
 	// use /data/*/<volumeName> as a backup directory and determine volume plugin by resticexecutor.
@@ -46,8 +48,12 @@ func jobForLiveBackup(
 		"backup",
 		"--volume-backup-name",
 		backupName,
+		"--namespace",
+		backuplocationNamespace,
 		"--repository",
 		toRepoName(pvcName, namespace),
+		"--credentials",
+		backuplocationName,
 		"--secret-file-path",
 		filepath.Join(drivers.KopiaSecretMount, drivers.KopiaSecretKey),
 		"--source-path-glob",
@@ -88,8 +94,8 @@ func jobForLiveBackup(
 									MountPath: "/data",
 								},
 								{
-									Name:      "secret",
-									MountPath: drivers.SecretMount,
+									Name:      "cred-secret",
+									MountPath: drivers.KopiaCredSecretMount,
 									ReadOnly:  true,
 								},
 							},
@@ -105,10 +111,10 @@ func jobForLiveBackup(
 							},
 						},
 						{
-							Name: "secret",
+							Name: "cred-secret",
 							VolumeSource: corev1.VolumeSource{
 								Secret: &corev1.SecretVolumeSource{
-									SecretName: jobName,
+									SecretName: backuplocationName,
 								},
 							},
 						},
