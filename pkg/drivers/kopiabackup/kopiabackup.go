@@ -17,6 +17,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+const (
+	skipResourceAnnotation = "stork.libopenstorage.org/skip-resource"
+)
+
 // Driver is a resticbackup implementation of the data export interface.
 type Driver struct{}
 
@@ -46,6 +50,9 @@ func (d Driver) StartJob(opts ...drivers.JobOption) (id string, err error) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      jobName,
 			Namespace: o.Namespace,
+			Annotations: map[string]string{
+				skipResourceAnnotation: "true",
+			},
 		},
 		StringData: map[string]string{
 			drivers.SecretKey: drivers.SecretValue,
