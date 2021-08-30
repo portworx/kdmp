@@ -1,6 +1,7 @@
 package job
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -88,5 +89,5 @@ func deleteDataExportJob(name, namespace string) error {
 		return err
 	}
 
-	return kdmpclient.DeleteDataExport(name, namespace)
+	return kdmpclient.DeleteDataExport(context.Background(), name, namespace)
 }

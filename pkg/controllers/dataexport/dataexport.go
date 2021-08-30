@@ -2,6 +2,7 @@ package dataexport
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 	"time"
 
@@ -11,6 +12,7 @@ import (
 	"github.com/sirupsen/logrus"
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -63,7 +65,7 @@ func (c *Controller) Init(mgr manager.Manager) error {
 // The Controller will requeue the Request to be processed again if the returned error is non-nil or
 // Result.Requeue is true, otherwise upon completion it will remove the work from the queue.
 //
-func (c *Controller) Reconcile(request reconcile.Request) (reconcile.Result, error) {
+func (c *Controller) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
 	logrus.Debugf("Reconciling DataExport %s/%s", request.Namespace, request.Name)
 
 	dataExport := &kdmpapi.DataExport{}
@@ -98,7 +100,7 @@ func (c *Controller) Reconcile(request reconcile.Request) (reconcile.Result, err
 
 func (c *Controller) createCRD() error {
 	// volumebackups is used by this controller - ensure it's registered
-	vb := apiextensions.CustomResource{
+	vbResource := apiextensions.CustomResource{
 		Name:    kdmpapi.VolumeBackupResourceName,
 		Plural:  kdmpapi.VolumeBackupResourcePlural,
 		Group:   kdmpapi.SchemeGroupVersion.Group,
@@ -106,15 +108,36 @@ func (c *Controller) createCRD() error {
 		Scope:   apiextensionsv1beta1.NamespaceScoped,
 		Kind:    reflect.TypeOf(kdmpapi.VolumeBackup{}).Name(),
 	}
-	err := apiextensions.Instance().CreateCRD(vb)
+	err := apiextensions.Instance().CreateCRD(vbResource)
 	if err != nil && !errors.IsAlreadyExists(err) {
 		return err
 	}
-	if err := apiextensions.Instance().ValidateCRD(vb, 10*time.Second, 2*time.Minute); err != nil {
+	crdName := fmt.Sprintf("%s.%s", vbResource.Plural, vbResource.Group)
+	vbCrd := &apiextensionsv1beta1.CustomResourceDefinition{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: crdName,
+		},
+		Spec: apiextensionsv1beta1.CustomResourceDefinitionSpec{
+			Group:   vbResource.Group,
+			Version: vbResource.Version,
+			Scope:   vbResource.Scope,
+			Names: apiextensionsv1beta1.CustomResourceDefinitionNames{
+				Singular:   vbResource.Name,
+				Plural:     vbResource.Plural,
+				Kind:       vbResource.Kind,
+				ShortNames: vbResource.ShortNames,
+			},
+		},
+	}
+	err = apiextensions.Instance().RegisterCRD(vbCrd)
+	if err != nil && !errors.IsAlreadyExists(err) {
+		return err
+	}
+	if err := apiextensions.Instance().ValidateCRD(vbResource, 10*time.Second, 2*time.Minute); err != nil {
 		return err
 	}
 
-	resource := apiextensions.CustomResource{
+	deResource := apiextensions.CustomResource{
 		Name:    kdmpapi.DataExportResourceName,
 		Plural:  kdmpapi.DataExportResourcePlural,
 		Group:   kdmpapi.SchemeGroupVersion.Group,
@@ -122,10 +145,27 @@ func (c *Controller) createCRD() error {
 		Scope:   apiextensionsv1beta1.NamespaceScoped,
 		Kind:    reflect.TypeOf(kdmpapi.DataExport{}).Name(),
 	}
-	err = apiextensions.Instance().CreateCRD(resource)
+	crdName = fmt.Sprintf("%s.%s", deResource.Plural, deResource.Group)
+	deCrd := &apiextensionsv1beta1.CustomResourceDefinition{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: crdName,
+		},
+		Spec: apiextensionsv1beta1.CustomResourceDefinitionSpec{
+			Group:   deResource.Group,
+			Version: deResource.Version,
+			Scope:   deResource.Scope,
+			Names: apiextensionsv1beta1.CustomResourceDefinitionNames{
+				Singular:   deResource.Name,
+				Plural:     deResource.Plural,
+				Kind:       deResource.Kind,
+				ShortNames: deResource.ShortNames,
+			},
+		},
+	}
+	err = apiextensions.Instance().RegisterCRD(deCrd)
 	if err != nil && !errors.IsAlreadyExists(err) {
 		return err
 	}
 
-	return apiextensions.Instance().ValidateCRD(resource, 10*time.Second, 2*time.Minute)
+	return apiextensions.Instance().ValidateCRD(deResource, 10*time.Second, 2*time.Minute)
 }

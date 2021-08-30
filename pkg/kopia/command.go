@@ -97,7 +97,7 @@ func (c *Command) AddEnv(envs []string) *Command {
 	return c
 }
 
-// Cmd returns os/exec.Cmd object for the provided Command
+// InitCmd returns os/exec.Cmd object for the kopia init Command
 func (c *Command) InitCmd() *exec.Cmd {
 	logrus.Infof("line 85 InitCmd()")
 
@@ -163,7 +163,7 @@ func (c *Command) ConnectCmd() *exec.Cmd {
 		"--password",
 		c.Password,
 		"--prefix",
-		c.RepositoryName,	
+		c.RepositoryName,
 	}
 	argsSlice = append(argsSlice, c.Flags...)
 	// Get the cmd args

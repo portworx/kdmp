@@ -2,6 +2,7 @@ package job
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io/ioutil"
 	"testing"
@@ -82,7 +83,7 @@ func TestDeleteCmd(t *testing.T) {
 		fakekdmpops := fake.NewSimpleClientset()
 		if tc.createJob {
 			o := dataExportFrom(tc.inputArgs, tc.inputFlags)
-			_, err := fakekdmpops.KdmpV1alpha1().DataExports(o.Namespace).Create(o)
+			_, err := fakekdmpops.KdmpV1alpha1().DataExports(o.Namespace).Create(context.Background(), o, metav1.CreateOptions{})
 			require.Nil(t, err, tc.name)
 		}
 		kdmpops.SetInstance(kdmpops.New(fakekdmpops))
