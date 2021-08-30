@@ -134,9 +134,9 @@ deploy-kdmp:
 
 kdmp: build-kdmp container-kdmp deploy-kdmp
 
-restic-executor: build-restic-executor container-restic-executor deploy-restic-executor
+restic-executor: build-restic-executor container-restic-executor
 
-kopia-executor: build-kopia-executor container-kopia-executor deploy-kopia-executor
+kopia-executor: build-kopia-executor container-kopia-executor
 
 ### restic-executor targets ###
 build-restic-executor:
@@ -182,4 +182,3 @@ build-pxc-exporter: gogenerate
 
 container-pxc-exporter:
 deploy-pxc-exporter:
-
