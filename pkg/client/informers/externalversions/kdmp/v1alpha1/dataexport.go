@@ -9,6 +9,7 @@ LICENSE
 package v1alpha1
 
 import (
+	"context"
 	time "time"
 
 	kdmpv1alpha1 "github.com/portworx/kdmp/pkg/apis/kdmp/v1alpha1"
@@ -51,13 +52,13 @@ func NewFilteredDataExportInformer(client versioned.Interface, namespace string,
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.KdmpV1alpha1().DataExports(namespace).List(options)
+				return client.KdmpV1alpha1().DataExports(namespace).List(context.TODO(), options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.KdmpV1alpha1().DataExports(namespace).Watch(options)
+				return client.KdmpV1alpha1().DataExports(namespace).Watch(context.TODO(), options)
 			},
 		},
 		&kdmpv1alpha1.DataExport{},

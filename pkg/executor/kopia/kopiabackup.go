@@ -1,6 +1,7 @@
 package kopia
 
 import (
+	"context"
 	"fmt"
 	"path/filepath"
 	"reflect"
@@ -13,14 +14,11 @@ import (
 	"github.com/portworx/kdmp/pkg/executor"
 	"github.com/portworx/kdmp/pkg/kopia"
 	kdmpops "github.com/portworx/kdmp/pkg/util/ops"
-	storkapi "github.com/libopenstorage/stork/pkg/apis/stork/v1alpha1"
-	"github.com/libopenstorage/stork/pkg/objectstore"
-	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"gocloud.dev/blob"
 	"k8s.io/apimachinery/pkg/api/errors"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubectl/pkg/cmd/util"
 )
 
@@ -104,28 +102,6 @@ func runBackup(sourcePath string) error {
 	//fmt.Println("Backup has been successfully created")
 	logrus.Infof("line 89 time: %v", time.Now())
 	return nil
-}
-
-func buildStorkBackupLocation(repository *executor.Repository) *storkapi.BackupLocation {
-	//var backupType storkapi.BackupLocationType
-	backupLocation := &storkapi.BackupLocation{
-		ObjectMeta: meta.ObjectMeta{},
-		Location:   storkapi.BackupLocationItem{},
-	}
-	switch repository.Type {
-	case storkapi.BackupLocationS3:
-		backupLocation.Location.S3Config = &storkapi.S3Config{
-			AccessKeyID:      repository.S3Config.AccessKeyID,
-			SecretAccessKey:  repository.S3Config.SecretAccessKey,
-			Endpoint:         repository.S3Config.Endpoint,
-			Region:           repository.S3Config.Endpoint,
-		}
-	}
-	backupLocation.Location.Path = repository.Path
-	backupLocation.ObjectMeta.Name = repository.Name
-	backupLocation.Location.Type = storkapi.BackupLocationS3
-
-	return backupLocation
 }
 
 func populateS3AccessDetails(initCmd *kopia.Command, repository *executor.Repository) *kopia.Command {
@@ -277,7 +253,7 @@ func writeVolumeBackupStatus(status *kopia.Status) error {
 		return nil
 	}
 
-	vb, err := kdmpops.Instance().GetVolumeBackup(volumeBackupName, namespace)
+	vb, err := kdmpops.Instance().GetVolumeBackup(context.Background(), volumeBackupName, namespace)
 	if err != nil {
 		return fmt.Errorf("get %s/%s VolumeBackup: %v", volumeBackupName, namespace, err)
 	}
@@ -292,7 +268,7 @@ func writeVolumeBackupStatus(status *kopia.Status) error {
 		vb.Status.LastKnownError = ""
 	}
 
-	if _, err = kdmpops.Instance().UpdateVolumeBackup(vb); err != nil {
+	if _, err = kdmpops.Instance().UpdateVolumeBackup(context.Background(), vb); err != nil {
 		return fmt.Errorf("update %s/%s VolumeBackup: %v", volumeBackupName, namespace, err)
 	}
 	return nil
@@ -301,7 +277,7 @@ func writeVolumeBackupStatus(status *kopia.Status) error {
 // TODO: Can this be made common?
 func createVolumeBackup(name, namespace, repository string) error {
 	new := &kdmpapi.VolumeBackup{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: namespace,
 		},
@@ -314,10 +290,10 @@ func createVolumeBackup(name, namespace, repository string) error {
 		},
 	}
 
-	vb, err := kdmpops.Instance().GetVolumeBackup(name, namespace)
+	vb, err := kdmpops.Instance().GetVolumeBackup(context.Background(), name, namespace)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			_, err = kdmpops.Instance().CreateVolumeBackup(new)
+			_, err = kdmpops.Instance().CreateVolumeBackup(context.Background(), new)
 		}
 		return err
 	}

@@ -1,6 +1,7 @@
 package kopiabackup
 
 import (
+	"context"
 	"fmt"
 	"path/filepath"
 	"strings"
@@ -100,7 +101,7 @@ func (d Driver) JobStatus(id string) (*drivers.JobStatus, error) {
 	}
 
 	// restic executor updates a volumebackup object with a progress details
-	vb, err := kdmpops.Instance().GetVolumeBackup(name, namespace)
+	vb, err := kdmpops.Instance().GetVolumeBackup(context.Background(), name, namespace)
 	if err != nil {
 		return nil, err
 	}
@@ -235,7 +236,7 @@ func buildJob(jobName string, o drivers.JobOpts) (*batchv1.Job, error) {
 	if err := utils.SetupServiceAccount(jobName, o.Namespace, roleFor()); err != nil {
 		return nil, err
 	}
-	
+
 	pods, err := coreops.Instance().GetPodsUsingPVC(o.SourcePVCName, o.Namespace)
 	if err != nil {
 		return nil, err
