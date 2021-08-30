@@ -1,6 +1,7 @@
 package kopiabackup
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -253,7 +254,7 @@ func buildJob(jobName string, o drivers.JobOpts) (*batchv1.Job, error) {
 		logrus.Errorf("%s: %v", fn, errMsg)
 		return nil, fmt.Errorf(errMsg)
 	}
-	
+
 	pods, err := coreops.Instance().GetPodsUsingPVC(o.SourcePVCName, o.Namespace)
 	if err != nil {
 		errMsg := fmt.Sprintf("error fetching pods using PVC %s/%s: %v", o.Namespace, o.SourcePVCName, err)

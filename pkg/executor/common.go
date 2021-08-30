@@ -213,6 +213,7 @@ func parseGce(repoName string, backupLocation storkapi.BackupLocationItem) (*Rep
 	}, nil
 }
 
+// ParseCloudCred parsing cloud credentials
 func ParseCloudCred() (*Repository, error) {
 	// Read the BL type
 	blType, err := ioutil.ReadFile("/tmp/cred-secret/type")
@@ -227,8 +228,6 @@ func ParseCloudCred() (*Repository, error) {
 		return parseS3Creds()
 	}
 
-	out, err := exec.Command("ls", "/tmp/cred-secret").Output()
-	logrus.Infof("out: %v", string(out))
 	return nil, nil
 }
 

@@ -81,7 +81,7 @@ func (c *Controller) sync(ctx context.Context, in *kdmpapi.DataExport) (bool, er
 
 	snapshotter, err := snapshotsinstance.Get(snapshots.ExternalStorage)
 	if err != nil {
-		return false, fmt.Errorf("failed to get snapshotter for a storage provider: %s", err)
+		return false, fmt.Errorf("failed to get snapshotter for a storage provider: %v", err)
 	}
 
 	if dataExport.DeletionTimestamp != nil {
@@ -137,8 +137,8 @@ func (c *Controller) sync(ctx context.Context, in *kdmpapi.DataExport) (bool, er
 				passwd.Data["password"],
 			)
 			if err != nil {
-				msg := fmt.Sprintf("failed to create cloud credential secret: %s", err)
-				logrus.Error("%v", msg)
+				msg := fmt.Sprintf("failed to create cloud credential secret: %v", err)
+				logrus.Errorf(msg)
 				return false, c.updateStatus(dataExport, kdmpapi.DataExportStatusFailed, msg)
 			}
 		}
@@ -146,8 +146,8 @@ func (c *Controller) sync(ctx context.Context, in *kdmpapi.DataExport) (bool, er
 		// start data transfer
 		id, err := startTransferJob(driver, srcPVCName, dataExport)
 		if err != nil {
-			msg := fmt.Sprintf("failed to start a data transfer job: %s", err)
-			logrus.Error("%v", msg)
+			msg := fmt.Sprintf("failed to start a data transfer job: %v", err)
+			logrus.Error(msg)
 			return false, c.updateStatus(dataExport, kdmpapi.DataExportStatusFailed, msg)
 		}
 
@@ -519,7 +519,7 @@ func checkVolumeBackup(ref kdmpapi.DataExportObjectReference) (*kdmpapi.VolumeBa
 	if err := checkNameNamespace(ref); err != nil {
 		return nil, err
 	}
-	return kdmpopts.Instance().GetVolumeBackup(ref.Name, ref.Namespace)
+	return kdmpopts.Instance().GetVolumeBackup(context.Background(), ref.Name, ref.Namespace)
 }
 
 func toPodNames(objs []corev1.Pod) []string {

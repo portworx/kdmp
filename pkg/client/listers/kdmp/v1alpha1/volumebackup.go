@@ -16,8 +16,10 @@ import (
 )
 
 // VolumeBackupLister helps list VolumeBackups.
+// All objects returned here must be treated as read-only.
 type VolumeBackupLister interface {
 	// List lists all VolumeBackups in the indexer.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1alpha1.VolumeBackup, err error)
 	// VolumeBackups returns an object that can list and get VolumeBackups.
 	VolumeBackups(namespace string) VolumeBackupNamespaceLister
@@ -48,10 +50,13 @@ func (s *volumeBackupLister) VolumeBackups(namespace string) VolumeBackupNamespa
 }
 
 // VolumeBackupNamespaceLister helps list and get VolumeBackups.
+// All objects returned here must be treated as read-only.
 type VolumeBackupNamespaceLister interface {
 	// List lists all VolumeBackups in the indexer for a given namespace.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1alpha1.VolumeBackup, err error)
 	// Get retrieves the VolumeBackup from the indexer for a given namespace and name.
+	// Objects returned here must be treated as read-only.
 	Get(name string) (*v1alpha1.VolumeBackup, error)
 	VolumeBackupNamespaceListerExpansion
 }

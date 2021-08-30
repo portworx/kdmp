@@ -2,6 +2,7 @@ package job
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -120,7 +121,7 @@ func getDataExportJobs(name, namespace string) (*v1alpha1.DataExport, error) {
 		return nil, err
 	}
 
-	return kdmpclient.GetDataExport(name, namespace)
+	return kdmpclient.GetDataExport(context.Background(), name, namespace)
 }
 
 func getCmdMessage(format string, job *v1alpha1.DataExport) (string, error) {
