@@ -32,14 +32,14 @@ type InitSummaryResponse struct {
 }
 
 type initExecutor struct {
-	cmd             *Command
-	responseLock    sync.Mutex
-	summaryResponse *InitSummaryResponse
-	execCmd         *exec.Cmd
-	outBuf          *bytes.Buffer
-	errBuf          *bytes.Buffer
-	lastError       error
-	isRunning       bool
+	cmd          *Command
+	responseLock sync.Mutex
+	//summaryResponse *InitSummaryResponse
+	execCmd   *exec.Cmd
+	outBuf    *bytes.Buffer
+	errBuf    *bytes.Buffer
+	lastError error
+	isRunning bool
 }
 
 // GetInitCommand returns a wrapper over the restic init command

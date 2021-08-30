@@ -1,6 +1,7 @@
 package ops
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -14,76 +15,76 @@ import (
 // VolumeBackupOps is an interface to perform k8s VolumeBackup operations
 type VolumeBackupOps interface {
 	// CreateVolumeBackup creates the VolumeBackup
-	CreateVolumeBackup(volumeBackup *kdmpv1alpha1.VolumeBackup) (*kdmpv1alpha1.VolumeBackup, error)
+	CreateVolumeBackup(ctx context.Context, volumeBackup *kdmpv1alpha1.VolumeBackup) (*kdmpv1alpha1.VolumeBackup, error)
 	// GetVolumeBackup gets the VolumeBackup
-	GetVolumeBackup(name string, namespace string) (*kdmpv1alpha1.VolumeBackup, error)
+	GetVolumeBackup(ctx context.Context, name string, namespace string) (*kdmpv1alpha1.VolumeBackup, error)
 	// ListVolumeBackups lists all the VolumeBackups
-	ListVolumeBackups(namespace string) (*kdmpv1alpha1.VolumeBackupList, error)
+	ListVolumeBackups(ctx context.Context, namespace string) (*kdmpv1alpha1.VolumeBackupList, error)
 	// UpdateVolumeBackup updates the VolumeBackup
-	UpdateVolumeBackup(*kdmpv1alpha1.VolumeBackup) (*kdmpv1alpha1.VolumeBackup, error)
+	UpdateVolumeBackup(ctx context.Context, volumeBackup *kdmpv1alpha1.VolumeBackup) (*kdmpv1alpha1.VolumeBackup, error)
 	// DeleteVolumeBackup deletes the VolumeBackup
-	DeleteVolumeBackup(name string, namespace string) error
+	DeleteVolumeBackup(ctx context.Context, name string, namespace string) error
 	// ValidateVolumeBackup validates the VolumeBackup
-	ValidateVolumeBackup(name string, namespace string, timeout, retryInterval time.Duration) error
+	ValidateVolumeBackup(ctx context.Context, name string, namespace string, timeout, retryInterval time.Duration) error
 }
 
 // CreateVolumeBackup creates the VolumeBackup
-func (c *Client) CreateVolumeBackup(volumeBackup *kdmpv1alpha1.VolumeBackup) (*kdmpv1alpha1.VolumeBackup, error) {
+func (c *Client) CreateVolumeBackup(ctx context.Context, volumeBackup *kdmpv1alpha1.VolumeBackup) (*kdmpv1alpha1.VolumeBackup, error) {
 	if err := c.initClient(); err != nil {
 		return nil, err
 	}
-	return c.kdmp.KdmpV1alpha1().VolumeBackups(volumeBackup.Namespace).Create(volumeBackup)
+	return c.kdmp.KdmpV1alpha1().VolumeBackups(volumeBackup.Namespace).Create(ctx, volumeBackup, metav1.CreateOptions{})
 }
 
 // GetVolumeBackup gets the VolumeBackup
-func (c *Client) GetVolumeBackup(name string, namespace string) (*kdmpv1alpha1.VolumeBackup, error) {
+func (c *Client) GetVolumeBackup(ctx context.Context, name string, namespace string) (*kdmpv1alpha1.VolumeBackup, error) {
 	if err := c.initClient(); err != nil {
 		return nil, err
 	}
-	return c.kdmp.KdmpV1alpha1().VolumeBackups(namespace).Get(name, metav1.GetOptions{})
+	return c.kdmp.KdmpV1alpha1().VolumeBackups(namespace).Get(ctx, name, metav1.GetOptions{})
 }
 
 // ListVolumeBackups lists all the VolumeBackups
-func (c *Client) ListVolumeBackups(namespace string) (*kdmpv1alpha1.VolumeBackupList, error) {
+func (c *Client) ListVolumeBackups(ctx context.Context, namespace string) (*kdmpv1alpha1.VolumeBackupList, error) {
 	if err := c.initClient(); err != nil {
 		return nil, err
 	}
-	return c.kdmp.KdmpV1alpha1().VolumeBackups(namespace).List(metav1.ListOptions{})
+	return c.kdmp.KdmpV1alpha1().VolumeBackups(namespace).List(ctx, metav1.ListOptions{})
 }
 
 // UpdateVolumeBackup updates the VolumeBackup
-func (c *Client) UpdateVolumeBackup(volumeBackup *kdmpv1alpha1.VolumeBackup) (*kdmpv1alpha1.VolumeBackup, error) {
+func (c *Client) UpdateVolumeBackup(ctx context.Context, volumeBackup *kdmpv1alpha1.VolumeBackup) (*kdmpv1alpha1.VolumeBackup, error) {
 	if err := c.initClient(); err != nil {
 		return nil, err
 	}
-	return c.kdmp.KdmpV1alpha1().VolumeBackups(volumeBackup.Namespace).Update(volumeBackup)
+	return c.kdmp.KdmpV1alpha1().VolumeBackups(volumeBackup.Namespace).Update(ctx, volumeBackup, metav1.UpdateOptions{})
 }
 
 // PatchVolumeBackup applies a patch for a given volumeBackup.
-func (c *Client) PatchVolumeBackup(name, ns string, pt types.PatchType, jsonPatch []byte) (*kdmpv1alpha1.VolumeBackup, error) {
+func (c *Client) PatchVolumeBackup(ctx context.Context, name, ns string, pt types.PatchType, jsonPatch []byte) (*kdmpv1alpha1.VolumeBackup, error) {
 	if err := c.initClient(); err != nil {
 		return nil, err
 	}
-	return c.kdmp.KdmpV1alpha1().VolumeBackups(ns).Patch(name, pt, jsonPatch)
+	return c.kdmp.KdmpV1alpha1().VolumeBackups(ns).Patch(ctx, name, pt, jsonPatch, metav1.PatchOptions{})
 }
 
 // DeleteVolumeBackup deletes the VolumeBackup
-func (c *Client) DeleteVolumeBackup(name string, namespace string) error {
+func (c *Client) DeleteVolumeBackup(ctx context.Context, name string, namespace string) error {
 	if err := c.initClient(); err != nil {
 		return err
 	}
-	return c.kdmp.KdmpV1alpha1().VolumeBackups(namespace).Delete(name, &metav1.DeleteOptions{
+	return c.kdmp.KdmpV1alpha1().VolumeBackups(namespace).Delete(ctx, name, metav1.DeleteOptions{
 		PropagationPolicy: &deleteForegroundPolicy,
 	})
 }
 
 // ValidateVolumeBackup validates the VolumeBackup
-func (c *Client) ValidateVolumeBackup(name, namespace string, timeout, retryInterval time.Duration) error {
+func (c *Client) ValidateVolumeBackup(ctx context.Context, name, namespace string, timeout, retryInterval time.Duration) error {
 	if err := c.initClient(); err != nil {
 		return err
 	}
 	t := func() (interface{}, bool, error) {
-		resp, err := c.GetVolumeBackup(name, namespace)
+		resp, err := c.GetVolumeBackup(ctx, name, namespace)
 		if err != nil {
 			return "", true, &errors.ErrFailedToValidateCustomSpec{
 				Name:  name,

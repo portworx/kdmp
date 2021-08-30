@@ -82,6 +82,12 @@ rules:
       - securitycontextconstraints
     verbs:
       - use
+  - apiGroups:
+      - coordination.k8s.io
+    resources:
+      - leases
+    verbs:
+      - "*"
 ---
 kind: ClusterRoleBinding
 apiVersion: rbac.authorization.k8s.io/v1

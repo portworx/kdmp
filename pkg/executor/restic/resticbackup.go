@@ -1,6 +1,7 @@
 package restic
 
 import (
+	"context"
 	"fmt"
 	"path/filepath"
 	"reflect"
@@ -149,7 +150,7 @@ func writeVolumeBackupStatus(status *restic.Status) error {
 		return nil
 	}
 
-	vb, err := kdmpops.Instance().GetVolumeBackup(volumeBackupName, namespace)
+	vb, err := kdmpops.Instance().GetVolumeBackup(context.Background(), volumeBackupName, namespace)
 	if err != nil {
 		return fmt.Errorf("get %s/%s VolumeBackup: %v", volumeBackupName, namespace, err)
 	}
@@ -164,7 +165,7 @@ func writeVolumeBackupStatus(status *restic.Status) error {
 		vb.Status.LastKnownError = ""
 	}
 
-	if _, err = kdmpops.Instance().UpdateVolumeBackup(vb); err != nil {
+	if _, err = kdmpops.Instance().UpdateVolumeBackup(context.Background(), vb); err != nil {
 		return fmt.Errorf("update %s/%s VolumeBackup: %v", volumeBackupName, namespace, err)
 	}
 	return nil
@@ -185,10 +186,10 @@ func createVolumeBackup(name, namespace, repository string) error {
 		},
 	}
 
-	vb, err := kdmpops.Instance().GetVolumeBackup(name, namespace)
+	vb, err := kdmpops.Instance().GetVolumeBackup(context.Background(), name, namespace)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			_, err = kdmpops.Instance().CreateVolumeBackup(new)
+			_, err = kdmpops.Instance().CreateVolumeBackup(context.Background(), new)
 		}
 		return err
 	}

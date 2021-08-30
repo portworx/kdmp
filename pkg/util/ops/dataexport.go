@@ -1,6 +1,7 @@
 package ops
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -14,76 +15,76 @@ import (
 // DataExportOps is an interface to perform k8s DataExport operations
 type DataExportOps interface {
 	// CreateDataExport creates the DataExport
-	CreateDataExport(dataExport *kdmpv1alpha1.DataExport) (*kdmpv1alpha1.DataExport, error)
+	CreateDataExport(ctx context.Context, cdataExport *kdmpv1alpha1.DataExport) (*kdmpv1alpha1.DataExport, error)
 	// GetDataExport gets the DataExport
-	GetDataExport(name string, namespace string) (*kdmpv1alpha1.DataExport, error)
+	GetDataExport(ctx context.Context, name string, namespace string) (*kdmpv1alpha1.DataExport, error)
 	// ListDataExports lists all the DataExports
-	ListDataExports(namespace string) (*kdmpv1alpha1.DataExportList, error)
+	ListDataExports(ctx context.Context, namespace string) (*kdmpv1alpha1.DataExportList, error)
 	// UpdateDataExport updates the DataExport
-	UpdateDataExport(*kdmpv1alpha1.DataExport) (*kdmpv1alpha1.DataExport, error)
+	UpdateDataExport(ctx context.Context, dataExport *kdmpv1alpha1.DataExport) (*kdmpv1alpha1.DataExport, error)
 	// DeleteDataExport deletes the DataExport
-	DeleteDataExport(name string, namespace string) error
+	DeleteDataExport(ctx context.Context, name string, namespace string) error
 	// ValidateDataExport validates the DataExport
-	ValidateDataExport(name string, namespace string, timeout, retryInterval time.Duration) error
+	ValidateDataExport(ctx context.Context, name string, namespace string, timeout, retryInterval time.Duration) error
 }
 
 // CreateDataExport creates the DataExport
-func (c *Client) CreateDataExport(dataExport *kdmpv1alpha1.DataExport) (*kdmpv1alpha1.DataExport, error) {
+func (c *Client) CreateDataExport(ctx context.Context, dataExport *kdmpv1alpha1.DataExport) (*kdmpv1alpha1.DataExport, error) {
 	if err := c.initClient(); err != nil {
 		return nil, err
 	}
-	return c.kdmp.KdmpV1alpha1().DataExports(dataExport.Namespace).Create(dataExport)
+	return c.kdmp.KdmpV1alpha1().DataExports(dataExport.Namespace).Create(ctx, dataExport, metav1.CreateOptions{})
 }
 
 // GetDataExport gets the DataExport
-func (c *Client) GetDataExport(name string, namespace string) (*kdmpv1alpha1.DataExport, error) {
+func (c *Client) GetDataExport(ctx context.Context, name string, namespace string) (*kdmpv1alpha1.DataExport, error) {
 	if err := c.initClient(); err != nil {
 		return nil, err
 	}
-	return c.kdmp.KdmpV1alpha1().DataExports(namespace).Get(name, metav1.GetOptions{})
+	return c.kdmp.KdmpV1alpha1().DataExports(namespace).Get(ctx, name, metav1.GetOptions{})
 }
 
 // ListDataExports lists all the DataExports
-func (c *Client) ListDataExports(namespace string) (*kdmpv1alpha1.DataExportList, error) {
+func (c *Client) ListDataExports(ctx context.Context, namespace string) (*kdmpv1alpha1.DataExportList, error) {
 	if err := c.initClient(); err != nil {
 		return nil, err
 	}
-	return c.kdmp.KdmpV1alpha1().DataExports(namespace).List(metav1.ListOptions{})
+	return c.kdmp.KdmpV1alpha1().DataExports(namespace).List(ctx, metav1.ListOptions{})
 }
 
 // UpdateDataExport updates the DataExport
-func (c *Client) UpdateDataExport(dataExport *kdmpv1alpha1.DataExport) (*kdmpv1alpha1.DataExport, error) {
+func (c *Client) UpdateDataExport(ctx context.Context, dataExport *kdmpv1alpha1.DataExport) (*kdmpv1alpha1.DataExport, error) {
 	if err := c.initClient(); err != nil {
 		return nil, err
 	}
-	return c.kdmp.KdmpV1alpha1().DataExports(dataExport.Namespace).Update(dataExport)
+	return c.kdmp.KdmpV1alpha1().DataExports(dataExport.Namespace).Update(ctx, dataExport, metav1.UpdateOptions{})
 }
 
 // PatchDataExport applies a patch for a given dataExport.
-func (c *Client) PatchDataExport(name, ns string, pt types.PatchType, jsonPatch []byte) (*kdmpv1alpha1.DataExport, error) {
+func (c *Client) PatchDataExport(ctx context.Context, name, ns string, pt types.PatchType, jsonPatch []byte) (*kdmpv1alpha1.DataExport, error) {
 	if err := c.initClient(); err != nil {
 		return nil, err
 	}
-	return c.kdmp.KdmpV1alpha1().DataExports(ns).Patch(name, pt, jsonPatch)
+	return c.kdmp.KdmpV1alpha1().DataExports(ns).Patch(ctx, name, pt, jsonPatch, metav1.PatchOptions{})
 }
 
 // DeleteDataExport deletes the DataExport
-func (c *Client) DeleteDataExport(name string, namespace string) error {
+func (c *Client) DeleteDataExport(ctx context.Context, name string, namespace string) error {
 	if err := c.initClient(); err != nil {
 		return err
 	}
-	return c.kdmp.KdmpV1alpha1().DataExports(namespace).Delete(name, &metav1.DeleteOptions{
+	return c.kdmp.KdmpV1alpha1().DataExports(namespace).Delete(ctx, name, metav1.DeleteOptions{
 		PropagationPolicy: &deleteForegroundPolicy,
 	})
 }
 
 // ValidateDataExport validates the DataExport
-func (c *Client) ValidateDataExport(name, namespace string, timeout, retryInterval time.Duration) error {
+func (c *Client) ValidateDataExport(ctx context.Context, name, namespace string, timeout, retryInterval time.Duration) error {
 	if err := c.initClient(); err != nil {
 		return err
 	}
 	t := func() (interface{}, bool, error) {
-		resp, err := c.GetDataExport(name, namespace)
+		resp, err := c.GetDataExport(ctx, name, namespace)
 		if err != nil {
 			return "", true, &errors.ErrFailedToValidateCustomSpec{
 				Name:  name,

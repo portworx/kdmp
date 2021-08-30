@@ -1,6 +1,7 @@
 package copy
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -100,7 +101,7 @@ func (o *Options) run() error {
 	}
 
 	// create a dataexport job
-	j, err := kdmpclient.CreateDataExport(buildDataExportFor(o.name, o))
+	j, err := kdmpclient.CreateDataExport(context.Background(), buildDataExportFor(o.name, o))
 	if err != nil {
 		return fmt.Errorf("failed to start a dataExport job: %s", err)
 	}

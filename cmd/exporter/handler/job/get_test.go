@@ -2,6 +2,7 @@ package job
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io/ioutil"
 	"testing"
@@ -10,6 +11,7 @@ import (
 	kdmpops "github.com/portworx/kdmp/pkg/util/ops"
 	"github.com/spf13/pflag"
 	"github.com/stretchr/testify/require"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func TestGetCmdFlags(t *testing.T) {
@@ -85,7 +87,7 @@ func TestGetCmd(t *testing.T) {
 		fakekdmpops := fake.NewSimpleClientset()
 		if tc.createJob {
 			o := successfulDataExportFrom(tc.inputArgs, tc.inputFlags)
-			_, err := fakekdmpops.KdmpV1alpha1().DataExports(o.Namespace).Create(o)
+			_, err := fakekdmpops.KdmpV1alpha1().DataExports(o.Namespace).Create(context.Background(), o, metav1.CreateOptions{})
 			require.Nil(t, err, tc.name)
 		}
 		kdmpops.SetInstance(kdmpops.New(fakekdmpops))

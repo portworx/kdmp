@@ -2,6 +2,7 @@ package utils
 
 // Move this file to sched-ops once the location of DataExport CRD is finalized
 import (
+	"context"
 	"fmt"
 	"os"
 	"sync"
@@ -150,33 +151,33 @@ func (c *Client) loadClient() error {
 // DataExportOps is an interface to perform kubernetes related operations on the kdmp resources.
 type DataExportOps interface {
 	// CreateDataExport create a provided DataExport object
-	CreateDataExport(obj *kdmpv1alpha1.DataExport) (*kdmpv1alpha1.DataExport, error)
+	CreateDataExport(ctx context.Context, obj *kdmpv1alpha1.DataExport) (*kdmpv1alpha1.DataExport, error)
 	// GetDataExport gets the DataExport object of the given name in the given namespace
-	GetDataExport(name, namespace string) (*kdmpv1alpha1.DataExport, error)
+	GetDataExport(ctx context.Context, name, namespace string) (*kdmpv1alpha1.DataExport, error)
 	// UpdateDataExportStatus updates the status field of DataExport
-	UpdateDataExportStatus(*kdmpv1alpha1.DataExport) (*kdmpv1alpha1.DataExport, error)
+	UpdateDataExportStatus(ctx context.Context, dataExport *kdmpv1alpha1.DataExport) (*kdmpv1alpha1.DataExport, error)
 }
 
 // CreateDataExport create a provided DataExport object
-func (c *Client) CreateDataExport(obj *kdmpv1alpha1.DataExport) (*kdmpv1alpha1.DataExport, error) {
+func (c *Client) CreateDataExport(ctx context.Context, obj *kdmpv1alpha1.DataExport) (*kdmpv1alpha1.DataExport, error) {
 	if err := c.initClient(); err != nil {
 		return nil, err
 	}
-	return c.kst.KdmpV1alpha1().DataExports(obj.Namespace).Create(obj)
+	return c.kst.KdmpV1alpha1().DataExports(obj.Namespace).Create(ctx, obj, metav1.CreateOptions{})
 }
 
 // GetDataExport gets the DataExport object of the given name in the given namespace
-func (c *Client) GetDataExport(name, namespace string) (*kdmpv1alpha1.DataExport, error) {
+func (c *Client) GetDataExport(ctx context.Context, name, namespace string) (*kdmpv1alpha1.DataExport, error) {
 	if err := c.initClient(); err != nil {
 		return nil, err
 	}
-	return c.kst.KdmpV1alpha1().DataExports(namespace).Get(name, metav1.GetOptions{})
+	return c.kst.KdmpV1alpha1().DataExports(namespace).Get(ctx, name, metav1.GetOptions{})
 }
 
 // UpdateDataExportStatus updates the status field of DataExport
-func (c *Client) UpdateDataExportStatus(dataExport *kdmpv1alpha1.DataExport) (*kdmpv1alpha1.DataExport, error) {
+func (c *Client) UpdateDataExportStatus(ctx context.Context, dataExport *kdmpv1alpha1.DataExport) (*kdmpv1alpha1.DataExport, error) {
 	if err := c.initClient(); err != nil {
 		return nil, err
 	}
-	return c.kst.KdmpV1alpha1().DataExports(dataExport.Namespace).UpdateStatus(dataExport)
+	return c.kst.KdmpV1alpha1().DataExports(dataExport.Namespace).UpdateStatus(ctx, dataExport, metav1.UpdateOptions{})
 }
