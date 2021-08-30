@@ -1,6 +1,7 @@
 package resticrestore
 
 import (
+	"context"
 	"fmt"
 	"path/filepath"
 	"strings"
@@ -40,7 +41,7 @@ func (d Driver) StartJob(opts ...drivers.JobOption) (id string, err error) {
 		return "", err
 	}
 
-	vb, err := kdmpops.Instance().GetVolumeBackup(o.VolumeBackupName, o.VolumeBackupNamespace)
+	vb, err := kdmpops.Instance().GetVolumeBackup(context.Background(), o.VolumeBackupName, o.VolumeBackupNamespace)
 	if err != nil {
 		return "", err
 	}

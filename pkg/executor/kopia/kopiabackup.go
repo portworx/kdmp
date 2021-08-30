@@ -1,6 +1,7 @@
 package kopia
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -106,28 +107,6 @@ func runBackup(sourcePath string) error {
 	}
 
 	return nil
-}
-
-func buildStorkBackupLocation(repository *executor.Repository) *storkapi.BackupLocation {
-	//var backupType storkapi.BackupLocationType
-	backupLocation := &storkapi.BackupLocation{
-		ObjectMeta: meta.ObjectMeta{},
-		Location:   storkapi.BackupLocationItem{},
-	}
-	switch repository.Type {
-	case storkapi.BackupLocationS3:
-		backupLocation.Location.S3Config = &storkapi.S3Config{
-			AccessKeyID:      repository.S3Config.AccessKeyID,
-			SecretAccessKey:  repository.S3Config.SecretAccessKey,
-			Endpoint:         repository.S3Config.Endpoint,
-			Region:           repository.S3Config.Endpoint,
-		}
-	}
-	backupLocation.Location.Path = repository.Path
-	backupLocation.ObjectMeta.Name = repository.Name
-	backupLocation.Location.Type = storkapi.BackupLocationS3
-
-	return backupLocation
 }
 
 func populateS3AccessDetails(initCmd *kopia.Command, repository *executor.Repository) *kopia.Command {

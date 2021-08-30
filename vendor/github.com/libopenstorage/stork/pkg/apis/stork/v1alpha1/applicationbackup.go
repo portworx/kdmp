@@ -24,14 +24,18 @@ type ApplicationBackup struct {
 
 // ApplicationBackupSpec is the spec used to backup applications
 type ApplicationBackupSpec struct {
-	Namespaces     []string                           `json:"namespaces"`
-	BackupLocation string                             `json:"backupLocation"`
-	Selectors      map[string]string                  `json:"selectors"`
-	PreExecRule    string                             `json:"preExecRule"`
-	PostExecRule   string                             `json:"postExecRule"`
-	ReclaimPolicy  ApplicationBackupReclaimPolicyType `json:"reclaimPolicy"`
+	Namespaces        []string                           `json:"namespaces"`
+	BackupLocation    string                             `json:"backupLocation"`
+	Selectors         map[string]string                  `json:"selectors"`
+	PreExecRule       string                             `json:"preExecRule"`
+	PostExecRule      string                             `json:"postExecRule"`
+	ReclaimPolicy     ApplicationBackupReclaimPolicyType `json:"reclaimPolicy"`
+	SkipServiceUpdate bool                               `json:"skipServiceUpdate"`
 	// Options to be passed in to the driver
-	Options map[string]string `json:"options"`
+	Options          map[string]string `json:"options"`
+	IncludeResources []ObjectInfo      `json:"includeResources"`
+	ResourceTypes    []string          `json:"resourceTypes"`
+	BackupType       string            `json:"backupType"`
 }
 
 // ApplicationBackupReclaimPolicyType is the reclaim policy for the application backup
@@ -57,7 +61,7 @@ type ApplicationBackupStatus struct {
 	TriggerTimestamp    metav1.Time                      `json:"triggerTimestamp"`
 	LastUpdateTimestamp metav1.Time                      `json:"lastUpdateTimestamp"`
 	FinishTimestamp     metav1.Time                      `json:"finishTimestamp"`
-	Size                uint64                           `json:"size"`
+	TotalSize           uint64                           `json:"totalSize"`
 }
 
 // ObjectInfo contains info about an object being backed up or restored
@@ -83,7 +87,9 @@ type ApplicationBackupVolumeInfo struct {
 	Status                ApplicationBackupStatusType `json:"status"`
 	Reason                string                      `json:"reason"`
 	Options               map[string]string           `jons:"options"`
-	Size                  uint64                      `json:"size"`
+	TotalSize             uint64                      `json:"totalSize"`
+	ActualSize            uint64                      `json:"actualSize"`
+	StorageClass          string                      `json:"storageClass"`
 }
 
 // ApplicationBackupStatusType is the status of the application backup
@@ -130,4 +136,19 @@ type ApplicationBackupList struct {
 	metav1.ListMeta `json:"metadata,omitempty"`
 
 	Items []ApplicationBackup `json:"items"`
+}
+
+// CreateObjectsMap create a map of objects that are to be included in an
+// operation. Allows quick lookup of objects
+func CreateObjectsMap(
+	includeObjects []ObjectInfo,
+) map[ObjectInfo]bool {
+	objectsMap := make(map[ObjectInfo]bool)
+	for i := 0; i < len(includeObjects); i++ {
+		if includeObjects[i].Group == "" {
+			includeObjects[i].Group = "core"
+		}
+		objectsMap[includeObjects[i]] = true
+	}
+	return objectsMap
 }

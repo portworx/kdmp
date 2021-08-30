@@ -2,6 +2,7 @@ package job
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -91,7 +92,7 @@ func listDataExportJob(namespace string) ([]v1alpha1.DataExport, error) {
 		return nil, err
 	}
 
-	list, err := kdmpclient.ListDataExports(namespace)
+	list, err := kdmpclient.ListDataExports(context.Background(), namespace)
 	if err != nil {
 		return nil, err
 	}
