@@ -437,6 +437,14 @@ func startTransferJob(drv drivers.Interface, srcPVCName string, dataExport *kdmp
 			drivers.WithVolumeBackupNamespace(dataExport.Spec.Source.Namespace),
 			drivers.WithLabels(jobLabels(dataExport.GetName())),
 		)
+	case drivers.KopiaBackup:
+		return drv.StartJob(
+			drivers.WithSourcePVC(srcPVCName),
+			drivers.WithNamespace(dataExport.Spec.Destination.Namespace),
+			drivers.WithBackupLocationName(dataExport.Spec.Destination.Name),
+			drivers.WithBackupLocationNamespace(dataExport.Spec.Destination.Namespace),
+			drivers.WithLabels(jobLabels(dataExport.GetName())),
+		)
 	}
 
 	return "", fmt.Errorf("unknown data transfer driver: %s", drv.Name())
@@ -515,26 +523,46 @@ func jobLabels(DataExportName string) map[string]string {
 }
 
 func getDriverType(de *kdmpapi.DataExport) (string, error) {
+	src := de.Spec.Source
+	dst := de.Spec.Destination
+	doBackup := false
+	doRestore := false
+
+	switch {
+	case isPVCRef(src) || isAPIVersionKindNotSetRef(src):
+		if isBackupLocationRef(dst) {
+			doBackup = true
+		} else {
+			return "", fmt.Errorf("invalid kind for generic backup destination: expected BackupLocation")
+		}
+	case isVolumeBackupRef(src):
+		if isPVCRef(dst) || (isAPIVersionKindNotSetRef(dst)) {
+			doRestore = true
+		} else {
+			return "", fmt.Errorf("invalid kind for generic restore destination: expected PersistentVolumeClaim")
+		}
+	}
+
 	switch de.Spec.Type {
 	case kdmpapi.DataExportRsync:
 	case kdmpapi.DataExportRestic:
-		src := de.Spec.Source
-		dst := de.Spec.Destination
-
-		switch {
-		case isPVCRef(src) || isAPIVersionKindNotSetRef(src):
-			if isBackupLocationRef(dst) {
-				return drivers.ResticBackup, nil
-			}
-			return "", fmt.Errorf("invalid kind for restic backup destination: expected BackupLocation")
-		case isVolumeBackupRef(src):
-			if isPVCRef(dst) || (isAPIVersionKindNotSetRef(dst)) {
-				return drivers.ResticRestore, nil
-			}
-			return "", fmt.Errorf("invalid kind for restic restore destination: expected PersistentVolumeClaim")
+		if doBackup {
+			return drivers.ResticBackup, nil
 		}
 
-		return "", fmt.Errorf("invalid kind for restic source: expected PersistentVolumeClaim or VolumeBackup")
+		if doRestore {
+			return drivers.ResticRestore, nil
+		}
+		return "", fmt.Errorf("invalid kind for generic source: expected PersistentVolumeClaim or VolumeBackup")
+	case kdmpapi.DataExportKopia:
+		if doBackup {
+			return drivers.KopiaBackup, nil
+		}
+
+		if doRestore {
+			return drivers.KopiaRestore, nil
+		}
+		return "", fmt.Errorf("invalid kind for generic source: expected PersistentVolumeClaim or VolumeBackup")
 	}
 
 	return string(de.Spec.Type), nil

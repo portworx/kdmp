@@ -17,6 +17,9 @@ KDMP_UNITTEST_IMG=$(DOCKER_IMAGE_REPO)/$(DOCKER_KDMP_UNITTEST_IMAGE):$(DOCKER_KD
 RESTICEXECUTOR_DOCKER_IMAGE_NAME=resticexecutor
 RESTICEXECUTOR_DOCKER_IMAGE=$(DOCKER_IMAGE_REPO)/$(RESTICEXECUTOR_DOCKER_IMAGE_NAME):$(DOCKER_IMAGE_TAG)
 
+KOPIAEXECUTOR_DOCKER_IMAGE_NAME=kopiaexecutor
+KOPIAEXECUTOR_DOCKER_IMAGE=$(DOCKER_IMAGE_REPO)/$(KOPIAEXECUTOR_DOCKER_IMAGE_NAME):$(DOCKER_IMAGE_TAG)
+
 export GO111MODULE=on
 export GOFLAGS = -mod=vendor
 
@@ -44,9 +47,9 @@ test-container:
 	docker build --tag $(KDMP_UNITTEST_IMG) -f Dockerfile.unittest .
 
 pretest: check-fmt lint vet errcheck staticcheck
-build: update-deployment build-kdmp build-restic-executor build-pxc-exporter
-container: container-kdmp container-restic-executor container-pxc-exporter
-deploy: deploy-kdmp deploy-restic-executor deploy-pxc-exporter
+build: update-deployment build-kdmp build-restic-executor kopia-executor build-pxc-exporter
+container: container-kdmp container-restic-executor container-kopia-executor container-pxc-exporter
+deploy: deploy-kdmp deploy-restic-executor deploy-kopia-executor deploy-pxc-exporter
 
 ### util targets ###
 unittest:
@@ -131,7 +134,9 @@ deploy-kdmp:
 
 kdmp: build-kdmp container-kdmp deploy-kdmp
 
-executor: build-restic-executor container-restic-executor deploy-restic-executor
+restic-executor: build-restic-executor container-restic-executor deploy-restic-executor
+
+kopia-executor: build-kopia-executor container-kopia-executor deploy-kopia-executor
 
 ### restic-executor targets ###
 build-restic-executor:
@@ -140,15 +145,31 @@ build-restic-executor:
 	-X github.com/portworx/kdmp/pkg/version.gitVersion=${RELEASE_VER} \
 	-X github.com/portworx/kdmp/pkg/version.gitCommit=${GIT_SHA} \
 	-X github.com/portworx/kdmp/pkg/version.buildDate=${BUILD_DATE}" \
-	$(BASE_DIR)/cmd/executor
+	$(BASE_DIR)/cmd/executor/restic
+
+build-kopia-executor:
+	@echo "Build kopia-executor"
+	go build -o $(BIN)/kopiaexecutor -ldflags="-s -w \
+	-X github.com/portworx/kdmp/pkg/version.gitVersion=${RELEASE_VER} \
+	-X github.com/portworx/kdmp/pkg/version.gitCommit=${GIT_SHA} \
+	-X github.com/portworx/kdmp/pkg/version.buildDate=${BUILD_DATE}" \
+	$(BASE_DIR)/cmd/executor/kopia
 
 container-restic-executor:
-	@echo "Build restice-xecutor docker image"
+	@echo "Build restice-executor docker image"
 	docker build --tag $(RESTICEXECUTOR_DOCKER_IMAGE) -f Dockerfile.resticexecutor .
+
+container-kopia-executor:
+	@echo "Build kopia-executor docker image"
+	docker build --tag $(KOPIAEXECUTOR_DOCKER_IMAGE) -f Dockerfile.kopia .
 
 deploy-restic-executor:
 	@echo "Deploy kdmp docker image"
 	docker push $(RESTICEXECUTOR_DOCKER_IMAGE)
+
+deploy-kopia-executor:
+	@echo "Deploy kopia docker image"
+	docker push $(KOPIAEXECUTOR_DOCKER_IMAGE)
 
 ### pxc-exporter targets ###
 build-pxc-exporter: gogenerate

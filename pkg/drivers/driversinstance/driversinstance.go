@@ -5,6 +5,7 @@ import (
 	"sync"
 
 	"github.com/portworx/kdmp/pkg/drivers"
+	"github.com/portworx/kdmp/pkg/drivers/kopiabackup"
 	"github.com/portworx/kdmp/pkg/drivers/resticbackup"
 	"github.com/portworx/kdmp/pkg/drivers/resticrestore"
 	"github.com/portworx/kdmp/pkg/drivers/rsync"
@@ -16,6 +17,7 @@ var (
 		drivers.Rsync:         rsync.Driver{},
 		drivers.ResticBackup:  resticbackup.Driver{},
 		drivers.ResticRestore: resticrestore.Driver{},
+		drivers.KopiaBackup:   kopiabackup.Driver{},
 	}
 )
 
