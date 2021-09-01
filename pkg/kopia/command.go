@@ -1,30 +1,15 @@
 package kopia
 
 import (
-	"fmt"
 	"os"
 	"os/exec"
 
-	"github.com/sirupsen/logrus"
+	cmdexec "github.com/portworx/kdmp/pkg/executor"
 )
 
 const (
 	baseCmd = "kopia"
 )
-
-// Error is the error returned by the command
-type Error struct {
-	// CmdOutput is the stdout received from the command
-	CmdOutput string
-	// CmdErr is the stderr received from the command
-	CmdErr string
-	// Reason is the actual reason describing the error
-	Reason string
-}
-
-func (e *Error) Error() string {
-	return fmt.Sprintf("%v: Cmd Output [%v] Cmd Error [%v]", e.Reason, e.CmdOutput, e.CmdErr)
-}
 
 // Command defines the essential fields required to
 // execute any kopia commands
@@ -51,22 +36,6 @@ type Command struct {
 	Provider string
 }
 
-// Status is the current status of the command being executed
-type Status struct {
-	// ProgressPercentage is the progress of the command in percentage
-	ProgressPercentage float64
-	// TotalBytesProcessed is the no. of bytes processed
-	TotalBytesProcessed uint64
-	// TotalBytes is the total no. of bytes to be backed up
-	TotalBytes uint64
-	// SnapshotID is the snapshot ID of the backup being handled
-	SnapshotID string
-	// Done indicates if the operation has completed
-	Done bool
-	// LastKnownError is the last known error of the command
-	LastKnownError error
-}
-
 // Executor interface defines APIs for implementing a command wrapper
 // for long running export/restore commands in an asyncronous fashion with the ability
 // to query for the status.
@@ -76,7 +45,7 @@ type Executor interface {
 	Run() error
 
 	// Status returns the status of
-	Status() (*Status, error)
+	Status() (*cmdexec.Status, error)
 }
 
 // AddArg adds an argument to the command
@@ -99,8 +68,6 @@ func (c *Command) AddEnv(envs []string) *Command {
 
 // InitCmd returns os/exec.Cmd object for the kopia init Command
 func (c *Command) InitCmd() *exec.Cmd {
-	logrus.Infof("line 85 InitCmd()")
-
 	// Get all the flags
 	argsSlice := []string{
 		"repository",
@@ -121,20 +88,16 @@ func (c *Command) InitCmd() *exec.Cmd {
 		cmd.Env = append(os.Environ(), c.Env...)
 	}
 	cmd.Dir = c.Dir
-	logrus.Infof("line 111 InitCmd cmd: %+v", cmd)
 	return cmd
 }
 
-// InitCmd returns os/exec.Cmd object for the kopia init Command
+// BackupCmd returns os/exec.Cmd object for the kopia create Command
 func (c *Command) BackupCmd() *exec.Cmd {
-	logrus.Infof("line 85 InitCmd()")
 
 	// Get all the flags
 	argsSlice := []string{
 		"snapshot",
 		c.Name, // create command
-		// Path of the PVC to be backed up
-		//c.Dir,
 		"--json",
 	}
 	argsSlice = append(argsSlice, c.Flags...)
@@ -145,14 +108,11 @@ func (c *Command) BackupCmd() *exec.Cmd {
 		cmd.Env = append(os.Environ(), c.Env...)
 	}
 	cmd.Dir = c.Dir
-	logrus.Infof("line 135 BackupCmd cmd: %+v", cmd)
 	return cmd
 }
 
-// InitCmd returns os/exec.Cmd object for the kopia init Command
+// ConnectCmd returns os/exec.Cmd object for the kopia connect Command
 func (c *Command) ConnectCmd() *exec.Cmd {
-	logrus.Infof("line 85 InitCmd()")
-
 	// Get all the flags
 	argsSlice := []string{
 		"repository",
@@ -173,6 +133,6 @@ func (c *Command) ConnectCmd() *exec.Cmd {
 		cmd.Env = append(os.Environ(), c.Env...)
 	}
 	cmd.Dir = c.Dir
-	logrus.Infof("line 111 InitCmd cmd: %+v", cmd)
+
 	return cmd
 }

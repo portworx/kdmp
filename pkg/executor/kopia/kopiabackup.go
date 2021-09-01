@@ -3,21 +3,15 @@ package kopia
 import (
 	"context"
 	"fmt"
-	"path/filepath"
-	"reflect"
 	"time"
 
-	kdmpapi "github.com/portworx/kdmp/pkg/apis/kdmp/v1alpha1"
-	// TODO: Add calls later just for vendoring purpose
 	storkv1 "github.com/libopenstorage/stork/pkg/apis/stork/v1alpha1"
 	"github.com/libopenstorage/stork/pkg/objectstore"
 	"github.com/portworx/kdmp/pkg/executor"
 	"github.com/portworx/kdmp/pkg/kopia"
-	kdmpops "github.com/portworx/kdmp/pkg/util/ops"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"gocloud.dev/blob"
-	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubectl/pkg/cmd/util"
 )
@@ -36,17 +30,13 @@ func newBackupCommand() *cobra.Command {
 		Use:   "backup",
 		Short: "Start a kopia backup",
 		Run: func(c *cobra.Command, args []string) {
-			/*if len(backupLocationFile) == 0 && len(backupLocationName) == 0 {
-				util.CheckErr(fmt.Errorf("backup-location or backup-location-file has to be provided for kopia backups"))
-				return
-			}*/
-			srcPath, err := getSourcePath(sourcePath, sourcePathGlob)
+			srcPath, err := executor.GetSourcePath(sourcePath, sourcePathGlob)
 			if err != nil {
 				util.CheckErr(err)
 				return
 			}
 
-			handleErr(runBackup(srcPath))
+			executor.HandleErr(runBackup(srcPath))
 		},
 	}
 	backupCommand.Flags().StringVar(&sourcePath, "source-path", "", "Source for kopia backup")
@@ -56,51 +46,63 @@ func newBackupCommand() *cobra.Command {
 }
 
 func runBackup(sourcePath string) error {
-	//repo, err := executor.ParseBackupLocation(kopiaRepo, backupLocationName, namespace, backupLocationFile)
 	// Parse using the mounted secrets
+	fn := "runBackup"
 	repo, err := executor.ParseCloudCred()
 	repo.Name = frameBackupPath()
 
-	logrus.Infof("line 54 runBackup - repo %+v", repo)
 	if err != nil {
-		if statusErr := writeVolumeBackupStatus(&kopia.Status{LastKnownError: err}); statusErr != nil {
+		if statusErr := executor.WriteVolumeBackupStatus(
+			&executor.Status{LastKnownError: err},
+			volumeBackupName,
+			namespace,
+		); statusErr != nil {
 			return statusErr
 		}
 		return fmt.Errorf("parse backuplocation: %s", err)
 	}
 	if volumeBackupName != "" {
-		if err = createVolumeBackup(volumeBackupName, namespace, repo.Name); err != nil {
+		if err = executor.CreateVolumeBackup(
+			volumeBackupName,
+			namespace,
+			repo.Name,
+			credentials,
+		); err != nil {
+			logrus.Errorf("%s: %v", fn, err)
 			return err
 		}
 	}
-	// TODO: kopia doesn't have a way to know if repository is already initialzed.
+	// kopia doesn't have a way to know if repository is already initialized.
 	// Repository create needs to run only first time.
-	// One option is to check if the repo path exists, if not do a repository create
-	logrus.Infof("line 76 time: %v", time.Now())
+	// Check if kopia.repository exists
 	exists, err := isRepositoryExists(repo)
 	if err != nil {
-		return fmt.Errorf("run kopia repo check failed: %v", err)
+		errMsg := fmt.Sprintf("repository exists check failed: %v", err)
+		logrus.Errorf("%s: %v", fn, errMsg)
+		return fmt.Errorf("%s: %v", errMsg, err)
 	}
 
 	if !exists {
-		if err = runKopiaInit(repo); err != nil {
-			return fmt.Errorf("run kopia init: %v", err)
+		if err = runKopiaCreateRepo(repo); err != nil {
+			errMsg := "repo creation failed"
+			logrus.Errorf("%s: %v", fn, errMsg)
+			return fmt.Errorf("%s: %v", errMsg, err)
 		}
 	}
 
-	logrus.Infof("line 80 sourcePath: %v", sourcePath)
-
-	time.Sleep(20 * time.Second)
 	if err = runKopiaRepositoryConnect(repo); err != nil {
-		return fmt.Errorf("run kopia repository connect failed: %v", err)
+		errMsg := fmt.Sprintf("repository connect failed: %v", err)
+		logrus.Errorf("%s: %v", fn, errMsg)
+		return fmt.Errorf(errMsg)
 	}
 
 	if err = runKopiaBackup(repo, sourcePath); err != nil {
-		return fmt.Errorf("run kopia backup failed: %v", err)
+		errMsg := fmt.Sprintf("backup failed: %v", err)
+		logrus.Errorf("%s: %v", fn, errMsg)
+		return fmt.Errorf(errMsg)
 	}
 
-	//fmt.Println("Backup has been successfully created")
-	logrus.Infof("line 89 time: %v", time.Now())
+	logrus.Infof("Backup has been successfully created")
 	return nil
 }
 
@@ -116,15 +118,14 @@ func populateS3AccessDetails(initCmd *kopia.Command, repository *executor.Reposi
 	return initCmd
 }
 
-func runKopiaInit(repository *executor.Repository) error {
-	initCmd, err := kopia.GetInitCommand(repository.Path, repository.Name, repository.Password, string(repository.Type))
-	logrus.Infof("line 84 runKopiaInit cmd: %+v", initCmd)
+func runKopiaCreateRepo(repository *executor.Repository) error {
+	initCmd, err := kopia.GetCreateCommand(repository.Path, repository.Name, repository.Password, string(repository.Type))
 	if err != nil {
 		return err
 	}
 	// TODO: Add for other storagr providers
 	initCmd = populateS3AccessDetails(initCmd, repository)
-	initExecutor := kopia.NewInitExecutor(initCmd)
+	initExecutor := kopia.NewCreateExecutor(initCmd)
 	if err := initExecutor.Run(); err != nil {
 		err = fmt.Errorf("failed to run kopia init command: %v", err)
 		return err
@@ -137,16 +138,17 @@ func runKopiaInit(repository *executor.Repository) error {
 			return err
 		}
 		if status.LastKnownError != nil {
-			logrus.Infof("line 130 runKopiaInit")
-			if status.LastKnownError != kopia.ErrAlreadyInitialized {
-				logrus.Infof("line 132 runKopiaInit")
+			if status.LastKnownError != kopia.ErrAlreadyRepoExist {
 				return status.LastKnownError
 			}
 			status.LastKnownError = nil
 		}
-		logrus.Infof("line 137 runKopiaInit")
-		// TODO: Enable this
-		if err = writeVolumeBackupStatus(status); err != nil {
+
+		if err = executor.WriteVolumeBackupStatus(
+			status,
+			volumeBackupName,
+			namespace,
+		); err != nil {
 			logrus.Errorf("failed to write a VolumeBackup status: %v", err)
 			continue
 		}
@@ -154,7 +156,6 @@ func runKopiaInit(repository *executor.Repository) error {
 			break
 		}
 	}
-	logrus.Infof("line 138 kopia repository create successfully done")
 	return nil
 }
 
@@ -166,7 +167,6 @@ func runKopiaBackup(repository *executor.Repository, sourcePath string) error {
 		string(repository.Type),
 		sourcePath,
 	)
-	logrus.Infof("line 104 runKopiaBackup cmd: %+v", backupCmd)
 	if err != nil {
 		return err
 	}
@@ -187,14 +187,14 @@ func runKopiaBackup(repository *executor.Repository, sourcePath string) error {
 			return err
 		}
 		if status.LastKnownError != nil {
-			if status.LastKnownError != kopia.ErrAlreadyInitialized {
-				return status.LastKnownError
-			}
-			status.LastKnownError = nil
+			return status.LastKnownError
 		}
-		// TODO: Enable this
-		logrus.Infof("line 179 status: %+v", status)
-		if err = writeVolumeBackupStatus(status); err != nil {
+
+		if err = executor.WriteVolumeBackupStatus(
+			status,
+			volumeBackupName,
+			namespace,
+		); err != nil {
 			logrus.Errorf("failed to write a VolumeBackup status: %v", err)
 			continue
 		}
@@ -202,13 +202,12 @@ func runKopiaBackup(repository *executor.Repository, sourcePath string) error {
 			break
 		}
 	}
-	logrus.Infof("line 186 kopia backup successfully done")
+
 	return nil
 }
 
 func runKopiaRepositoryConnect(repository *executor.Repository) error {
 	connectCmd, err := kopia.GetConnectCommand(repository.Path, repository.Name, repository.Password, string(repository.Type))
-	logrus.Infof("line 84 runKopiaInit cmd: %+v", connectCmd)
 	if err != nil {
 		return err
 	}
@@ -228,116 +227,18 @@ func runKopiaRepositoryConnect(repository *executor.Repository) error {
 			return err
 		}
 		if status.LastKnownError != nil {
-			if status.LastKnownError != kopia.ErrAlreadyInitialized {
-				return status.LastKnownError
-			}
-			status.LastKnownError = nil
+			return status.LastKnownError
 		}
-		// TODO: Enable this, not needed
-		/*if err = writeVolumeBackupStatus(status); err != nil {
-			logrus.Errorf("failed to write a VolumeBackup status: %v", err)
-			continue
-		}*/
 		if status.Done {
 			break
 		}
 	}
-	logrus.Infof("line 227 kopia connect successfully done")
-	return nil
-}
-
-// TODO: Can this be made common?
-// writeVolumeBackupStatus writes a restic status to the VolumeBackup crd.
-func writeVolumeBackupStatus(status *kopia.Status) error {
-	if volumeBackupName == "" {
-		return nil
-	}
-
-	vb, err := kdmpops.Instance().GetVolumeBackup(context.Background(), volumeBackupName, namespace)
-	if err != nil {
-		return fmt.Errorf("get %s/%s VolumeBackup: %v", volumeBackupName, namespace, err)
-	}
-
-	vb.Status.ProgressPercentage = status.ProgressPercentage
-	vb.Status.TotalBytes = status.TotalBytes
-	vb.Status.TotalBytesProcessed = status.TotalBytesProcessed
-	vb.Status.SnapshotID = status.SnapshotID
-	if status.LastKnownError != nil {
-		vb.Status.LastKnownError = status.LastKnownError.Error()
-	} else {
-		vb.Status.LastKnownError = ""
-	}
-
-	if _, err = kdmpops.Instance().UpdateVolumeBackup(context.Background(), vb); err != nil {
-		return fmt.Errorf("update %s/%s VolumeBackup: %v", volumeBackupName, namespace, err)
-	}
-	return nil
-}
-
-// TODO: Can this be made common?
-func createVolumeBackup(name, namespace, repository string) error {
-	new := &kdmpapi.VolumeBackup{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: namespace,
-		},
-		Spec: kdmpapi.VolumeBackupSpec{
-			Repository: repository,
-			BackupLocation: kdmpapi.DataExportObjectReference{
-				Name:      credentials,
-				Namespace: namespace,
-			},
-		},
-	}
-
-	vb, err := kdmpops.Instance().GetVolumeBackup(context.Background(), name, namespace)
-	if err != nil {
-		if errors.IsNotFound(err) {
-			_, err = kdmpops.Instance().CreateVolumeBackup(context.Background(), new)
-		}
-		return err
-	}
-
-	if !reflect.DeepEqual(vb.Spec, new.Spec) {
-		return fmt.Errorf("volumebackup %s/%s with different spec already exists", namespace, name)
-	}
-
-	if vb.Status.SnapshotID != "" {
-		return fmt.Errorf("volumebackup %s/%s with snapshot id already exists", namespace, name)
-	}
 
 	return nil
 }
 
-func getSourcePath(path, glob string) (string, error) {
-	if len(path) == 0 && len(glob) == 0 {
-		return "", fmt.Errorf("source-path argument is required for kopia backups")
-	}
-
-	if len(path) > 0 {
-		return path, nil
-	}
-
-	matches, err := filepath.Glob(glob)
-	if err != nil {
-		return "", fmt.Errorf("parse source-path-glob: %s", err)
-	}
-
-	if len(matches) != 1 {
-		return "", fmt.Errorf("parse source-path-glob: invalid amount of matches: %v", matches)
-	}
-
-	return matches[0], nil
-}
-
-func handleErr(err error) {
-	if err != nil {
-		util.CheckErr(err)
-	}
-}
-
-// Under backuplocaiton path, following path would be creaetd
-// <bucket>/generic-backup/<pvcns - pvc>
+// Under backuplocaiton path, following path would be created
+// <bucket>/generic-backup/<ns - pvc>
 func frameBackupPath() string {
 	return genericBackupDir + "/" + kopiaRepo + "/"
 }
@@ -374,12 +275,13 @@ func isRepositoryExists(repository *executor.Repository) (bool, error) {
 	}
 	bucket, err := objectstore.GetBucket(bl)
 	if err != nil {
-		logrus.Errorf("line 373 err: %v", err)
+		logrus.Errorf("err: %v", err)
+		return false, err
 	}
 	bucket = blob.PrefixedBucket(bucket, repository.Name)
 	exists, err := bucket.Exists(context.TODO(), "kopia.repository")
 	if err != nil {
-		logrus.Errorf("line 371 %v", err)
+		logrus.Errorf("%v", err)
 		return false, err
 	}
 	if exists {

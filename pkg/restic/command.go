@@ -1,11 +1,10 @@
 package restic
 
 import (
-	"fmt"
 	"os"
 	"os/exec"
 
-	"github.com/sirupsen/logrus"
+	cmdexec "github.com/portworx/kdmp/pkg/executor"
 )
 
 const (
@@ -70,46 +69,14 @@ func (c *Command) Cmd() *exec.Cmd {
 		cmd.Env = append(os.Environ(), c.Env...)
 	}
 	cmd.Dir = c.Dir
-	logrus.Infof("line 73 cmd: %+v", cmd)
-	logrus.Infof("line 74 args: %+v", argsSlice)
 	return cmd
 }
 
 // ID is a unique ID that identifies a running command
 type ID string
 
-// Status is the current status of the command being executed
-type Status struct {
-	// ProgressPercentage is the progress of the command in percentage
-	ProgressPercentage float64
-	// TotalBytesProcessed is the no. of bytes processed
-	TotalBytesProcessed uint64
-	// TotalBytes is the total no. of bytes to be backed up
-	TotalBytes uint64
-	// SnapshotID is the snapshot ID of the backup being handled
-	SnapshotID string
-	// Done indicates if the operation has completed
-	Done bool
-	// LastKnownError is the last known error of the command
-	LastKnownError error
-}
-
-// Error is the error returned by the command
-type Error struct {
-	// CmdOutput is the stdout received from the command
-	CmdOutput string
-	// CmdErr is the stderr received from the command
-	CmdErr string
-	// Reason is the actual reason describing the error
-	Reason string
-}
-
-func (e *Error) Error() string {
-	return fmt.Sprintf("%v: Cmd Output [%v] Cmd Error [%v]", e.Reason, e.CmdOutput, e.CmdErr)
-}
-
 // Executor interface defines APIs for implementing a command wrapper
-// for long running export/restore commands in an asyncronous fashion with the ability
+// for long running export/restore commands in an asynchronous fashion with the ability
 // to query for the status.
 type Executor interface {
 	// Run a long running command. Returns a unique CommandID that can be
@@ -117,7 +84,7 @@ type Executor interface {
 	Run() error
 
 	// Status returns the status of
-	Status() (*Status, error)
+	Status() (*cmdexec.Status, error)
 }
 
 func defaultFlags() []string {

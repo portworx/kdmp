@@ -2,7 +2,6 @@ package kopiabackup
 
 import (
 	"fmt"
-	"path/filepath"
 	"strings"
 
 	"github.com/portworx/kdmp/pkg/drivers"
@@ -22,17 +21,15 @@ func jobForLiveBackup(
 	jobName,
 	namespace,
 	pvcName,
-	backuplocationName string,
+	credSecretName,
 	backuplocationNamespace string,
 	mountPod corev1.Pod,
 	resources corev1.ResourceRequirements,
 	labels map[string]string) (*batchv1.Job, error) {
 	volDir, err := getVolumeDirectory(pvcName, namespace)
 	if err != nil {
-		logrus.Infof("line 32 jobForLiveBackup")
 		return nil, err
 	}
-	logrus.Infof("line 33 jobForLiveBackup")
 	// pod volumes reside under /var/lib/kubelet/pods/<podUID>/volumes/<volumePlugin>/<volumeName> directory.
 	// mount /var/lib/kubelet/pods/<podUID>/volumes as a /data directory to a resticexecutor job and
 	// use /data/*/<volumeName> as a backup directory and determine volume plugin by resticexecutor.
@@ -48,14 +45,12 @@ func jobForLiveBackup(
 		"backup",
 		"--volume-backup-name",
 		backupName,
+		"--credentials",
+		credSecretName,
 		"--namespace",
 		backuplocationNamespace,
 		"--repository",
 		toRepoName(pvcName, namespace),
-		"--credentials",
-		backuplocationName,
-		"--secret-file-path",
-		filepath.Join(drivers.KopiaSecretMount, drivers.KopiaSecretKey),
 		"--source-path-glob",
 		backupPath,
 	}, " ")
@@ -80,7 +75,7 @@ func jobForLiveBackup(
 						{
 							Name:            "kopiaexecutor",
 							Image:           utils.KopiaExecutorImage(),
-							ImagePullPolicy: corev1.PullIfNotPresent,
+							ImagePullPolicy: corev1.PullAlways,
 							Command: []string{
 								"/bin/sh",
 								"-x",
@@ -114,7 +109,7 @@ func jobForLiveBackup(
 							Name: "cred-secret",
 							VolumeSource: corev1.VolumeSource{
 								Secret: &corev1.SecretVolumeSource{
-									SecretName: backuplocationName,
+									SecretName: credSecretName,
 								},
 							},
 						},
@@ -128,14 +123,19 @@ func jobForLiveBackup(
 // getVolumeDirectory gets the name of the directory on the host, under /var/lib/kubelet/pods/<podUID>/volumes/,
 // where the specified volume lives. For volumes with a CSIVolumeSource, append "/mount" to the directory name.
 func getVolumeDirectory(pvcName, pvcNamespace string) (string, error) {
+	fn := "getVolumeDirectory"
 	pvc, err := coreops.Instance().GetPersistentVolumeClaim(pvcName, pvcNamespace)
 	if err != nil {
-		return "", err
+		errMsg := fmt.Sprintf("error fetching PVC %s/%s: %s", pvcNamespace, pvcName, err)
+		logrus.Errorf("%s: %v", fn, errMsg)
+		return "", fmt.Errorf(errMsg)
 	}
 
 	pv, err := coreops.Instance().GetPersistentVolume(pvc.Spec.VolumeName)
 	if err != nil {
-		return "", err
+		errMsg := fmt.Sprintf("error fetching PV %s/%s: %s", pvcNamespace, pvcName, err)
+		logrus.Errorf("%s: %v", fn, errMsg)
+		return "", fmt.Errorf(errMsg)
 	}
 
 	// PV's been created with a CSI source.

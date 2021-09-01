@@ -1,14 +1,23 @@
 package executor
 
 import (
+	"context"
 	"fmt"
 	"io/ioutil"
 	"os"
+	"path/filepath"
+	"reflect"
 
 	storkapi "github.com/libopenstorage/stork/pkg/apis/stork/v1alpha1"
+	kdmpapi "github.com/portworx/kdmp/pkg/apis/kdmp/v1alpha1"
+	kdmpops "github.com/portworx/kdmp/pkg/util/ops"
 	storkops "github.com/portworx/sched-ops/k8s/stork"
+
 	"github.com/sirupsen/logrus"
+	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/yaml"
+	"k8s.io/kubectl/pkg/cmd/util"
 )
 
 const (
@@ -66,6 +75,36 @@ type Repository struct {
 	Password string
 	// Type objectstore type
 	Type storkapi.BackupLocationType
+}
+
+// Status is the current status of the command being executed
+type Status struct {
+	// ProgressPercentage is the progress of the command in percentage
+	ProgressPercentage float64
+	// TotalBytesProcessed is the no. of bytes processed
+	TotalBytesProcessed uint64
+	// TotalBytes is the total no. of bytes to be backed up
+	TotalBytes uint64
+	// SnapshotID is the snapshot ID of the backup being handled
+	SnapshotID string
+	// Done indicates if the operation has completed
+	Done bool
+	// LastKnownError is the last known error of the command
+	LastKnownError error
+}
+
+// Error is the error returned by the command
+type Error struct {
+	// CmdOutput is the stdout received from the command
+	CmdOutput string
+	// CmdErr is the stderr received from the command
+	CmdErr string
+	// Reason is the actual reason describing the error
+	Reason string
+}
+
+func (e *Error) Error() string {
+	return fmt.Sprintf("%v: Cmd Output [%v] Cmd Error [%v]", e.Reason, e.CmdOutput, e.CmdErr)
 }
 
 // ParseBackupLocation parses the provided backup location and returns the repository name
@@ -190,7 +229,6 @@ func ParseCloudCred() (*Repository, error) {
 	}
 
 	return nil, nil
-	//return nil, fmt.Errorf("unsupported backup location: %v", backupLocation.Location.Type)
 }
 
 func parseS3Creds() (*Repository, error) {
@@ -203,8 +241,6 @@ func parseS3Creds() (*Repository, error) {
 		logrus.Errorf("%v", errMsg)
 		return nil, fmt.Errorf(errMsg)
 	}
-	err = os.Setenv("AWS_ACCESS_KEY_ID ", string(accessKey))
-	logrus.Infof("line 205 err: %v", err)
 
 	secretAccessKey, err := ioutil.ReadFile("/tmp/cred-secret/secretAccessKey")
 	if err != nil {
@@ -212,10 +248,7 @@ func parseS3Creds() (*Repository, error) {
 		logrus.Errorf("%v", errMsg)
 		return nil, fmt.Errorf(errMsg)
 	}
-	err = os.Setenv("AWS_SECRET_ACCESS_KEY ", string(secretAccessKey))
-	logrus.Infof("line 214 err: %v", err)
 
-	// Set the path
 	bucket, err := ioutil.ReadFile("/tmp/cred-secret/path")
 	if err != nil {
 		errMsg := fmt.Sprintf("failed reading data from file /tmp/cred-secret/path : %s", err)
@@ -229,6 +262,7 @@ func parseS3Creds() (*Repository, error) {
 		logrus.Errorf("%v", errMsg)
 		return nil, fmt.Errorf(errMsg)
 	}
+
 	password, err := ioutil.ReadFile("/tmp/cred-secret/password")
 	if err != nil {
 		errMsg := fmt.Sprintf("failed reading data from file /tmp/cred-secret/password : %s", err)
@@ -240,7 +274,6 @@ func parseS3Creds() (*Repository, error) {
 	repository.S3Config.SecretAccessKey = string(secretAccessKey)
 	repository.S3Config.Endpoint = string(endpoint)
 	repository.Type = storkapi.BackupLocationS3
-	// TODO: Add logic to backup under generic-backup folder/pvc name
 	repository.Path = string(bucket)
 	region, err := ioutil.ReadFile("/tmp/cred-secret/region")
 	if err != nil {
@@ -249,7 +282,101 @@ func parseS3Creds() (*Repository, error) {
 		return nil, fmt.Errorf(errMsg)
 	}
 	repository.S3Config.Region = string(region)
-	//logrus.Infof("line 240 repository: %v", repository)
-	logrus.Infof(" acces key: %v, secret: %v", os.Getenv("AWS_ACCESS_KEY_ID"), os.Getenv("AWS_SECRET_ACCESS_KEY"))
+
 	return repository, nil
+}
+
+// WriteVolumeBackupStatus writes a restic status to the VolumeBackup crd.
+func WriteVolumeBackupStatus(
+	status *Status,
+	volumeBackupName,
+	namespace string,
+) error {
+	if volumeBackupName == "" {
+		return nil
+	}
+
+	vb, err := kdmpops.Instance().GetVolumeBackup(context.Background(), volumeBackupName, namespace)
+	if err != nil {
+		return fmt.Errorf("get %s/%s VolumeBackup: %v", volumeBackupName, namespace, err)
+	}
+
+	vb.Status.ProgressPercentage = status.ProgressPercentage
+	vb.Status.TotalBytes = status.TotalBytes
+	vb.Status.TotalBytesProcessed = status.TotalBytesProcessed
+	vb.Status.SnapshotID = status.SnapshotID
+	if status.LastKnownError != nil {
+		vb.Status.LastKnownError = status.LastKnownError.Error()
+	} else {
+		vb.Status.LastKnownError = ""
+	}
+
+	if _, err = kdmpops.Instance().UpdateVolumeBackup(context.Background(), vb); err != nil {
+		return fmt.Errorf("update %s/%s VolumeBackup: %v", volumeBackupName, namespace, err)
+	}
+	return nil
+}
+
+// CreateVolumeBackup creates volumebackup CRD
+func CreateVolumeBackup(name, namespace, repository, blName string) error {
+	new := &kdmpapi.VolumeBackup{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+		},
+		Spec: kdmpapi.VolumeBackupSpec{
+			Repository: repository,
+			BackupLocation: kdmpapi.DataExportObjectReference{
+				Name:      blName,
+				Namespace: namespace,
+			},
+		},
+	}
+
+	vb, err := kdmpops.Instance().GetVolumeBackup(context.Background(), name, namespace)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			_, err = kdmpops.Instance().CreateVolumeBackup(context.Background(), new)
+		}
+		return err
+	}
+
+	if !reflect.DeepEqual(vb.Spec, new.Spec) {
+		return fmt.Errorf("volumebackup %s/%s with different spec already exists", namespace, name)
+	}
+
+	if vb.Status.SnapshotID != "" {
+		return fmt.Errorf("volumebackup %s/%s with snapshot id already exists", namespace, name)
+	}
+
+	return nil
+}
+
+// GetSourcePath data source path
+func GetSourcePath(path, glob string) (string, error) {
+	if len(path) == 0 && len(glob) == 0 {
+		return "", fmt.Errorf("source-path argument is required for kopia backups")
+	}
+
+	if len(path) > 0 {
+		return path, nil
+	}
+
+	matches, err := filepath.Glob(glob)
+	if err != nil {
+		return "", fmt.Errorf("parse source-path-glob: %s", err)
+	}
+
+	if len(matches) != 1 {
+		return "", fmt.Errorf("parse source-path-glob: invalid amount of matches: %v", matches)
+	}
+
+	return matches[0], nil
+}
+
+// HandleErr handle errors
+func HandleErr(err error) {
+	if err != nil {
+		util.CheckErr(err)
+	}
 }

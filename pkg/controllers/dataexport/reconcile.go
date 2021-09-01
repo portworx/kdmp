@@ -11,6 +11,8 @@ import (
 	kdmpapi "github.com/portworx/kdmp/pkg/apis/kdmp/v1alpha1"
 	"github.com/portworx/kdmp/pkg/drivers"
 	"github.com/portworx/kdmp/pkg/drivers/driversinstance"
+	"github.com/portworx/kdmp/pkg/drivers/kopiabackup"
+	"github.com/portworx/kdmp/pkg/drivers/utils"
 	"github.com/portworx/kdmp/pkg/snapshots"
 	"github.com/portworx/kdmp/pkg/snapshots/snapshotsinstance"
 	kdmpopts "github.com/portworx/kdmp/pkg/util/ops"
@@ -118,17 +120,22 @@ func (c *Controller) sync(ctx context.Context, in *kdmpapi.DataExport) (bool, er
 			srcPVCName = dataExport.Status.SnapshotPVCName
 		}
 		// Create the credential secret
-		logrus.Infof(" drivername: %v", driverName)
+		logrus.Debugf("drivername: %v", driverName)
 		if driverName == drivers.KopiaBackup || driverName == drivers.KopiaRestore {
-			logrus.Infof("line 119 ")
 			// Read the kopia secret from kube-system ns
 			passwd, err := core.Instance().GetSecret(KopiaSecretName, KopiaSecretNamespace)
 			if err != nil {
-				msg := fmt.Sprintf("failed to read kopia passwd secret: %s", err)
-				return false, c.updateStatus(dataExport, kdmpapi.DataExportStatusFailed, msg)
+				errMsg := fmt.Sprintf("failed to read kopia passwd secret: %s", err)
+				logrus.Errorf("%v", errMsg)
+				return false, c.updateStatus(dataExport, kdmpapi.DataExportStatusFailed, errMsg)
 			}
-			// TODO: Handling of multiple PVC creating secret will be taken up later.
-			err = CreateCredentialsSecret(dataExport.Spec.Destination.Name, dataExport.Spec.Destination.Namespace, passwd.Data["password"])
+			// This will create a unique secret per PVC being backed up
+			err = CreateCredentialsSecret(
+				utils.FrameCredSecretName(dataExport.Name, dataExport.Spec.Source.Name),
+				dataExport.Spec.Destination.Name,
+				dataExport.Spec.Destination.Namespace,
+				passwd.Data["password"],
+			)
 			if err != nil {
 				msg := fmt.Sprintf("failed to create cloud credential secret: %v", err)
 				logrus.Errorf(msg)
@@ -174,11 +181,11 @@ func (c *Controller) sync(ctx context.Context, in *kdmpapi.DataExport) (bool, er
 		if dataExport.Status.Status == kdmpapi.DataExportStatusSuccessful {
 			return false, nil
 		}
-		/* DBG: Removed temporarily
+		// DBG: Removed temporarily
 		if err := c.cleanUp(driver, snapshotter, dataExport); err != nil {
 			msg := fmt.Sprintf("failed to remove resources: %s", err)
 			return false, c.updateStatus(dataExport, kdmpapi.DataExportStatusFailed, msg)
-		}*/
+		}
 
 		return true, c.client.Update(ctx, setStatus(dataExport, kdmpapi.DataExportStatusSuccessful, ""))
 	}
@@ -621,8 +628,8 @@ func checkNameNamespace(ref kdmpapi.DataExportObjectReference) error {
 }
 
 // CreateCredentialsSecret parses the provided backup location and creates secret with cloud credentials
-func CreateCredentialsSecret(name, namespace string, password []byte) error {
-	backupLocation, err := readBackupLocation(name, namespace, "")
+func CreateCredentialsSecret(secretName, blName, namespace string, password []byte) error {
+	backupLocation, err := readBackupLocation(blName, namespace, "")
 	if err != nil {
 		return err
 	}
@@ -631,7 +638,7 @@ func CreateCredentialsSecret(name, namespace string, password []byte) error {
 	// Creating cloud cred secret
 	switch backupLocation.Location.Type {
 	case storkapi.BackupLocationS3:
-		return createS3Secret(backupLocation, password)
+		return createS3Secret(secretName, backupLocation, password)
 	}
 	return fmt.Errorf("unsupported backup location: %v", backupLocation.Location.Type)
 }
@@ -644,7 +651,7 @@ func readBackupLocation(name, namespace, filePath string) (*storkapi.BackupLocat
 		return stork.Instance().GetBackupLocation(name, namespace)
 	}
 
-	// TODO: Do we need this reading from file?
+	// TODO: This is needed for restic, we can think of removing it later
 	f, err := os.Open(filePath)
 	if err != nil {
 		return nil, err
@@ -658,8 +665,7 @@ func readBackupLocation(name, namespace, filePath string) (*storkapi.BackupLocat
 	return out, nil
 }
 
-func createS3Secret(backupLocation *storkapi.BackupLocation, password []byte) error {
-	logrus.Infof("line 653 createS3Secret")
+func createS3Secret(secretName string, backupLocation *storkapi.BackupLocation, password []byte) error {
 	credentialData := make(map[string][]byte)
 	credentialData["endpoint"] = []byte(backupLocation.Location.S3Config.Endpoint)
 	credentialData["accessKey"] = []byte(backupLocation.Location.S3Config.AccessKeyID)
@@ -670,8 +676,11 @@ func createS3Secret(backupLocation *storkapi.BackupLocation, password []byte) er
 	credentialData["password"] = password
 	secret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      backupLocation.Name,
+			Name:      secretName,
 			Namespace: backupLocation.Namespace,
+			Annotations: map[string]string{
+				kopiabackup.SkipResourceAnnotation: "true",
+			},
 		},
 		Data: credentialData,
 		Type: corev1.SecretTypeOpaque,
@@ -680,71 +689,3 @@ func createS3Secret(backupLocation *storkapi.BackupLocation, password []byte) er
 
 	return err
 }
-
-/*func parseS3(repoName string, backupLocation storkapi.BackupLocationItem) (*Repository, error) {
-	if backupLocation.S3Config == nil {
-		return nil, fmt.Errorf("failed to parse s3 config from BackupLocation")
-	}
-
-	envs := make([]string, 0)
-	envs = append(envs, fmt.Sprintf("AWS_ACCESS_KEY_ID=%s", backupLocation.S3Config.AccessKeyID))
-	envs = append(envs, fmt.Sprintf("AWS_SECRET_ACCESS_KEY=%s", backupLocation.S3Config.SecretAccessKey))
-	if backupLocation.S3Config.Region != "" {
-		envs = append(envs, fmt.Sprintf("AWS_REGION=%s", backupLocation.S3Config.Region))
-	}
-
-	if repoName == "" {
-		repoName = backupLocation.Path
-	}
-	return &Repository{
-		Name:    repoName,
-		Path:    fmt.Sprintf("s3:%s/%s", backupLocation.S3Config.Endpoint, repoName),
-		AuthEnv: envs,
-	}, nil
-}
-
-func parseAzure(repoName string, backupLocation storkapi.BackupLocationItem) (*Repository, error) {
-	if backupLocation.AzureConfig == nil {
-		return nil, fmt.Errorf("failed to parse azure config from BackupLocation")
-	}
-	envs := make([]string, 0)
-	envs = append(envs, fmt.Sprintf("AZURE_ACCOUNT_NAME=%s", backupLocation.AzureConfig.StorageAccountName))
-	envs = append(envs, fmt.Sprintf("AZURE_ACCOUNT_KEY=%s", backupLocation.AzureConfig.StorageAccountKey))
-
-	if repoName == "" {
-		repoName = backupLocation.Path
-	}
-	return &Repository{
-		Name:    repoName,
-		Path:    "azure:" + repoName + "/",
-		AuthEnv: envs,
-	}, nil
-}
-
-func parseGce(repoName string, backupLocation storkapi.BackupLocationItem) (*Repository, error) {
-	if backupLocation.GoogleConfig == nil {
-		return nil, fmt.Errorf("failed to parse google config from BackupLocation")
-	}
-
-	if err := ioutil.WriteFile(
-		googleAccountFilePath,
-		[]byte(backupLocation.GoogleConfig.AccountKey),
-		0644,
-	); err != nil {
-		return nil, fmt.Errorf("failed to parse google account key: %v", err)
-	}
-
-	envs := make([]string, 0)
-	envs = append(envs, fmt.Sprintf("GOOGLE_PROJECT_ID=%s", backupLocation.GoogleConfig.ProjectID))
-	envs = append(envs, fmt.Sprintf("GOOGLE_APPLICATION_CREDENTIALS=%s", googleAccountFilePath))
-
-	if repoName == "" {
-		repoName = backupLocation.Path
-	}
-	return &Repository{
-		Name:    repoName,
-		Path:    "gs:" + repoName + "/",
-		AuthEnv: envs,
-	}, nil
-}
-*/

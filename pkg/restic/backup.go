@@ -4,10 +4,11 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/sirupsen/logrus"
 	"os"
 	"os/exec"
 	"sync"
+
+	cmdexec "github.com/portworx/kdmp/pkg/executor"
 )
 
 // GetBackupCommand returns a wrapper over the restic backup
@@ -103,7 +104,6 @@ func (b *backupExecutor) Run() error {
 	b.execCmd = b.cmd.Cmd()
 	b.execCmd.Stdout = b.outBuf
 	b.execCmd.Stderr = b.errBuf
-	logrus.Infof("line 105 execCmd: %+v", b.execCmd)
 	if err := b.execCmd.Start(); err != nil {
 		b.lastError = err
 		return err
@@ -132,20 +132,20 @@ func (b *backupExecutor) Run() error {
 	return nil
 }
 
-func (b *backupExecutor) Status() (*Status, error) {
+func (b *backupExecutor) Status() (*cmdexec.Status, error) {
 	b.responseLock.Lock()
 	defer b.responseLock.Unlock()
 
 	if b.lastError != nil {
 		fmt.Fprintln(os.Stderr, b.errBuf.String())
-		return &Status{
+		return &cmdexec.Status{
 			LastKnownError: b.lastError,
 			Done:           true,
 		}, nil
 	}
 
 	if b.summaryResponse != nil {
-		return &Status{
+		return &cmdexec.Status{
 			ProgressPercentage:  100,
 			TotalBytesProcessed: b.summaryResponse.TotalBytesProcessed,
 			TotalBytes:          b.summaryResponse.TotalBytesProcessed,
@@ -156,13 +156,13 @@ func (b *backupExecutor) Status() (*Status, error) {
 	} // else backup is still in progress
 	progressResponse, err := getProgress(b.outBuf.Bytes(), b.errBuf.Bytes())
 	if err != nil {
-		return &Status{
+		return &cmdexec.Status{
 			Done:           false,
 			LastKnownError: err,
 		}, nil
 	}
 
-	return &Status{
+	return &cmdexec.Status{
 		ProgressPercentage:  progressResponse.PercentDone * 100,
 		TotalBytes:          progressResponse.TotalBytes,
 		TotalBytesProcessed: progressResponse.BytesDone,
@@ -175,7 +175,7 @@ func getSummary(outBytes []byte, errBytes []byte) (*BackupSummaryResponse, error
 	outLines := bytes.Split(outBytes, []byte("\n"))
 
 	if len(outLines) <= 2 {
-		return nil, &Error{
+		return nil, &cmdexec.Error{
 			Reason:    "backup summary not available",
 			CmdOutput: string(outBytes),
 			CmdErr:    string(errBytes),
@@ -189,7 +189,7 @@ func getSummary(outBytes []byte, errBytes []byte) (*BackupSummaryResponse, error
 			continue
 		}
 		if err := json.Unmarshal(outLines[i], summaryResponse); err != nil {
-			return nil, &Error{
+			return nil, &cmdexec.Error{
 				Reason:    fmt.Sprintf("failed to parse backup summary: %v", err),
 				CmdOutput: string(outLines[i]),
 				CmdErr:    string(errBytes),
@@ -200,7 +200,7 @@ func getSummary(outBytes []byte, errBytes []byte) (*BackupSummaryResponse, error
 		}
 		return summaryResponse, nil
 	}
-	return nil, &Error{
+	return nil, &cmdexec.Error{
 		Reason: "could not find backup summary",
 	}
 }
@@ -213,7 +213,7 @@ func getProgress(outBytes []byte, errBytes []byte) (*BackupProgressResponse, err
 	outLine := outLines[len(outLines)-2] // last line is \n
 	progressResponse := &BackupProgressResponse{}
 	if err := json.Unmarshal(outLine, progressResponse); err != nil || len(progressResponse.MessageType) == 0 {
-		return nil, &Error{
+		return nil, &cmdexec.Error{
 			Reason:    fmt.Sprintf("failed to parse progress of backup: %v", err),
 			CmdOutput: string(outLine),
 			CmdErr:    string(errBytes),
