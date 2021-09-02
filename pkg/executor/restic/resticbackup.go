@@ -1,7 +1,6 @@
 package restic
 
 import (
-	"context"
 	"fmt"
 	"time"
 
