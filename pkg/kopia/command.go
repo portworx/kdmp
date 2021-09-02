@@ -27,7 +27,7 @@ type Command struct {
 	// Flags is a list of flags provided to the kopia command.
 	// The order of the elements in the slice is important
 	Flags []string
-	// Envs is a list of environment variables to the kopia command.
+	// Env is a list of environment variables to the kopia command.
 	// Each entry is of the form "key=value".
 	Env []string
 	// Password is the env for storing password

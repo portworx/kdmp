@@ -23,6 +23,12 @@ import (
 const (
 	amazonS3Endpoint      = "s3.amazonaws.com"
 	googleAccountFilePath = "/root/.gce_credentials"
+	accessKeypath         = "/tmp/cred-secret/accessKey"
+	secretAccessKeyPath   = "/tmp/cred-secret/secretAccessKey"
+	bucketPath            = "/tmp/cred-secret/path"
+	endpointPath          = "/tmp/cred-secret/endpoint"
+	passwordPath          = "/tmp/cred-secret/password"
+	regionPath            = "/tmp/cred-secret/region"
 )
 
 // BackupTool backup tool
@@ -235,37 +241,37 @@ func parseS3Creds() (*Repository, error) {
 	repository := &Repository{
 		S3Config: &S3Config{},
 	}
-	accessKey, err := ioutil.ReadFile("/tmp/cred-secret/accessKey")
+	accessKey, err := ioutil.ReadFile(accessKeypath)
 	if err != nil {
-		errMsg := fmt.Sprintf("failed reading data from file /tmp/cred-secret/accessKey : %s", err)
+		errMsg := fmt.Sprintf("failed reading data from file %s : %s", accessKeypath, err)
 		logrus.Errorf("%v", errMsg)
 		return nil, fmt.Errorf(errMsg)
 	}
 
-	secretAccessKey, err := ioutil.ReadFile("/tmp/cred-secret/secretAccessKey")
+	secretAccessKey, err := ioutil.ReadFile(secretAccessKeyPath)
 	if err != nil {
-		errMsg := fmt.Sprintf("failed reading data from file /tmp/cred-secret/secretAccessKey : %s", err)
+		errMsg := fmt.Sprintf("failed reading data from file %s : %s", secretAccessKeyPath, err)
 		logrus.Errorf("%v", errMsg)
 		return nil, fmt.Errorf(errMsg)
 	}
 
-	bucket, err := ioutil.ReadFile("/tmp/cred-secret/path")
+	bucket, err := ioutil.ReadFile(bucketPath)
 	if err != nil {
-		errMsg := fmt.Sprintf("failed reading data from file /tmp/cred-secret/path : %s", err)
+		errMsg := fmt.Sprintf("failed reading data from file %s : %s", bucketPath, err)
 		logrus.Errorf("%v", errMsg)
 		return nil, fmt.Errorf(errMsg)
 	}
 
-	endpoint, err := ioutil.ReadFile("/tmp/cred-secret/endpoint")
+	endpoint, err := ioutil.ReadFile(endpointPath)
 	if err != nil {
-		errMsg := fmt.Sprintf("failed reading data from file /tmp/cred-secret/endpoint : %s", err)
+		errMsg := fmt.Sprintf("failed reading data from file %s : %s", endpointPath, err)
 		logrus.Errorf("%v", errMsg)
 		return nil, fmt.Errorf(errMsg)
 	}
 
-	password, err := ioutil.ReadFile("/tmp/cred-secret/password")
+	password, err := ioutil.ReadFile(passwordPath)
 	if err != nil {
-		errMsg := fmt.Sprintf("failed reading data from file /tmp/cred-secret/password : %s", err)
+		errMsg := fmt.Sprintf("failed reading data from file %s : %s", passwordPath, err)
 		logrus.Errorf("%v", errMsg)
 		return nil, fmt.Errorf(errMsg)
 	}
@@ -275,9 +281,9 @@ func parseS3Creds() (*Repository, error) {
 	repository.S3Config.Endpoint = string(endpoint)
 	repository.Type = storkapi.BackupLocationS3
 	repository.Path = string(bucket)
-	region, err := ioutil.ReadFile("/tmp/cred-secret/region")
+	region, err := ioutil.ReadFile(regionPath)
 	if err != nil {
-		errMsg := fmt.Sprintf("failed reading data from file /tmp/cred-secret/region : %s", err)
+		errMsg := fmt.Sprintf("failed reading data from file %s : %s", regionPath, err)
 		logrus.Errorf("%v", errMsg)
 		return nil, fmt.Errorf(errMsg)
 	}
@@ -286,7 +292,7 @@ func parseS3Creds() (*Repository, error) {
 	return repository, nil
 }
 
-// WriteVolumeBackupStatus writes a restic status to the VolumeBackup crd.
+// WriteVolumeBackupStatus writes a backup status to the VolumeBackup crd.
 func WriteVolumeBackupStatus(
 	status *Status,
 	volumeBackupName,
@@ -355,7 +361,7 @@ func CreateVolumeBackup(name, namespace, repository, blName string) error {
 // GetSourcePath data source path
 func GetSourcePath(path, glob string) (string, error) {
 	if len(path) == 0 && len(glob) == 0 {
-		return "", fmt.Errorf("source-path argument is required for kopia backups")
+		return "", fmt.Errorf("source-path argument is required for backups")
 	}
 
 	if len(path) > 0 {

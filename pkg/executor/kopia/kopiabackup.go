@@ -19,6 +19,7 @@ import (
 const (
 	progressCheckInterval = 5 * time.Second
 	genericBackupDir      = "generic-backup"
+	kopiaRepositoryFile   = "kopia.repository"
 )
 
 func newBackupCommand() *cobra.Command {
@@ -48,21 +49,11 @@ func newBackupCommand() *cobra.Command {
 func runBackup(sourcePath string) error {
 	// Parse using the mounted secrets
 	fn := "runBackup"
-	repo, err := executor.ParseCloudCred()
+	repo, rErr := executor.ParseCloudCred()
 	repo.Name = frameBackupPath()
 
-	if err != nil {
-		if statusErr := executor.WriteVolumeBackupStatus(
-			&executor.Status{LastKnownError: err},
-			volumeBackupName,
-			namespace,
-		); statusErr != nil {
-			return statusErr
-		}
-		return fmt.Errorf("parse backuplocation: %s", err)
-	}
 	if volumeBackupName != "" {
-		if err = executor.CreateVolumeBackup(
+		if err := executor.CreateVolumeBackup(
 			volumeBackupName,
 			namespace,
 			repo.Name,
@@ -72,12 +63,24 @@ func runBackup(sourcePath string) error {
 			return err
 		}
 	}
+
+	if rErr != nil {
+		if statusErr := executor.WriteVolumeBackupStatus(
+			&executor.Status{LastKnownError: rErr},
+			volumeBackupName,
+			namespace,
+		); statusErr != nil {
+			return statusErr
+		}
+		return fmt.Errorf("parse backuplocation: %s", rErr)
+	}
+
 	// kopia doesn't have a way to know if repository is already initialized.
 	// Repository create needs to run only first time.
 	// Check if kopia.repository exists
 	exists, err := isRepositoryExists(repo)
 	if err != nil {
-		errMsg := fmt.Sprintf("repository exists check failed: %v", err)
+		errMsg := fmt.Sprintf("repository exists check for repo %s failed: %v", repo.Name, err)
 		logrus.Errorf("%s: %v", fn, errMsg)
 		return fmt.Errorf("%s: %v", errMsg, err)
 	}
@@ -172,10 +175,9 @@ func runKopiaBackup(repository *executor.Repository, sourcePath string) error {
 	if err != nil {
 		return err
 	}
-	// This is needed to handle case where aftert kopia repo create it was successful
-	// the pod got terminated. Now user trigerrs another backup, so we need to pass
+	// This is needed to handle case where after kopia repo create was successful and
+	// the pod got terminated. Now user triggers another backup, so we need to pass
 	// credentials for "snapshot create".
-	//backupCmd = populateS3AccessDetails(backupCmd, repository)
 	initExecutor := kopia.NewBackupExecutor(backupCmd)
 	if err := initExecutor.Run(); err != nil {
 		err = fmt.Errorf("failed to run backup command: %v", err)
@@ -222,7 +224,7 @@ func runKopiaRepositoryConnect(repository *executor.Repository) error {
 		err = fmt.Errorf("failed to run repository connect  command: %v", err)
 		return err
 	}
-	//TODO: Temp commented out
+
 	for {
 		time.Sleep(progressCheckInterval)
 		status, err := initExecutor.Status()
@@ -282,15 +284,15 @@ func isRepositoryExists(repository *executor.Repository) (bool, error) {
 		return false, err
 	}
 	bucket = blob.PrefixedBucket(bucket, repository.Name)
-	exists, err := bucket.Exists(context.TODO(), "kopia.repository")
+	exists, err := bucket.Exists(context.TODO(), kopiaRepositoryFile)
 	if err != nil {
 		logrus.Errorf("%v", err)
 		return false, err
 	}
 	if exists {
-		logrus.Infof("kopia.repository exists")
+		logrus.Infof("%s exists", kopiaRepositoryFile)
 	} else {
-		logrus.Infof("kopia.repository doesn't exists")
+		logrus.Infof("%s doesn't exists", kopiaRepositoryFile)
 	}
 	return exists, nil
 }

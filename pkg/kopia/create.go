@@ -20,7 +20,7 @@ var (
 )
 
 // CreateSummaryResponse is the json representation of the summary output
-// of restic init
+// of kopia repo create command
 type CreateSummaryResponse struct {
 	Created bool `json:"created"`
 }

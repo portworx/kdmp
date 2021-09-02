@@ -181,7 +181,7 @@ func (c *Controller) sync(ctx context.Context, in *kdmpapi.DataExport) (bool, er
 		if dataExport.Status.Status == kdmpapi.DataExportStatusSuccessful {
 			return false, nil
 		}
-		// DBG: Removed temporarily
+
 		if err := c.cleanUp(driver, snapshotter, dataExport); err != nil {
 			msg := fmt.Sprintf("failed to remove resources: %s", err)
 			return false, c.updateStatus(dataExport, kdmpapi.DataExportStatusFailed, msg)
@@ -686,6 +686,8 @@ func createS3Secret(secretName string, backupLocation *storkapi.BackupLocation, 
 		Type: corev1.SecretTypeOpaque,
 	}
 	_, err := core.Instance().CreateSecret(secret)
-
+	if err != nil && errors.IsAlreadyExists(err) {
+		return nil
+	}
 	return err
 }

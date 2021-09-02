@@ -44,7 +44,7 @@ func GetConnectCommand(path, repoName, password, provider string) (*Command, err
 }
 
 // NewConnectExecutor returns an instance of Executor that can be used for
-// running a restic repository connect command
+// running a kopia repository connect command
 func NewConnectExecutor(cmd *Command) Executor {
 	return &connectExecutor{
 		cmd:    cmd,
@@ -67,7 +67,8 @@ func (b *connectExecutor) Run() error {
 		err := b.execCmd.Wait()
 
 		if err != nil {
-			b.lastError = fmt.Errorf("failed to run the init command: %v", err)
+			b.lastError = fmt.Errorf("failed to run the kopia connect command: %v", err)
+			logrus.Errorf("%v", b.lastError)
 			logrus.Debugf("stdout: %v", b.execCmd.Stdout)
 			logrus.Debugf("stderr: %v", b.execCmd.Stderr)
 			return
