@@ -34,6 +34,8 @@ type Command struct {
 	Password string
 	// Provider storage provider (aws, Google, Azure)
 	Provider string
+	// SnapshotID snapshot ID
+	SnapshotID string
 }
 
 // Executor interface defines APIs for implementing a command wrapper
@@ -124,6 +126,27 @@ func (c *Command) ConnectCmd() *exec.Cmd {
 		c.Password,
 		"--prefix",
 		c.RepositoryName,
+	}
+	argsSlice = append(argsSlice, c.Flags...)
+	// Get the cmd args
+	argsSlice = append(argsSlice, c.Args...)
+	cmd := exec.Command(baseCmd, argsSlice...)
+	if len(c.Env) > 0 {
+		cmd.Env = append(os.Environ(), c.Env...)
+	}
+	cmd.Dir = c.Dir
+
+	return cmd
+}
+
+// DeleteCmd returns os/exec.Cmd object for the kopia snapshot delete Command
+func (c *Command) DeleteCmd() *exec.Cmd {
+	// Get all the flags
+	argsSlice := []string{
+		"snapshot",
+		c.Name, // connect command
+		c.SnapshotID,
+		"--delete",
 	}
 	argsSlice = append(argsSlice, c.Flags...)
 	// Get the cmd args

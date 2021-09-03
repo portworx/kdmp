@@ -11,12 +11,7 @@ import (
 )
 
 var (
-	operatorServiceAccountYaml = `---
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: kdmp-operator
-  namespace: kube-system`
+	operatorServiceAccountYaml = ``
 
 	operatorDeploymentYaml = `---
 apiVersion: apps/v1
@@ -55,99 +50,9 @@ spec:
       serviceAccountName: kdmp-operator
 `
 
-	operatorClusterRoleYaml = `---
-kind: ClusterRole
-apiVersion: rbac.authorization.k8s.io/v1
-metadata:
-   name: kdmp-operator
-rules:
-  - apiGroups:
-      - ""
-    resources:
-      - persistentvolumeclaims
-      - configmaps
-      - events
-      - secrets
-      - serviceaccounts
-    verbs:
-      - '*'
-  - apiGroups:
-      - ""
-    resources:
-      - persistentvolumes
-      - pods
-    verbs:
-      - get
-      - list
-  - apiGroups:
-      - rbac.authorization.k8s.io
-    resources:
-      - roles
-      - rolebindings
-    verbs:
-      - '*'
-  - apiGroups:
-      - batch
-    resources:
-      - jobs
-    verbs:
-      - '*'
-  - apiGroups:
-      - apiextensions.k8s.io
-    resources:
-      - customresourcedefinitions
-    verbs:
-      - get
-      - list
-      - create
-  - apiGroups:
-      - kdmp.portworx.com
-    resources:
-      - dataexports
-      - volumebackups
-    verbs:
-      - '*'
-  - apiGroups:
-      - stork.libopenstorage.org
-    resources:
-      - backuplocations
-    verbs:
-      - '*'
-  - apiGroups:
-      - volumesnapshot.external-storage.k8s.io
-    resources:
-      - volumesnapshotdatas
-      - volumesnapshots
-    verbs:
-      - '*'
-  - apiGroups:
-      - snapshot.storage.k8s.io
-    resources:
-      - volumesnapshotclasses
-      - volumesnapshotcontents
-      - volumesnapshots
-    verbs:
-      - '*'
-  - apiGroups:
-      - security.openshift.io
-    resources:
-      - securitycontextconstraints
-    verbs:
-      - use`
+	operatorClusterRoleYaml = ``
 
-	operatorClusterRoleBindingYaml = `---
-kind: ClusterRoleBinding
-apiVersion: rbac.authorization.k8s.io/v1
-metadata:
-  name: kdmp-operator
-subjects:
-  - kind: ServiceAccount
-    name: kdmp-operator
-    namespace: kube-system
-roleRef:
-  kind: ClusterRole
-  name: kdmp-operator
-  apiGroup: rbac.authorization.k8s.io`
+	operatorClusterRoleBindingYaml = ``
 )
 
 type Manifests struct {

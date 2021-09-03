@@ -18,6 +18,7 @@ type JobOpts struct {
 	VolumeBackupName        string
 	VolumeBackupNamespace   string
 	DataExportName          string
+	SnapshotID              string
 	Labels                  map[string]string
 }
 
