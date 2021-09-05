@@ -1,8 +1,8 @@
 package kopiabackup
 
 import (
+	"context"
 	"fmt"
-	"path/filepath"
 	"strings"
 
 	"github.com/portworx/kdmp/pkg/drivers"
@@ -10,6 +10,7 @@ import (
 	kdmpops "github.com/portworx/kdmp/pkg/util/ops"
 	"github.com/portworx/sched-ops/k8s/batch"
 	coreops "github.com/portworx/sched-ops/k8s/core"
+	"github.com/sirupsen/logrus"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -18,7 +19,8 @@ import (
 )
 
 const (
-	skipResourceAnnotation = "stork.libopenstorage.org/skip-resource"
+	// SkipResourceAnnotation skipping kopia secret to be backed up
+	SkipResourceAnnotation = "stork.libopenstorage.org/skip-resource"
 )
 
 // Driver is a resticbackup implementation of the data export interface.
@@ -31,6 +33,7 @@ func (d Driver) Name() string {
 
 // StartJob creates a job for data transfer between volumes.
 func (d Driver) StartJob(opts ...drivers.JobOption) (id string, err error) {
+	fn := "StartJob"
 	o := drivers.JobOpts{}
 	for _, opt := range opts {
 		if opt != nil {
@@ -41,33 +44,23 @@ func (d Driver) StartJob(opts ...drivers.JobOption) (id string, err error) {
 	}
 
 	if err := d.validate(o); err != nil {
+		logrus.Errorf("%s validate: err: %v", fn, err)
 		return "", err
 	}
-
-	jobName := toJobName(o.SourcePVCName)
-
-	if _, err := coreops.Instance().CreateSecret(&corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      jobName,
-			Namespace: o.Namespace,
-			Annotations: map[string]string{
-				skipResourceAnnotation: "true",
-			},
-		},
-		StringData: map[string]string{
-			drivers.SecretKey: drivers.SecretValue,
-		},
-	}); err != nil && !apierrors.IsAlreadyExists(err) {
-
-		return "", fmt.Errorf("create a secret for a kopia password: %v", err)
-	}
-
+	// DataExportName will be unique name when also generated from stork
+	// if there are multiple backups being triggered
+	jobName := toJobName(o.DataExportName, o.SourcePVCName)
+	logrus.Debugf("backup jobname: %s", jobName)
 	job, err := buildJob(jobName, o)
 	if err != nil {
-		return "", err
+		errMsg := fmt.Sprintf("building backup job %s failed: %v", jobName, err)
+		logrus.Errorf("%s: %v", fn, errMsg)
+		return "", fmt.Errorf(errMsg)
 	}
 	if _, err = batch.Instance().CreateJob(job); err != nil && !apierrors.IsAlreadyExists(err) {
-		return "", err
+		errMsg := fmt.Sprintf("creation of backup job %s failed: %v", jobName, err)
+		logrus.Errorf("%s: %v", fn, errMsg)
+		return "", fmt.Errorf(errMsg)
 	}
 
 	return utils.NamespacedName(job.Namespace, job.Name), nil
@@ -75,21 +68,27 @@ func (d Driver) StartJob(opts ...drivers.JobOption) (id string, err error) {
 
 // DeleteJob stops data transfer between volumes.
 func (d Driver) DeleteJob(id string) error {
+	fn := "DeleteJob"
 	namespace, name, err := utils.ParseJobID(id)
 	if err != nil {
 		return err
 	}
 
 	if err := coreops.Instance().DeleteSecret(name, namespace); err != nil && !apierrors.IsNotFound(err) {
-		return err
+		errMsg := fmt.Sprintf("deletion of backup credential secret %s failed: %v", name, err)
+		logrus.Errorf("%s: %v", fn, errMsg)
+		return fmt.Errorf(errMsg)
 	}
-
 	if err := utils.CleanServiceAccount(name, namespace); err != nil {
-		return err
+		errMsg := fmt.Sprintf("deletion of service account %s/%s failed: %v", namespace, name, err)
+		logrus.Errorf("%s: %v", fn, errMsg)
+		return fmt.Errorf(errMsg)
 	}
 
 	if err = batch.Instance().DeleteJob(name, namespace); err != nil && !apierrors.IsNotFound(err) {
-		return err
+		errMsg := fmt.Sprintf("deletion of backup job %s/%s failed: %v", namespace, name, err)
+		logrus.Errorf("%s: %v", fn, errMsg)
+		return fmt.Errorf(errMsg)
 	}
 
 	return nil
@@ -97,6 +96,7 @@ func (d Driver) DeleteJob(id string) error {
 
 // JobStatus returns a progress status for a data transfer.
 func (d Driver) JobStatus(id string) (*drivers.JobStatus, error) {
+	fn := "JobStatus"
 	namespace, name, err := utils.ParseJobID(id)
 	if err != nil {
 		return utils.ToJobStatus(0, err.Error()), nil
@@ -104,17 +104,20 @@ func (d Driver) JobStatus(id string) (*drivers.JobStatus, error) {
 
 	job, err := batch.Instance().GetJob(name, namespace)
 	if err != nil {
-		return nil, err
+		errMsg := fmt.Sprintf("failed to fetch backup %s/%s job: %v", namespace, name, err)
+		logrus.Errorf("%s: %v", fn, errMsg)
+		return nil, fmt.Errorf(errMsg)
 	}
 	if utils.IsJobFailed(job) {
 		errMsg := fmt.Sprintf("check %s/%s job for details: %s", namespace, name, drivers.ErrJobFailed)
 		return utils.ToJobStatus(0, errMsg), nil
 	}
 
-	// restic executor updates a volumebackup object with a progress details
-	vb, err := kdmpops.Instance().GetVolumeBackup(name, namespace)
+	vb, err := kdmpops.Instance().GetVolumeBackup(context.Background(), name, namespace)
 	if err != nil {
-		return nil, err
+		errMsg := fmt.Sprintf("failed to fetch volumebackup %s/%s status: %v", namespace, name, err)
+		logrus.Errorf("%s: %v", fn, errMsg)
+		return nil, fmt.Errorf(errMsg)
 	}
 
 	return utils.ToJobStatus(vb.Status.ProgressPercentage, vb.Status.LastKnownError), nil
@@ -133,9 +136,9 @@ func (d Driver) validate(o drivers.JobOpts) error {
 func jobFor(
 	jobName,
 	namespace,
-	pvcName string,
-	//backuplocationName,
-	//backuplocationNamespace string,
+	pvcName,
+	credSecretName,
+	backuplocationNamespace string,
 	resources corev1.ResourceRequirements,
 	labels map[string]string) (*batchv1.Job, error) {
 	backupName := jobName
@@ -149,8 +152,10 @@ func jobFor(
 		backupName,
 		"--repository",
 		toRepoName(pvcName, namespace),
-		"--secret-file-path",
-		filepath.Join(drivers.KopiaSecretMount, drivers.KopiaSecretKey),
+		"--credentials",
+		credSecretName,
+		"--namespace",
+		backuplocationNamespace,
 		"--source-path",
 		"/data",
 	}, " ")
@@ -174,7 +179,7 @@ func jobFor(
 						{
 							Name:            "kopiaexecutor",
 							Image:           utils.KopiaExecutorImage(),
-							ImagePullPolicy: corev1.PullAlways,
+							ImagePullPolicy: corev1.PullIfNotPresent,
 							Command: []string{
 								"/bin/sh",
 								"-x",
@@ -188,8 +193,8 @@ func jobFor(
 									MountPath: "/data",
 								},
 								{
-									Name:      "secret",
-									MountPath: drivers.SecretMount,
+									Name:      "cred-secret",
+									MountPath: drivers.KopiaCredSecretMount,
 									ReadOnly:  true,
 								},
 							},
@@ -205,10 +210,10 @@ func jobFor(
 							},
 						},
 						{
-							Name: "secret",
+							Name: "cred-secret",
 							VolumeSource: corev1.VolumeSource{
 								Secret: &corev1.SecretVolumeSource{
-									SecretName: jobName,
+									SecretName: credSecretName,
 								},
 							},
 						},
@@ -219,12 +224,12 @@ func jobFor(
 	}, nil
 }
 
-func toJobName(id string) string {
-	return fmt.Sprintf("kopiabackup-%s", id)
+func toJobName(dataExportName, pvcName string) string {
+	return fmt.Sprintf("%s-%s", dataExportName, pvcName)
 }
 
 func toRepoName(pvcName, pvcNamespace string) string {
-	return fmt.Sprintf("kopia/%s-%s", pvcNamespace, pvcName)
+	return fmt.Sprintf("%s-%s", pvcNamespace, pvcName)
 }
 
 func addJobLabels(labels map[string]string) map[string]string {
@@ -237,17 +242,22 @@ func addJobLabels(labels map[string]string) map[string]string {
 }
 
 func buildJob(jobName string, o drivers.JobOpts) (*batchv1.Job, error) {
-	resources, err := utils.ResticResourceRequirements()
+	fn := "buildJob"
+	resources, err := utils.JobResourceRequirements()
 	if err != nil {
 		return nil, err
+	}
+	if err := utils.SetupServiceAccount(jobName, o.Namespace, roleFor()); err != nil {
+		errMsg := fmt.Sprintf("error creating service account %s/%s: %v", o.Namespace, jobName, err)
+		logrus.Errorf("%s: %v", fn, errMsg)
+		return nil, fmt.Errorf(errMsg)
 	}
 
-	if err := utils.SetupServiceAccount(jobName, o.Namespace, roleFor()); err != nil {
-		return nil, err
-	}
 	pods, err := coreops.Instance().GetPodsUsingPVC(o.SourcePVCName, o.Namespace)
 	if err != nil {
-		return nil, err
+		errMsg := fmt.Sprintf("error fetching pods using PVC %s/%s: %v", o.Namespace, o.SourcePVCName, err)
+		logrus.Errorf("%s: %v", fn, errMsg)
+		return nil, fmt.Errorf(errMsg)
 	}
 
 	// run a "live" backup if a pvc is mounted (mount a kubelet directory with pod volumes)
@@ -256,8 +266,8 @@ func buildJob(jobName string, o drivers.JobOpts) (*batchv1.Job, error) {
 			jobName,
 			o.Namespace,
 			o.SourcePVCName,
-			//o.BackupLocationName,
-			//o.BackupLocationNamespace,
+			utils.FrameCredSecretName(o.DataExportName, o.SourcePVCName),
+			o.BackupLocationNamespace,
 			pods[0],
 			resources,
 			o.Labels,
@@ -268,22 +278,16 @@ func buildJob(jobName string, o drivers.JobOpts) (*batchv1.Job, error) {
 		jobName,
 		o.Namespace,
 		o.SourcePVCName,
-		//o.BackupLocationName,
-		//o.BackupLocationNamespace,
+		utils.FrameCredSecretName(o.DataExportName, o.SourcePVCName),
+		o.BackupLocationNamespace,
 		resources,
 		o.Labels,
 	)
 }
 
-// TODO: backuplocations permission will be removed in later changes when we read credentials from secret
 func roleFor() *rbacv1.Role {
 	return &rbacv1.Role{
 		Rules: []rbacv1.PolicyRule{
-			{
-				APIGroups: []string{"stork.libopenstorage.org"},
-				Resources: []string{"backuplocations"},
-				Verbs:     []string{"get", "list"},
-			},
 			{
 				APIGroups: []string{"kdmp.portworx.com"},
 				Resources: []string{"volumebackups"},

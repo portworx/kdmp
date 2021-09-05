@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/signal"
@@ -122,7 +123,7 @@ func runApp(mgr manager.Manager) error {
 	}
 
 	log.Info("Starting controller manager")
-	return mgr.Start(stopCh)
+	return mgr.Start(context.Background())
 }
 
 func durationPtr(in time.Duration) *time.Duration {

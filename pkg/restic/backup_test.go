@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	cmdexec "github.com/portworx/kdmp/pkg/executor"
 	"github.com/stretchr/testify/require"
 )
 
@@ -89,7 +90,7 @@ func TestGetProgressUnmarshalFailure(t *testing.T) {
 	backupProgress, err := getProgress(testBytes, errBytes)
 	require.Error(t, err, "expected an error on getProgress")
 	require.Nil(t, backupProgress, "expected nil backup progress")
-	bErr, ok := err.(*Error)
+	bErr, ok := err.(*cmdexec.Error)
 	require.True(t, ok, "expected error of Error kind")
 	require.Contains(t, bErr.Reason, "failed to parse progress of backup")
 	require.Equal(t, string(errBytes), bErr.CmdErr, "unexpected cmdErr")
@@ -118,7 +119,7 @@ func TestGetSummaryNotAvailable(t *testing.T) {
 	testBytes := []byte(testData)
 	backupSummary, err := getSummary(testBytes, nil)
 	require.Nil(t, backupSummary, "expected nil backup summary")
-	bErr, ok := err.(*Error)
+	bErr, ok := err.(*cmdexec.Error)
 	require.True(t, ok, "unexpected error type")
 	require.Equal(t, bErr.Reason, "backup summary not available")
 }
@@ -131,7 +132,7 @@ sgssdfsafd
 	testBytes := []byte(testData)
 	backupSummary, err := getSummary(testBytes, nil)
 	require.Nil(t, backupSummary, "expected nil backup summary")
-	bErr, ok := err.(*Error)
+	bErr, ok := err.(*cmdexec.Error)
 	require.True(t, ok, "unexpected error type")
 	require.Contains(t, bErr.Reason, "failed to parse backup summary")
 }
@@ -145,7 +146,7 @@ func TestGetSummaryNotFound(t *testing.T) {
 	testBytes := []byte(testData)
 	backupSummary, err := getSummary(testBytes, nil)
 	require.Nil(t, backupSummary, "expected nil backup summary")
-	bErr, ok := err.(*Error)
+	bErr, ok := err.(*cmdexec.Error)
 	require.True(t, ok, "unexpected error type")
 	require.Equal(t, bErr.Reason, "could not find backup summary")
 }

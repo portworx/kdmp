@@ -1,6 +1,7 @@
 package resticbackup
 
 import (
+	"context"
 	"fmt"
 	"path/filepath"
 	"strings"
@@ -104,7 +105,7 @@ func (d Driver) JobStatus(id string) (*drivers.JobStatus, error) {
 	}
 
 	// restic executor updates a volumebackup object with a progress details
-	vb, err := kdmpops.Instance().GetVolumeBackup(name, namespace)
+	vb, err := kdmpops.Instance().GetVolumeBackup(context.Background(), name, namespace)
 	if err != nil {
 		return nil, err
 	}
@@ -232,7 +233,7 @@ func addJobLabels(labels map[string]string) map[string]string {
 }
 
 func buildJob(jobName string, o drivers.JobOpts) (*batchv1.Job, error) {
-	resources, err := utils.ResticResourceRequirements()
+	resources, err := utils.JobResourceRequirements()
 	if err != nil {
 		return nil, err
 	}

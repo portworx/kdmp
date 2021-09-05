@@ -137,8 +137,8 @@ func ToImagePullSecret(name string) []corev1.LocalObjectReference {
 
 }
 
-// ResticResourceRequirements returns ResourceRequirements for the restricexecutor container.
-func ResticResourceRequirements() (corev1.ResourceRequirements, error) {
+// JobResourceRequirements returns JobResourceRequirements for the executor container.
+func JobResourceRequirements() (corev1.ResourceRequirements, error) {
 	requestCPU := drivers.DefaultResticExecutorRequestCPU
 	if customRequestCPU := os.Getenv(drivers.ResticExecutorRequestCPU); customRequestCPU != "" {
 		requestCPU = customRequestCPU

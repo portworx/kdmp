@@ -1,6 +1,7 @@
 package v1alpha1
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 	"strings"
@@ -33,13 +34,14 @@ type BackupLocation struct {
 type BackupLocationItem struct {
 	Type BackupLocationType `json:"type"`
 	// Path is either the bucket or any other path for the backup location
-	Path          string        `json:"path"`
-	EncryptionKey string        `json:"encryptionKey"`
-	S3Config      *S3Config     `json:"s3Config,omitempty"`
-	AzureConfig   *AzureConfig  `json:"azureConfig,omitempty"`
-	GoogleConfig  *GoogleConfig `json:"googleConfig,omitempty"`
-	SecretConfig  string        `json:"secretConfig"`
-	Sync          bool          `json:"sync"`
+	Path               string        `json:"path"`
+	EncryptionKey      string        `json:"encryptionKey"`
+	S3Config           *S3Config     `json:"s3Config,omitempty"`
+	AzureConfig        *AzureConfig  `json:"azureConfig,omitempty"`
+	GoogleConfig       *GoogleConfig `json:"googleConfig,omitempty"`
+	SecretConfig       string        `json:"secretConfig"`
+	Sync               bool          `json:"sync"`
+	RepositoryPassword string        `json:"repositoryPassword"`
 }
 
 // BackupLocationType is the type of the backup location
@@ -96,7 +98,7 @@ type BackupLocationList struct {
 // UpdateFromSecret updated the config information from the secret if not provided inline
 func (bl *BackupLocation) UpdateFromSecret(client kubernetes.Interface) error {
 	if bl.Location.SecretConfig != "" {
-		secretConfig, err := client.CoreV1().Secrets(bl.Namespace).Get(bl.Location.SecretConfig, metav1.GetOptions{})
+		secretConfig, err := client.CoreV1().Secrets(bl.Namespace).Get(context.TODO(), bl.Location.SecretConfig, metav1.GetOptions{})
 		if err != nil {
 			return fmt.Errorf("error getting secretConfig for backupLocation: %v", err)
 		}
@@ -127,7 +129,7 @@ func (bl *BackupLocation) getMergedS3Config(client kubernetes.Interface) error {
 		bl.Location.S3Config.DisableSSL = false
 	}
 	if bl.Location.SecretConfig != "" {
-		secretConfig, err := client.CoreV1().Secrets(bl.Namespace).Get(bl.Location.SecretConfig, metav1.GetOptions{})
+		secretConfig, err := client.CoreV1().Secrets(bl.Namespace).Get(context.TODO(), bl.Location.SecretConfig, metav1.GetOptions{})
 		if err != nil {
 			return fmt.Errorf("error getting secretConfig for backupLocation: %v", err)
 		}
@@ -161,7 +163,7 @@ func (bl *BackupLocation) getMergedAzureConfig(client kubernetes.Interface) erro
 		bl.Location.AzureConfig = &AzureConfig{}
 	}
 	if bl.Location.SecretConfig != "" {
-		secretConfig, err := client.CoreV1().Secrets(bl.Namespace).Get(bl.Location.SecretConfig, metav1.GetOptions{})
+		secretConfig, err := client.CoreV1().Secrets(bl.Namespace).Get(context.TODO(), bl.Location.SecretConfig, metav1.GetOptions{})
 		if err != nil {
 			return fmt.Errorf("error getting secretConfig for backupLocation: %v", err)
 		}
@@ -180,7 +182,7 @@ func (bl *BackupLocation) getMergedGoogleConfig(client kubernetes.Interface) err
 		bl.Location.GoogleConfig = &GoogleConfig{}
 	}
 	if bl.Location.SecretConfig != "" {
-		secretConfig, err := client.CoreV1().Secrets(bl.Namespace).Get(bl.Location.SecretConfig, metav1.GetOptions{})
+		secretConfig, err := client.CoreV1().Secrets(bl.Namespace).Get(context.TODO(), bl.Location.SecretConfig, metav1.GetOptions{})
 		if err != nil {
 			return fmt.Errorf("error getting secretConfig for backupLocation: %v", err)
 		}

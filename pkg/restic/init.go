@@ -6,6 +6,8 @@ import (
 	"os"
 	"os/exec"
 	"sync"
+
+	cmdexec "github.com/portworx/kdmp/pkg/executor"
 )
 
 const (
@@ -100,25 +102,25 @@ func (b *initExecutor) Run() error {
 	return nil
 }
 
-func (b *initExecutor) Status() (*Status, error) {
+func (b *initExecutor) Status() (*cmdexec.Status, error) {
 	b.responseLock.Lock()
 	defer b.responseLock.Unlock()
 
 	if b.lastError != nil {
 		fmt.Fprintln(os.Stderr, b.errBuf.String())
-		return &Status{
+		return &cmdexec.Status{
 			LastKnownError: b.lastError,
 			Done:           true,
 		}, nil
 	}
 
 	if b.summaryResponse != nil {
-		return &Status{
+		return &cmdexec.Status{
 			Done: true,
 		}, nil
 	}
 
-	return &Status{
+	return &cmdexec.Status{
 		Done:           false,
 		LastKnownError: nil,
 	}, nil

@@ -37,7 +37,7 @@ GO_FILES := $(shell find . -name '*.go' | grep -v 'vendor' | \
 .DEFAULT_GOAL: all
 .PHONY: test deploy build container
 
-all: pretest test build container
+all: pretest test-container test build container
 
 test:
 	docker run --rm -it -v ${GOPATH}:/go: $(KDMP_UNITTEST_IMG) make unittest
@@ -72,8 +72,8 @@ lint:
         done
 
 vet:
-	go vet $(PKGS)
-	go vet -tags unittest $(PKGS)
+	GO111MODULE=off go vet $(PKGS)
+	GO111MODULE=off go vet -tags unittest $(PKGS)
 	#go vet -tags integrationtest github.com/portworx/kdmp/test/integration_test
 
 
@@ -133,6 +133,8 @@ deploy-kdmp:
 	docker push $(DOCKER_IMAGE)
 
 kdmp: build-kdmp container-kdmp deploy-kdmp
+kopia: kopia-executor deploy-kopia-executor
+restic: restic-executor deploy-restic-executor
 
 restic-executor: build-restic-executor container-restic-executor
 
