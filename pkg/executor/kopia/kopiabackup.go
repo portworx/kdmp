@@ -296,6 +296,7 @@ func runKopiaRepositoryConnect(repository *executor.Repository) error {
 		logrus.Errorf("failed connecting to repository %s: %v", repository.Name, err)
 		return err
 	}
+	logrus.Infof("kopia repo connect successful ..")
 
 	return nil
 }

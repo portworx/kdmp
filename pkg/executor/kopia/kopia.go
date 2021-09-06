@@ -29,6 +29,7 @@ func NewCommand() *cobra.Command {
 
 	cmds.AddCommand(
 		newBackupCommand(),
+		newDeleteCommand(),
 	)
 	cmds.PersistentFlags().AddGoFlagSet(flag.CommandLine)
 	err := flag.CommandLine.Parse([]string{})
