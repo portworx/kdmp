@@ -22,6 +22,18 @@ type JobOpts struct {
 	Labels                  map[string]string
 }
 
+// WithSnapshotID is job parameter
+func WithSnapshotID(snapshotID string) JobOption {
+	return func(opts *JobOpts) error {
+		if strings.TrimSpace(snapshotID) == "" {
+			return fmt.Errorf("snapshotID should be set")
+		}
+		opts.SnapshotID = strings.TrimSpace(snapshotID)
+		return nil
+	}
+
+}
+
 // WithSourcePVC is job parameter.
 func WithSourcePVC(name string) JobOption {
 	return func(opts *JobOpts) error {
