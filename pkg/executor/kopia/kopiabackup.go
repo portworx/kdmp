@@ -21,6 +21,12 @@ const (
 	progressCheckInterval = 5 * time.Second
 	genericBackupDir      = "generic-backup"
 	kopiaRepositoryFile   = "kopia.repository"
+	annualSnapshots       = "2147483647"
+	monthlySnapshots      = "2147483647"
+	weeklySnapshots       = "2147483647"
+	dailySnapshots        = "2147483647"
+	hourlySnapshots       = "2147483647"
+	latestSnapshots       = "2147483647"
 )
 
 func newBackupCommand() *cobra.Command {
@@ -51,6 +57,16 @@ func runBackup(sourcePath string) error {
 	// Parse using the mounted secrets
 	fn := "runBackup"
 	repo, rErr := executor.ParseCloudCred()
+	if rErr != nil {
+		if statusErr := executor.WriteVolumeBackupStatus(
+			&executor.Status{LastKnownError: rErr},
+			volumeBackupName,
+			namespace,
+		); statusErr != nil {
+			return statusErr
+		}
+		return fmt.Errorf("parse backuplocation: %s", rErr)
+	}
 	repo.Name = frameBackupPath()
 
 	if volumeBackupName != "" {
@@ -65,17 +81,6 @@ func runBackup(sourcePath string) error {
 		}
 	}
 
-	if rErr != nil {
-		if statusErr := executor.WriteVolumeBackupStatus(
-			&executor.Status{LastKnownError: rErr},
-			volumeBackupName,
-			namespace,
-		); statusErr != nil {
-			return statusErr
-		}
-		return fmt.Errorf("parse backuplocation: %s", rErr)
-	}
-
 	// kopia doesn't have a way to know if repository is already initialized.
 	// Repository create needs to run only first time.
 	// Check if kopia.repository exists
@@ -88,20 +93,26 @@ func runBackup(sourcePath string) error {
 
 	if !exists {
 		if err = runKopiaCreateRepo(repo); err != nil {
-			errMsg := "repo creation failed"
+			errMsg := fmt.Sprintf("repository %s creation failed", repo.Name)
 			logrus.Errorf("%s: %v", fn, errMsg)
 			return fmt.Errorf("%s: %v", errMsg, err)
+		}
+
+		if err = setGlobalPolicy(); err != nil {
+			errMsg := fmt.Sprintf("setting global policy for repository %s failed: %v", repo.Name, err)
+			logrus.Errorf("%s: %v", fn, errMsg)
+			return fmt.Errorf(errMsg)
 		}
 	}
 
 	if err = runKopiaRepositoryConnect(repo); err != nil {
-		errMsg := fmt.Sprintf("repository connect failed: %v", err)
+		errMsg := fmt.Sprintf("connecting to repository %s failed: %v", repo.Name, err)
 		logrus.Errorf("%s: %v", fn, errMsg)
 		return fmt.Errorf(errMsg)
 	}
 
 	if err = runKopiaBackup(repo, sourcePath); err != nil {
-		errMsg := fmt.Sprintf("backup failed: %v", err)
+		errMsg := fmt.Sprintf("backup failed for repository %s: %v", repo.Name, err)
 		logrus.Errorf("%s: %v", fn, errMsg)
 		return fmt.Errorf(errMsg)
 	}
@@ -122,7 +133,7 @@ func populateS3AccessDetails(initCmd *kopia.Command, repository *executor.Reposi
 }
 
 func runKopiaCreateRepo(repository *executor.Repository) error {
-	logrus.Infof("kopia repository creation started...")
+	logrus.Infof("Repository creation started")
 	initCmd, err := kopia.GetCreateCommand(repository.Path, repository.Name, repository.Password, string(repository.Type))
 	if err != nil {
 		return err
@@ -131,7 +142,7 @@ func runKopiaCreateRepo(repository *executor.Repository) error {
 	initCmd = populateS3AccessDetails(initCmd, repository)
 	initExecutor := kopia.NewCreateExecutor(initCmd)
 	if err := initExecutor.Run(); err != nil {
-		err = fmt.Errorf("failed to run kopia init command: %v", err)
+		err = fmt.Errorf("failed to run repository create command: %v", err)
 		return err
 	}
 
@@ -172,14 +183,16 @@ func runKopiaCreateRepo(repository *executor.Repository) error {
 		return "", true, fmt.Errorf("repo create status not available")
 	}
 	if _, err := task.DoRetryWithTimeout(t, executor.DefaultTimeout, progressCheckInterval); err != nil {
+		logrus.Errorf("repository %s creation failed: %v", repository.Name, err)
 		return err
 	}
-	logrus.Infof("kopia repository creation successful...")
+	logrus.Infof("Repository creation successful")
+
 	return nil
 }
 
 func runKopiaBackup(repository *executor.Repository, sourcePath string) error {
-	logrus.Infof("kopia backup started...")
+	logrus.Infof("Backup started")
 	backupCmd, err := kopia.GetBackupCommand(
 		repository.Path,
 		repository.Name,
@@ -193,14 +206,14 @@ func runKopiaBackup(repository *executor.Repository, sourcePath string) error {
 	// This is needed to handle case where after kopia repo create was successful and
 	// the pod got terminated. Now user triggers another backup, so we need to pass
 	// credentials for "snapshot create".
-	initExecutor := kopia.NewBackupExecutor(backupCmd)
-	if err := initExecutor.Run(); err != nil {
+	backupExecutor := kopia.NewBackupExecutor(backupCmd)
+	if err := backupExecutor.Run(); err != nil {
 		err = fmt.Errorf("failed to run backup command: %v", err)
 		return err
 	}
 
 	t := func() (interface{}, bool, error) {
-		status, err := initExecutor.Status()
+		status, err := backupExecutor.Status()
 		if err != nil {
 			return "", false, err
 		}
@@ -233,34 +246,45 @@ func runKopiaBackup(repository *executor.Repository, sourcePath string) error {
 		return "", true, fmt.Errorf("backup status not available")
 	}
 	if _, err := task.DoRetryWithTimeout(t, executor.DefaultTimeout, progressCheckInterval); err != nil {
+		logrus.Errorf("backup failed for repository %s: %v", repository.Name, err)
 		return err
 	}
 
-	logrus.Infof("kopia backup successful...")
+	logrus.Infof("Backup successful")
 
 	return nil
 }
 
 func runKopiaRepositoryConnect(repository *executor.Repository) error {
+	logrus.Infof("Repository connect started")
 	connectCmd, err := kopia.GetConnectCommand(repository.Path, repository.Name, repository.Password, string(repository.Type))
 	if err != nil {
 		return err
 	}
 	// TODO: Add for other storage providers
 	connectCmd = populateS3AccessDetails(connectCmd, repository)
-	initExecutor := kopia.NewConnectExecutor(connectCmd)
-	if err := initExecutor.Run(); err != nil {
+	connectExecutor := kopia.NewConnectExecutor(connectCmd)
+	if err := connectExecutor.Run(); err != nil {
 		err = fmt.Errorf("failed to run repository connect  command: %v", err)
 		return err
 	}
 
 	t := func() (interface{}, bool, error) {
-		status, err := initExecutor.Status()
+		status, err := connectExecutor.Status()
 		if err != nil {
 			return "", true, err
 		}
 		if status.LastKnownError != nil {
-			return "", true, status.LastKnownError
+			if err = executor.WriteVolumeBackupStatus(
+				status,
+				volumeBackupName,
+				namespace,
+			); err != nil {
+				errMsg := fmt.Sprintf("failed to write a VolumeBackup status: %v", err)
+				logrus.Errorf("%v", errMsg)
+				return "", false, fmt.Errorf(errMsg)
+			}
+			return "", false, status.LastKnownError
 		}
 		if status.Done {
 			return "", false, nil
@@ -269,13 +293,64 @@ func runKopiaRepositoryConnect(repository *executor.Repository) error {
 		return "", true, fmt.Errorf("repository connect status not available")
 	}
 	if _, err := task.DoRetryWithTimeout(t, executor.DefaultTimeout, progressCheckInterval); err != nil {
+		logrus.Errorf("failed connecting to repository %s: %v", repository.Name, err)
 		return err
 	}
 
 	return nil
 }
 
-// Under backuplocaiton path, following path would be created
+func setGlobalPolicy() error {
+	logrus.Infof("Setting global policy")
+	policyCmd, err := kopia.SetGlobalPolicyCommand()
+	if err != nil {
+		return err
+	}
+	// As we don't want kopia maintenance to kick in and trigger global policy on default values
+	// for the repository, setting them to very high values
+	policyCmd = addPolicySetting(policyCmd)
+	policyExecutor := kopia.NewSetGlobalPolicyExecutor(policyCmd)
+	if err := policyExecutor.Run(); err != nil {
+		errMsg := fmt.Sprintf("failed to run setting global policy command: %v", err)
+		logrus.Errorf("%v", errMsg)
+		return fmt.Errorf(errMsg)
+	}
+
+	t := func() (interface{}, bool, error) {
+		status, err := policyExecutor.Status()
+		if err != nil {
+			return "", false, err
+		}
+		if status.LastKnownError != nil {
+			if err = executor.WriteVolumeBackupStatus(
+				status,
+				volumeBackupName,
+				namespace,
+			); err != nil {
+				errMsg := fmt.Sprintf("failed to write a VolumeBackup status: %v", err)
+				logrus.Errorf("%v", errMsg)
+				return "", false, fmt.Errorf(errMsg)
+			}
+			return "", false, status.LastKnownError
+		}
+
+		if status.Done {
+			return "", false, nil
+		}
+
+		return "", true, fmt.Errorf("global policy command status not available")
+	}
+
+	if _, err := task.DoRetryWithTimeout(t, executor.DefaultTimeout, progressCheckInterval); err != nil {
+		logrus.Errorf("failed setting global policy for repository")
+		return err
+	}
+	logrus.Infof("Global policy set successfully")
+
+	return nil
+}
+
+// Under backuplocation path, following path would be created
 // <bucket>/generic-backup/<ns - pvc>
 func frameBackupPath() string {
 	return genericBackupDir + "/" + kopiaRepo + "/"
@@ -328,4 +403,21 @@ func isRepositoryExists(repository *executor.Repository) (bool, error) {
 		logrus.Infof("%s doesn't exists", kopiaRepositoryFile)
 	}
 	return exists, nil
+}
+
+func addPolicySetting(policyCmd *kopia.Command) *kopia.Command {
+	policyCmd.AddArg("--keep-latest")
+	policyCmd.AddArg(latestSnapshots)
+	policyCmd.AddArg("--keep-hourly")
+	policyCmd.AddArg(hourlySnapshots)
+	policyCmd.AddArg("--keep-daily")
+	policyCmd.AddArg(dailySnapshots)
+	policyCmd.AddArg("--keep-weekly")
+	policyCmd.AddArg(weeklySnapshots)
+	policyCmd.AddArg("--keep-monthly")
+	policyCmd.AddArg(monthlySnapshots)
+	policyCmd.AddArg("--keep-annual")
+	policyCmd.AddArg(annualSnapshots)
+
+	return policyCmd
 }

@@ -136,3 +136,23 @@ func (c *Command) ConnectCmd() *exec.Cmd {
 
 	return cmd
 }
+
+// SetPolicyCmd returns os/exec.Cmd object for the kopia policy Command
+func (c *Command) SetPolicyCmd() *exec.Cmd {
+	// Get all the flags
+	argsSlice := []string{
+		"policy",
+		c.Name, // set command
+		"--global",
+	}
+	argsSlice = append(argsSlice, c.Flags...)
+	// Get the cmd args
+	argsSlice = append(argsSlice, c.Args...)
+	cmd := exec.Command(baseCmd, argsSlice...)
+	if len(c.Env) > 0 {
+		cmd.Env = append(os.Environ(), c.Env...)
+	}
+	cmd.Dir = c.Dir
+
+	return cmd
+}
