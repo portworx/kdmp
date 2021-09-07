@@ -418,6 +418,7 @@ func buildStorkBackupLocation(repository *executor.Repository) (*storkv1.BackupL
 			SecretAccessKey: repository.S3Config.SecretAccessKey,
 			Endpoint:        repository.S3Config.Endpoint,
 			Region:          repository.S3Config.Region,
+			DisableSSL:      true, //TODO: test ssl
 		}
 	case storkv1.BackupLocationGoogle:
 		backupType = storkv1.BackupLocationGoogle
