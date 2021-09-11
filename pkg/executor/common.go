@@ -30,6 +30,12 @@ const (
 	endpointPath          = "/etc/cred-secret/endpoint"
 	passwordPath          = "/etc/cred-secret/password"
 	regionPath            = "/etc/cred-secret/region"
+	// AccountKeyPath gce account key path
+	AccountKeyPath         = "/etc/cred-secret/accountkey"
+	projectIDKeypath       = "/etc/cred-secret/projectid"
+	storageAccountNamePath = "/etc/cred-secret/storageaccountname"
+	storageAccountKeyPath  = "/etc/cred-secret/storageaccountkey"
+
 	// DefaultTimeout Max time a command will be retired before failing
 	DefaultTimeout = 2 * time.Minute
 )
@@ -233,12 +239,36 @@ func ParseCloudCred() (*Repository, error) {
 		return nil, fmt.Errorf(errMsg)
 	}
 	logrus.Infof("type: %v", string(blType))
+	repository := &Repository{}
+	var rErr error
 	switch storkapi.BackupLocationType(blType) {
 	case storkapi.BackupLocationS3:
-		return parseS3Creds()
+		repository, rErr = parseS3Creds()
+	case storkapi.BackupLocationGoogle:
+		repository, rErr = parseGoogleCreds()
+	case storkapi.BackupLocationAzure:
+		repository, rErr = parseAzureCreds()
+	}
+	if rErr != nil {
+		return nil, rErr
 	}
 
-	return nil, nil
+	password, err := ioutil.ReadFile(passwordPath)
+	if err != nil {
+		errMsg := fmt.Sprintf("failed reading data from file %s : %s", passwordPath, err)
+		logrus.Errorf("%v", errMsg)
+		return nil, fmt.Errorf(errMsg)
+	}
+	bucket, err := ioutil.ReadFile(bucketPath)
+	if err != nil {
+		errMsg := fmt.Sprintf("failed reading data from file %s : %s", bucketPath, err)
+		logrus.Errorf("%v", errMsg)
+		return nil, fmt.Errorf(errMsg)
+	}
+	repository.Path = string(bucket)
+	repository.Password = string(password)
+
+	return repository, rErr
 }
 
 func parseS3Creds() (*Repository, error) {
@@ -259,13 +289,6 @@ func parseS3Creds() (*Repository, error) {
 		return nil, fmt.Errorf(errMsg)
 	}
 
-	bucket, err := ioutil.ReadFile(bucketPath)
-	if err != nil {
-		errMsg := fmt.Sprintf("failed reading data from file %s : %s", bucketPath, err)
-		logrus.Errorf("%v", errMsg)
-		return nil, fmt.Errorf(errMsg)
-	}
-
 	endpoint, err := ioutil.ReadFile(endpointPath)
 	if err != nil {
 		errMsg := fmt.Sprintf("failed reading data from file %s : %s", endpointPath, err)
@@ -273,18 +296,10 @@ func parseS3Creds() (*Repository, error) {
 		return nil, fmt.Errorf(errMsg)
 	}
 
-	password, err := ioutil.ReadFile(passwordPath)
-	if err != nil {
-		errMsg := fmt.Sprintf("failed reading data from file %s : %s", passwordPath, err)
-		logrus.Errorf("%v", errMsg)
-		return nil, fmt.Errorf(errMsg)
-	}
-	repository.Password = string(password)
 	repository.S3Config.AccessKeyID = string(accessKey)
 	repository.S3Config.SecretAccessKey = string(secretAccessKey)
 	repository.S3Config.Endpoint = string(endpoint)
 	repository.Type = storkapi.BackupLocationS3
-	repository.Path = string(bucket)
 	region, err := ioutil.ReadFile(regionPath)
 	if err != nil {
 		errMsg := fmt.Sprintf("failed reading data from file %s : %s", regionPath, err)
@@ -292,6 +307,57 @@ func parseS3Creds() (*Repository, error) {
 		return nil, fmt.Errorf(errMsg)
 	}
 	repository.S3Config.Region = string(region)
+
+	return repository, nil
+}
+
+func parseGoogleCreds() (*Repository, error) {
+	repository := &Repository{
+		GoogleConfig: &GoogleConfig{},
+	}
+
+	projectID, err := ioutil.ReadFile(projectIDKeypath)
+	if err != nil {
+		errMsg := fmt.Sprintf("failed reading data from file %s : %s", projectIDKeypath, err)
+		logrus.Errorf("%v", errMsg)
+		return nil, fmt.Errorf(errMsg)
+	}
+	accountKey, err := ioutil.ReadFile(AccountKeyPath)
+	if err != nil {
+		errMsg := fmt.Sprintf("failed reading data from file %s : %s", AccountKeyPath, err)
+		logrus.Errorf("%v", errMsg)
+		return nil, fmt.Errorf(errMsg)
+	}
+
+	repository.Type = storkapi.BackupLocationGoogle
+	repository.GoogleConfig.AccountKey = string(accountKey)
+	repository.GoogleConfig.ProjectID = string(projectID)
+
+	return repository, nil
+}
+
+func parseAzureCreds() (*Repository, error) {
+	repository := &Repository{
+		AzureConfig: &AzureConfig{},
+	}
+
+	storageAccountName, err := ioutil.ReadFile(storageAccountNamePath)
+	if err != nil {
+		errMsg := fmt.Sprintf("failed reading data from file %s : %s", storageAccountNamePath, err)
+		logrus.Errorf("%v", errMsg)
+		return nil, fmt.Errorf(errMsg)
+	}
+
+	storageAccountKey, err := ioutil.ReadFile(storageAccountKeyPath)
+	if err != nil {
+		errMsg := fmt.Sprintf("failed reading data from file %s : %s", storageAccountKeyPath, err)
+		logrus.Errorf("%v", errMsg)
+		return nil, fmt.Errorf(errMsg)
+	}
+
+	repository.Type = storkapi.BackupLocationAzure
+	repository.AzureConfig.StorageAccountName = string(storageAccountName)
+	repository.AzureConfig.StorageAccountKey = string(storageAccountKey)
 
 	return repository, nil
 }
