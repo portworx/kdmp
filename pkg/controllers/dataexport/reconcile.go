@@ -121,7 +121,7 @@ func (c *Controller) sync(ctx context.Context, in *kdmpapi.DataExport) (bool, er
 		}
 		// Create the credential secret
 		logrus.Debugf("drivername: %v", driverName)
-		if driverName == drivers.KopiaBackup || driverName == drivers.KopiaRestore {
+		if driverName == drivers.KopiaBackup {
 			// This will create a unique secret per PVC being backed up
 			err = CreateCredentialsSecret(
 				utils.FrameCredSecretName(dataExport.Name, dataExport.Spec.Source.Name),
@@ -129,10 +129,35 @@ func (c *Controller) sync(ctx context.Context, in *kdmpapi.DataExport) (bool, er
 				dataExport.Spec.Destination.Namespace,
 			)
 			if err != nil {
-				msg := fmt.Sprintf("failed to create cloud credential secret: %v", err)
+				msg := fmt.Sprintf("failed to create cloud credential secret during kopia backup: %v", err)
 				logrus.Errorf(msg)
 				return false, c.updateStatus(dataExport, kdmpapi.DataExportStatusFailed, msg)
 			}
+		}
+
+		if driverName == drivers.KopiaRestore {
+			// Get the volumebackup
+			vb, err := kdmpopts.Instance().GetVolumeBackup(context.Background(),
+				dataExport.Spec.Source.Name, dataExport.Spec.Source.Namespace)
+			if err != nil {
+				msg := fmt.Sprintf("Error accessing volumebackup %s in namespace %s : %v",
+					dataExport.Spec.Source.Name, dataExport.Spec.Source.Namespace, err)
+				logrus.Errorf(msg)
+				return false, c.updateStatus(dataExport, kdmpapi.DataExportStatusFailed, msg)
+			}
+			// This will create a unique secret per PVC being restored
+			err = CreateCredentialsSecret(
+				utils.FrameCredSecretName(dataExport.Name, dataExport.Spec.Destination.Name),
+				vb.Spec.BackupLocation.Name,
+				vb.Spec.BackupLocation.Namespace,
+			)
+			if err != nil {
+				msg := fmt.Sprintf("failed to create cloud credential secret during kopia restore: %v", err)
+				logrus.Errorf(msg)
+				return false, c.updateStatus(dataExport, kdmpapi.DataExportStatusFailed, msg)
+			}
+			// For restore setting the source PVCName as the destination PVC name for the job
+			srcPVCName = dataExport.Spec.Destination.Name
 		}
 
 		// start data transfer
@@ -467,6 +492,15 @@ func startTransferJob(drv drivers.Interface, srcPVCName string, dataExport *kdmp
 			drivers.WithNamespace(dataExport.Spec.Destination.Namespace),
 			drivers.WithBackupLocationName(dataExport.Spec.Destination.Name),
 			drivers.WithBackupLocationNamespace(dataExport.Spec.Destination.Namespace),
+			drivers.WithLabels(jobLabels(dataExport.GetName())),
+			drivers.WithDataExportName(dataExport.GetName()),
+		)
+	case drivers.KopiaRestore:
+		return drv.StartJob(
+			drivers.WithDestinationPVC(dataExport.Spec.Destination.Name),
+			drivers.WithNamespace(dataExport.Spec.Destination.Namespace),
+			drivers.WithVolumeBackupName(dataExport.Spec.Source.Name),
+			drivers.WithVolumeBackupNamespace(dataExport.Spec.Source.Namespace),
 			drivers.WithLabels(jobLabels(dataExport.GetName())),
 			drivers.WithDataExportName(dataExport.GetName()),
 		)

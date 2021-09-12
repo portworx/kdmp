@@ -47,6 +47,7 @@ func newBackupCommand() *cobra.Command {
 			executor.HandleErr(runBackup(srcPath))
 		},
 	}
+	backupCommand.Flags().StringVarP(&namespace, "backup-location-namespace", "n", "", "Namespace for backup command")
 	backupCommand.Flags().StringVar(&sourcePath, "source-path", "", "Source for kopia backup")
 	backupCommand.Flags().StringVar(&sourcePathGlob, "source-path-glob", "", "The regexp should match only one path that will be used for backup")
 	backupCommand.Flags().StringVar(&volumeBackupName, "volume-backup-name", "", "Provided VolumeBackup CRD will be updated with the latest backup progress details")
@@ -74,7 +75,7 @@ func runBackup(sourcePath string) error {
 			volumeBackupName,
 			namespace,
 			repo.Name,
-			credentials,
+			backupLocationName,
 		); err != nil {
 			logrus.Errorf("%s: %v", fn, err)
 			return err
