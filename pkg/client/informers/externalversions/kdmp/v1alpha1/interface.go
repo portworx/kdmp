@@ -14,6 +14,8 @@ import (
 
 // Interface provides access to all the informers in this group version.
 type Interface interface {
+	// BackupLocationMaintenances returns a BackupLocationMaintenanceInformer.
+	BackupLocationMaintenances() BackupLocationMaintenanceInformer
 	// DataExports returns a DataExportInformer.
 	DataExports() DataExportInformer
 	// VolumeBackups returns a VolumeBackupInformer.
@@ -29,6 +31,11 @@ type version struct {
 // New returns a new Interface.
 func New(f internalinterfaces.SharedInformerFactory, namespace string, tweakListOptions internalinterfaces.TweakListOptionsFunc) Interface {
 	return &version{factory: f, namespace: namespace, tweakListOptions: tweakListOptions}
+}
+
+// BackupLocationMaintenances returns a BackupLocationMaintenanceInformer.
+func (v *version) BackupLocationMaintenances() BackupLocationMaintenanceInformer {
+	return &backupLocationMaintenanceInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
 // DataExports returns a DataExportInformer.
