@@ -157,7 +157,7 @@ func jobFor(
 		credSecretName,
 		"--backup-location",
 		backuplocationName,
-		"--namespace",
+		"--backup-location-namespace",
 		backuplocationNamespace,
 		"--source-path",
 		"/data",

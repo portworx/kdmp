@@ -50,7 +50,7 @@ func jobForLiveBackup(
 		credSecretName,
 		"--backup-location",
 		backupLocationName,
-		"--namespace",
+		"--backup-location-namespace",
 		backuplocationNamespace,
 		"--repository",
 		toRepoName(pvcName, namespace),

@@ -129,7 +129,7 @@ func (c *Controller) sync(ctx context.Context, in *kdmpapi.DataExport) (bool, er
 				dataExport.Spec.Destination.Namespace,
 			)
 			if err != nil {
-				msg := fmt.Sprintf("failed to create cloud credential secret: %v", err)
+				msg := fmt.Sprintf("failed to create cloud credential secret during kopia backup: %v", err)
 				logrus.Errorf(msg)
 				return false, c.updateStatus(dataExport, kdmpapi.DataExportStatusFailed, msg)
 			}
@@ -140,12 +140,6 @@ func (c *Controller) sync(ctx context.Context, in *kdmpapi.DataExport) (bool, er
 			vb, err := kdmpopts.Instance().GetVolumeBackup(context.Background(),
 				dataExport.Spec.Source.Name, dataExport.Spec.Source.Namespace)
 			if err != nil {
-				if errors.IsNotFound(err) {
-					msg := fmt.Sprintf("Could not find volumebackup %s in namespace %s : %v",
-						dataExport.Spec.Source.Name, dataExport.Spec.Source.Namespace, err)
-					logrus.Errorf(msg)
-					return false, c.updateStatus(dataExport, kdmpapi.DataExportStatusFailed, msg)
-				}
 				msg := fmt.Sprintf("Error accessing volumebackup %s in namespace %s : %v",
 					dataExport.Spec.Source.Name, dataExport.Spec.Source.Namespace, err)
 				logrus.Errorf(msg)
@@ -158,7 +152,7 @@ func (c *Controller) sync(ctx context.Context, in *kdmpapi.DataExport) (bool, er
 				vb.Spec.BackupLocation.Namespace,
 			)
 			if err != nil {
-				msg := fmt.Sprintf("failed to create cloud credential secret: %v", err)
+				msg := fmt.Sprintf("failed to create cloud credential secret during kopia restore: %v", err)
 				logrus.Errorf(msg)
 				return false, c.updateStatus(dataExport, kdmpapi.DataExportStatusFailed, msg)
 			}
@@ -503,7 +497,6 @@ func startTransferJob(drv drivers.Interface, srcPVCName string, dataExport *kdmp
 		)
 	case drivers.KopiaRestore:
 		return drv.StartJob(
-			drivers.WithSourcePVC(srcPVCName),
 			drivers.WithDestinationPVC(dataExport.Spec.Destination.Name),
 			drivers.WithNamespace(dataExport.Spec.Destination.Namespace),
 			drivers.WithVolumeBackupName(dataExport.Spec.Source.Name),

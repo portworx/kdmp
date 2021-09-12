@@ -50,7 +50,7 @@ func (d Driver) StartJob(opts ...drivers.JobOption) (id string, err error) {
 		jobName,
 		o.Namespace,
 		o.DestinationPVCName,
-		utils.FrameCredSecretName(o.DataExportName, o.SourcePVCName),
+		utils.FrameCredSecretName(o.DataExportName, o.DestinationPVCName),
 		vb.Spec.BackupLocation.Name,
 		vb.Spec.BackupLocation.Namespace,
 		vb.Status.SnapshotID,
@@ -112,6 +112,9 @@ func (d Driver) JobStatus(id string) (*drivers.JobStatus, error) {
 }
 
 func (d Driver) validate(o drivers.JobOpts) error {
+	if o.DestinationPVCName == "" {
+		return fmt.Errorf("destination pvc name should be set")
+	}
 	if o.VolumeBackupName == "" {
 		return fmt.Errorf("volumebackup name should be set")
 	}
@@ -147,7 +150,7 @@ func jobFor(
 		"restore",
 		"--backup-location",
 		backuplocationName,
-		"--namespace",
+		"--backup-location-namespace",
 		backuplocationNamespace,
 		"--repository",
 		repository,
@@ -155,7 +158,7 @@ func jobFor(
 		credSecretName,
 		"--target-path",
 		"/data",
-		"--id",
+		"--snapshot-id",
 		snapshotID,
 	}, " ")
 

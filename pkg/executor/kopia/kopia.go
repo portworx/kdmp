@@ -14,7 +14,6 @@ var (
 	kopiaRepo          string
 	credentials        string
 	backupLocationName string
-	backupLocationFile string
 )
 
 // NewCommand returns a kopia command wrapper

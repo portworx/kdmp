@@ -5,15 +5,9 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"sync"
 
 	cmdexec "github.com/portworx/kdmp/pkg/executor"
 	"github.com/sirupsen/logrus"
-)
-
-const (
-	// DefaultDestPath is the directory to do kopia restore
-	DefaultDestPath = "/data"
 )
 
 // GetRestoreCommand returns a wrapper over the kopia restore command.
@@ -36,7 +30,7 @@ func GetRestoreCommand(path, repoName, password, provider, targetPath, snapshotI
 	return &Command{
 		Name:     "restore",
 		Password: password,
-		Dir:      DefaultDestPath,
+		Dir:      targetPath,
 		Provider: provider,
 		Args:     args,
 	}, nil
@@ -56,14 +50,12 @@ type RestoreSummaryResponse struct {
 }
 
 type restoreExecutor struct {
-	cmd             *Command
-	responseLock    sync.Mutex
-	summaryResponse *RestoreSummaryResponse
-	execCmd         *exec.Cmd
-	outBuf          *bytes.Buffer
-	errBuf          *bytes.Buffer
-	lastError       error
-	isRunning       bool
+	cmd       *Command
+	execCmd   *exec.Cmd
+	outBuf    *bytes.Buffer
+	errBuf    *bytes.Buffer
+	lastError error
+	isRunning bool
 }
 
 // NewRestoreExecutor returns an instance of Executor that can be used for
@@ -78,13 +70,6 @@ func NewRestoreExecutor(cmd *Command) Executor {
 
 func (b *restoreExecutor) Run() error {
 
-	b.responseLock.Lock()
-	defer b.responseLock.Unlock()
-
-	if b.isRunning {
-		return fmt.Errorf("another restore operation is already running")
-	}
-
 	b.execCmd = b.cmd.RestoreCmd()
 	b.execCmd.Stdout = b.outBuf
 	b.execCmd.Stderr = b.errBuf
@@ -97,29 +82,18 @@ func (b *restoreExecutor) Run() error {
 
 	go func() {
 		err := b.execCmd.Wait()
-		b.responseLock.Lock()
-		defer b.responseLock.Unlock()
 		if err != nil {
 			b.lastError = fmt.Errorf("failed to run the restore command: %v", err)
 			logrus.Infof("stdout: %v", b.execCmd.Stdout)
 			logrus.Infof("Stderr: %v", b.execCmd.Stderr)
 			return
 		}
-
-		summaryResponse, err := getRestoreSummary(b.outBuf.Bytes(), b.errBuf.Bytes())
-		if err != nil {
-			b.lastError = err
-			return
-		}
-		b.summaryResponse = summaryResponse
+		b.isRunning = false
 	}()
 	return nil
 }
 
 func (b *restoreExecutor) Status() (*cmdexec.Status, error) {
-	b.responseLock.Lock()
-	defer b.responseLock.Unlock()
-
 	if b.lastError != nil {
 		fmt.Fprintln(os.Stderr, b.errBuf.String())
 		return &cmdexec.Status{
@@ -128,7 +102,7 @@ func (b *restoreExecutor) Status() (*cmdexec.Status, error) {
 		}, nil
 	}
 
-	if b.summaryResponse != nil {
+	if !b.isRunning {
 		return &cmdexec.Status{
 			ProgressPercentage: 100,
 			Done:               true,
@@ -136,8 +110,4 @@ func (b *restoreExecutor) Status() (*cmdexec.Status, error) {
 	}
 
 	return &cmdexec.Status{}, nil
-}
-
-func getRestoreSummary(outBytes []byte, errBytes []byte) (*RestoreSummaryResponse, error) {
-	return &RestoreSummaryResponse{}, nil
 }

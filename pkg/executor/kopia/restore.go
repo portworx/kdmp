@@ -20,20 +20,20 @@ func newRestoreCommand() *cobra.Command {
 		Use:   "restore",
 		Short: "Start a kopia restore",
 		Run: func(c *cobra.Command, args []string) {
-			if len(backupLocationFile) == 0 && len(backupLocationName) == 0 {
-				util.CheckErr(fmt.Errorf("backup-location or backup-location-file has to be provided for kopia backups"))
+			if len(backupLocationName) == 0 {
+				util.CheckErr(fmt.Errorf("backup-location has to be provided for kopia restores"))
 				return
 			}
 			if len(targetPath) == 0 {
-				util.CheckErr(fmt.Errorf("target-path argument is required for kopia backups"))
+				util.CheckErr(fmt.Errorf("target-path argument is required for kopia restores"))
 				return
 			}
 			executor.HandleErr(runRestore(snapshotID, targetPath))
 		},
 	}
-	restoreCommand.Flags().StringVarP(&namespace, "namespace", "n", "", "Namespace for restore command")
-	restoreCommand.Flags().StringVar(&targetPath, "target-path", "", "Destination path for kopia restore backup")
-	restoreCommand.Flags().StringVar(&snapshotID, "id", "", "Snapshot id of the backup")
+	restoreCommand.Flags().StringVarP(&namespace, "backup-location-namespace", "", "", "Namespace for restore command")
+	restoreCommand.Flags().StringVar(&targetPath, "target-path", "", "Destination path for kopia restore")
+	restoreCommand.Flags().StringVar(&snapshotID, "snapshot-id", "", "Snapshot id of the restore")
 	return restoreCommand
 }
 
@@ -42,21 +42,25 @@ func runRestore(snapshotID, targetPath string) error {
 	// Parse using the mounted secrets
 	fn := "runRestore"
 	repo, err := executor.ParseCloudCred()
-	repo.Name = kopiaRepo
 
 	if err != nil {
+		errMsg := fmt.Sprintf("parse backuplocation failed: %s", err)
+		logrus.Errorf("%s: %v", fn, errMsg)
 		if statusErr := executor.WriteVolumeBackupStatus(
 			&executor.Status{LastKnownError: err},
 			volumeBackupName,
 			namespace,
 		); statusErr != nil {
-			return statusErr
+			errMsg = fmt.Sprintf("Updating volume backup cr failed with error %s", statusErr)
+			return fmt.Errorf("%s: %v", fn, errMsg)
 		}
-		return fmt.Errorf("parse backuplocation: %s", err)
+		return fmt.Errorf(errMsg)
 	}
 
+	repo.Name = kopiaRepo
+
 	if err = runKopiaRepositoryConnect(repo); err != nil {
-		errMsg := fmt.Sprintf("repository connect failed: %v", err)
+		errMsg := fmt.Sprintf("repository %s connect failed: %v", repo.Name, err)
 		logrus.Errorf("%s: %v", fn, errMsg)
 		return fmt.Errorf(errMsg)
 	}
@@ -94,19 +98,6 @@ func runKopiaRestore(repository *executor.Repository, targetPath, snapshotID str
 		if err != nil {
 			return "", false, err
 		}
-		if status.LastKnownError != nil {
-			if err = executor.WriteVolumeBackupStatus(
-				status,
-				volumeBackupName,
-				namespace,
-			); err != nil {
-				errMsg := fmt.Sprintf("failed to write a VolumeBackup status: %v", err)
-				logrus.Errorf("%v", errMsg)
-				return "", false, fmt.Errorf(errMsg)
-			}
-			return "", false, status.LastKnownError
-		}
-
 		if err = executor.WriteVolumeBackupStatus(
 			status,
 			volumeBackupName,
@@ -115,6 +106,9 @@ func runKopiaRestore(repository *executor.Repository, targetPath, snapshotID str
 			errMsg := fmt.Sprintf("failed to write a VolumeBackup status: %v", err)
 			logrus.Errorf("%v", errMsg)
 			return "", false, fmt.Errorf(errMsg)
+		}
+		if status.LastKnownError != nil {
+			return "", false, status.LastKnownError
 		}
 		if status.Done {
 			return "", false, nil
