@@ -18,6 +18,10 @@ type FakeKdmpV1alpha1 struct {
 	*testing.Fake
 }
 
+func (c *FakeKdmpV1alpha1) BackupLocationMaintenances(namespace string) v1alpha1.BackupLocationMaintenanceInterface {
+	return &FakeBackupLocationMaintenances{c, namespace}
+}
+
 func (c *FakeKdmpV1alpha1) DataExports(namespace string) v1alpha1.DataExportInterface {
 	return &FakeDataExports{c, namespace}
 }

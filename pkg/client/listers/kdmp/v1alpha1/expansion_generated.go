@@ -8,6 +8,14 @@ LICENSE
 
 package v1alpha1
 
+// BackupLocationMaintenanceListerExpansion allows custom methods to be added to
+// BackupLocationMaintenanceLister.
+type BackupLocationMaintenanceListerExpansion interface{}
+
+// BackupLocationMaintenanceNamespaceListerExpansion allows custom methods to be added to
+// BackupLocationMaintenanceNamespaceLister.
+type BackupLocationMaintenanceNamespaceListerExpansion interface{}
+
 // DataExportListerExpansion allows custom methods to be added to
 // DataExportLister.
 type DataExportListerExpansion interface{}
