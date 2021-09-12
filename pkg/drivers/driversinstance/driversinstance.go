@@ -6,6 +6,7 @@ import (
 
 	"github.com/portworx/kdmp/pkg/drivers"
 	"github.com/portworx/kdmp/pkg/drivers/kopiabackup"
+	"github.com/portworx/kdmp/pkg/drivers/kopiadelete"
 	"github.com/portworx/kdmp/pkg/drivers/kopiarestore"
 	"github.com/portworx/kdmp/pkg/drivers/resticbackup"
 	"github.com/portworx/kdmp/pkg/drivers/resticrestore"
@@ -20,6 +21,7 @@ var (
 		drivers.ResticRestore: resticrestore.Driver{},
 		drivers.KopiaBackup:   kopiabackup.Driver{},
 		drivers.KopiaRestore:  kopiarestore.Driver{},
+		drivers.KopiaDelete:   kopiadelete.Driver{},
 	}
 )
 
