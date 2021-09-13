@@ -464,7 +464,6 @@ func isRepositoryExists(repository *executor.Repository) (bool, error) {
 	}
 	return exists, nil
 }
-
 func addPolicySetting(policyCmd *kopia.Command) *kopia.Command {
 	policyCmd.AddArg("--keep-latest")
 	policyCmd.AddArg(latestSnapshots)

@@ -17,12 +17,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// Driver is a kopiarestore implementation of the data export interface.
-type Driver struct{}
-
 const (
 	restoreJobPrefix = "restore"
 )
+
+// Driver is a kopiarestore implementation of the data export interface.
+type Driver struct{}
 
 // Name returns a name of the driver.
 func (d Driver) Name() string {
