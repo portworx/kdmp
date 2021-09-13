@@ -665,7 +665,12 @@ func CreateCredentialsSecret(secretName, blName, namespace string) error {
 	switch backupLocation.Location.Type {
 	case storkapi.BackupLocationS3:
 		return createS3Secret(secretName, backupLocation)
+	case storkapi.BackupLocationGoogle:
+		return createGoogleSecret(secretName, backupLocation)
+	case storkapi.BackupLocationAzure:
+		return createAzureSecret(secretName, backupLocation)
 	}
+
 	return fmt.Errorf("unsupported backup location: %v", backupLocation.Location.Type)
 }
 
@@ -700,10 +705,44 @@ func createS3Secret(secretName string, backupLocation *storkapi.BackupLocation) 
 	credentialData["path"] = []byte(backupLocation.Location.Path)
 	credentialData["type"] = []byte(backupLocation.Location.Type)
 	credentialData["password"] = []byte(backupLocation.Location.RepositoryPassword)
+	err := createCredSecret(secretName, backupLocation.Namespace, credentialData)
+
+	return err
+}
+
+func createGoogleSecret(secretName string, backupLocation *storkapi.BackupLocation) error {
+	credentialData := make(map[string][]byte)
+	credentialData["type"] = []byte(backupLocation.Location.Type)
+	credentialData["password"] = []byte(backupLocation.Location.RepositoryPassword)
+	credentialData["accountkey"] = []byte(backupLocation.Location.GoogleConfig.AccountKey)
+	credentialData["projectid"] = []byte(backupLocation.Location.GoogleConfig.ProjectID)
+	credentialData["path"] = []byte(backupLocation.Location.Path)
+	err := createCredSecret(secretName, backupLocation.Namespace, credentialData)
+
+	return err
+}
+
+func createAzureSecret(secretName string, backupLocation *storkapi.BackupLocation) error {
+	credentialData := make(map[string][]byte)
+	credentialData["type"] = []byte(backupLocation.Location.Type)
+	credentialData["password"] = []byte(backupLocation.Location.RepositoryPassword)
+	credentialData["path"] = []byte(backupLocation.Location.Path)
+	credentialData["storageaccountname"] = []byte(backupLocation.Location.AzureConfig.StorageAccountName)
+	credentialData["storageaccountkey"] = []byte(backupLocation.Location.AzureConfig.StorageAccountKey)
+	err := createCredSecret(secretName, backupLocation.Namespace, credentialData)
+
+	return err
+}
+
+func createCredSecret(
+	secretName string,
+	namespace string,
+	credentialData map[string][]byte,
+) error {
 	secret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      secretName,
-			Namespace: backupLocation.Namespace,
+			Namespace: namespace,
 			Annotations: map[string]string{
 				kopiabackup.SkipResourceAnnotation: "true",
 			},
@@ -715,5 +754,6 @@ func createS3Secret(secretName string, backupLocation *storkapi.BackupLocation) 
 	if err != nil && errors.IsAlreadyExists(err) {
 		return nil
 	}
+
 	return err
 }

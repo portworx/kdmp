@@ -69,11 +69,13 @@ func GetBackupCommand(path, repoName, password, provider, sourcePath string) (*C
 	if repoName == "" {
 		return nil, fmt.Errorf("repository name cannot be empty")
 	}
+
 	return &Command{
 		Name:     "create",
 		Password: password,
 		Path:     path,
 		Dir:      sourcePath,
+		Provider: provider,
 		Args:     []string{"."},
 	}, nil
 }

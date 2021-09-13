@@ -68,20 +68,35 @@ func (c *Command) AddEnv(envs []string) *Command {
 	return c
 }
 
-// InitCmd returns os/exec.Cmd object for the kopia init Command
-func (c *Command) InitCmd() *exec.Cmd {
+// CreateCmd returns os/exec.Cmd object for the kopia repo create Command
+func (c *Command) CreateCmd() *exec.Cmd {
 	// Get all the flags
-	argsSlice := []string{
-		"repository",
-		c.Name, // create command
-		"s3",
-		"--bucket",
-		c.Path,
-		"--password",
-		c.Password,
-		"--prefix",
-		c.RepositoryName,
+	var argsSlice []string
+	switch c.Provider {
+	case "azure":
+		argsSlice = []string{
+			"repository",
+			c.Name, // create command
+			c.Provider,
+			"--password",
+			c.Password,
+			"--prefix",
+			c.RepositoryName,
+		}
+	case "s3", "google":
+		argsSlice = []string{
+			"repository",
+			c.Name, // create command
+			c.Provider,
+			"--bucket",
+			c.Path,
+			"--password",
+			c.Password,
+			"--prefix",
+			c.RepositoryName,
+		}
 	}
+
 	argsSlice = append(argsSlice, c.Flags...)
 	// Get the cmd args
 	argsSlice = append(argsSlice, c.Args...)
@@ -115,18 +130,32 @@ func (c *Command) BackupCmd() *exec.Cmd {
 
 // ConnectCmd returns os/exec.Cmd object for the kopia connect Command
 func (c *Command) ConnectCmd() *exec.Cmd {
-	// Get all the flags
-	argsSlice := []string{
-		"repository",
-		c.Name, // connect command
-		c.Provider,
-		"--bucket",
-		c.Path,
-		"--password",
-		c.Password,
-		"--prefix",
-		c.RepositoryName,
+	var argsSlice []string
+	switch c.Provider {
+	case "azure":
+		argsSlice = []string{
+			"repository",
+			c.Name, // connect command
+			c.Provider,
+			"--password",
+			c.Password,
+			"--prefix",
+			c.RepositoryName,
+		}
+	case "s3", "google":
+		argsSlice = []string{
+			"repository",
+			c.Name, // connect command
+			c.Provider,
+			"--bucket",
+			c.Path,
+			"--password",
+			c.Password,
+			"--prefix",
+			c.RepositoryName,
+		}
 	}
+
 	argsSlice = append(argsSlice, c.Flags...)
 	// Get the cmd args
 	argsSlice = append(argsSlice, c.Args...)

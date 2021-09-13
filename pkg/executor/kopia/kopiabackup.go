@@ -58,6 +58,26 @@ func runBackup(sourcePath string) error {
 	// Parse using the mounted secrets
 	fn := "runBackup"
 	repo, rErr := executor.ParseCloudCred()
+	var repoName string
+	if repo == nil {
+		// A case wherein repo was nil, we want VB CR with respective failed msg
+		// hence having a empty repo name
+		repoName = ""
+	} else {
+		repoName = frameBackupPath()
+		repo.Name = repoName
+	}
+	if volumeBackupName != "" {
+		if err := executor.CreateVolumeBackup(
+			volumeBackupName,
+			namespace,
+			repoName,
+			backupLocationName,
+		); err != nil {
+			logrus.Errorf("%s: %v", fn, err)
+			return err
+		}
+	}
 	if rErr != nil {
 		if statusErr := executor.WriteVolumeBackupStatus(
 			&executor.Status{LastKnownError: rErr},
@@ -68,20 +88,6 @@ func runBackup(sourcePath string) error {
 		}
 		return fmt.Errorf("parse backuplocation: %s", rErr)
 	}
-	repo.Name = frameBackupPath()
-
-	if volumeBackupName != "" {
-		if err := executor.CreateVolumeBackup(
-			volumeBackupName,
-			namespace,
-			repo.Name,
-			backupLocationName,
-		); err != nil {
-			logrus.Errorf("%s: %v", fn, err)
-			return err
-		}
-	}
-
 	// kopia doesn't have a way to know if repository is already initialized.
 	// Repository create needs to run only first time.
 	// Check if kopia.repository exists
@@ -133,15 +139,41 @@ func populateS3AccessDetails(initCmd *kopia.Command, repository *executor.Reposi
 	return initCmd
 }
 
+func populateGCEAccessDetails(initCmd *kopia.Command, repository *executor.Repository) *kopia.Command {
+	initCmd.AddArg("--credentials-file")
+	initCmd.AddArg(executor.AccountKeyPath)
+
+	return initCmd
+}
+
+func populateAzureccessDetails(initCmd *kopia.Command, repository *executor.Repository) *kopia.Command {
+	initCmd.AddArg("--container")
+	initCmd.AddArg(repository.Path)
+	initCmd.AddArg("--storage-account")
+	initCmd.AddArg(repository.AzureConfig.StorageAccountName)
+	initCmd.AddArg("--storage-key")
+	initCmd.AddArg(repository.AzureConfig.StorageAccountKey)
+
+	return initCmd
+}
+
 func runKopiaCreateRepo(repository *executor.Repository) error {
 	logrus.Infof("Repository creation started")
-	initCmd, err := kopia.GetCreateCommand(repository.Path, repository.Name, repository.Password, string(repository.Type))
+	repoCreateCmd, err := kopia.GetCreateCommand(repository.Path, repository.Name, repository.Password, string(repository.Type))
 	if err != nil {
 		return err
 	}
-	// TODO: Add for other storage providers
-	initCmd = populateS3AccessDetails(initCmd, repository)
-	initExecutor := kopia.NewCreateExecutor(initCmd)
+
+	switch repository.Type {
+	case storkv1.BackupLocationS3:
+		repoCreateCmd = populateS3AccessDetails(repoCreateCmd, repository)
+	case storkv1.BackupLocationGoogle:
+		repoCreateCmd = populateGCEAccessDetails(repoCreateCmd, repository)
+	case storkv1.BackupLocationAzure:
+		repoCreateCmd = populateAzureccessDetails(repoCreateCmd, repository)
+	}
+
+	initExecutor := kopia.NewCreateExecutor(repoCreateCmd)
 	if err := initExecutor.Run(); err != nil {
 		err = fmt.Errorf("failed to run repository create command: %v", err)
 		return err
@@ -262,8 +294,16 @@ func runKopiaRepositoryConnect(repository *executor.Repository) error {
 	if err != nil {
 		return err
 	}
-	// TODO: Add for other storage providers
-	connectCmd = populateS3AccessDetails(connectCmd, repository)
+
+	switch repository.Type {
+	case storkv1.BackupLocationS3:
+		connectCmd = populateS3AccessDetails(connectCmd, repository)
+	case storkv1.BackupLocationGoogle:
+		connectCmd = populateGCEAccessDetails(connectCmd, repository)
+	case storkv1.BackupLocationAzure:
+		connectCmd = populateAzureccessDetails(connectCmd, repository)
+	}
+
 	connectExecutor := kopia.NewConnectExecutor(connectCmd)
 	if err := connectExecutor.Run(); err != nil {
 		err = fmt.Errorf("failed to run repository connect  command: %v", err)
@@ -374,11 +414,24 @@ func buildStorkBackupLocation(repository *executor.Repository) (*storkv1.BackupL
 			Endpoint:        repository.S3Config.Endpoint,
 			Region:          repository.S3Config.Region,
 		}
+	case storkv1.BackupLocationGoogle:
+		backupType = storkv1.BackupLocationGoogle
+		backupLocation.Location.GoogleConfig = &storkv1.GoogleConfig{
+			ProjectID:  repository.GoogleConfig.ProjectID,
+			AccountKey: repository.GoogleConfig.AccountKey,
+		}
+	case storkv1.BackupLocationAzure:
+		backupType = storkv1.BackupLocationAzure
+		backupLocation.Location.AzureConfig = &storkv1.AzureConfig{
+			StorageAccountName: repository.AzureConfig.StorageAccountName,
+			StorageAccountKey:  repository.AzureConfig.StorageAccountKey,
+		}
 	}
 
 	backupLocation.Location.Path = repository.Path
 	backupLocation.ObjectMeta.Name = repository.Name
 	backupLocation.Location.Type = backupType
+
 	return backupLocation, nil
 }
 

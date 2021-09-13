@@ -59,7 +59,7 @@ func NewCreateExecutor(cmd *Command) Executor {
 }
 
 func (b *createExecutor) Run() error {
-	b.execCmd = b.cmd.InitCmd()
+	b.execCmd = b.cmd.CreateCmd()
 	b.execCmd.Stdout = b.outBuf
 	b.execCmd.Stderr = b.errBuf
 
