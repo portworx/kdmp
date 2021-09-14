@@ -394,7 +394,7 @@ func WriteVolumeBackupStatus(
 }
 
 // CreateVolumeBackup creates volumebackup CRD
-func CreateVolumeBackup(name, namespace, repository, blName string) error {
+func CreateVolumeBackup(name, namespace, repository, blName, blNamespace string) error {
 	new := &kdmpapi.VolumeBackup{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
@@ -404,7 +404,7 @@ func CreateVolumeBackup(name, namespace, repository, blName string) error {
 			Repository: repository,
 			BackupLocation: kdmpapi.DataExportObjectReference{
 				Name:      blName,
-				Namespace: namespace,
+				Namespace: blNamespace,
 			},
 		},
 	}

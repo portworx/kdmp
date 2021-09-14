@@ -11,6 +11,10 @@ import (
 	"k8s.io/kubectl/pkg/cmd/util"
 )
 
+var (
+	restoreNamespace string
+)
+
 func newRestoreCommand() *cobra.Command {
 	var (
 		targetPath string
@@ -31,12 +35,14 @@ func newRestoreCommand() *cobra.Command {
 			executor.HandleErr(runRestore(snapshotID, targetPath))
 		},
 	}
-	restoreCommand.Flags().StringVarP(&namespace, "backup-location-namespace", "", "", "Namespace for restore command")
+	restoreCommand.Flags().StringVarP(&restoreNamespace, "restore-namespace", "", "", "Namespace for restore command")
 	restoreCommand.Flags().StringVar(&targetPath, "target-path", "", "Destination path for kopia restore")
 	restoreCommand.Flags().StringVar(&snapshotID, "snapshot-id", "", "Snapshot id of the restore")
 	return restoreCommand
 }
 
+// VolumeBackup CR are present in the same namespace as the restore PVC
+// be restored namespace. Stork would take care of creating it
 func runRestore(snapshotID, targetPath string) error {
 	logrus.Infof("Restore started from snapshotID: %s", snapshotID)
 	// Parse using the mounted secrets
@@ -49,7 +55,7 @@ func runRestore(snapshotID, targetPath string) error {
 		if statusErr := executor.WriteVolumeBackupStatus(
 			&executor.Status{LastKnownError: err},
 			volumeBackupName,
-			namespace,
+			restoreNamespace,
 		); statusErr != nil {
 			errMsg = fmt.Sprintf("Updating volume backup cr failed with error %s", statusErr)
 			return fmt.Errorf("%s: %v", fn, errMsg)
@@ -101,7 +107,7 @@ func runKopiaRestore(repository *executor.Repository, targetPath, snapshotID str
 		if err = executor.WriteVolumeBackupStatus(
 			status,
 			volumeBackupName,
-			namespace,
+			restoreNamespace,
 		); err != nil {
 			errMsg := fmt.Sprintf("failed to write a VolumeBackup status: %v", err)
 			logrus.Errorf("%v", errMsg)

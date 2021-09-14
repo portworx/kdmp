@@ -23,7 +23,8 @@ func jobForLiveBackup(
 	pvcName,
 	credSecretName,
 	backupLocationName,
-	backuplocationNamespace string,
+	backuplocationNamespace,
+	backupNamespace string,
 	mountPod corev1.Pod,
 	resources corev1.ResourceRequirements,
 	labels map[string]string) (*batchv1.Job, error) {
@@ -52,6 +53,8 @@ func jobForLiveBackup(
 		backupLocationName,
 		"--backup-location-namespace",
 		backuplocationNamespace,
+		"--backup-namespace",
+		backupNamespace,
 		"--repository",
 		toRepoName(pvcName, namespace),
 		"--source-path-glob",

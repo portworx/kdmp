@@ -21,6 +21,7 @@ import (
 const (
 	// SkipResourceAnnotation skipping kopia secret to be backed up
 	SkipResourceAnnotation = "stork.libopenstorage.org/skip-resource"
+	backupJobPrefix        = "backup"
 )
 
 // Driver is a resticbackup implementation of the data export interface.
@@ -49,7 +50,7 @@ func (d Driver) StartJob(opts ...drivers.JobOption) (id string, err error) {
 	}
 	// DataExportName will be unique name when also generated from stork
 	// if there are multiple backups being triggered
-	jobName := toJobName(o.DataExportName, o.SourcePVCName)
+	jobName := toJobName(o.DataExportName)
 	logrus.Debugf("backup jobname: %s", jobName)
 	job, err := buildJob(jobName, o)
 	if err != nil {
@@ -139,7 +140,8 @@ func jobFor(
 	pvcName,
 	credSecretName,
 	backuplocationName,
-	backuplocationNamespace string,
+	backuplocationNamespace,
+	backupNamespace string,
 	resources corev1.ResourceRequirements,
 	labels map[string]string) (*batchv1.Job, error) {
 	backupName := jobName
@@ -159,6 +161,8 @@ func jobFor(
 		backuplocationName,
 		"--backup-location-namespace",
 		backuplocationNamespace,
+		"--backup-namespace",
+		backupNamespace,
 		"--source-path",
 		"/data",
 	}, " ")
@@ -227,8 +231,8 @@ func jobFor(
 	}, nil
 }
 
-func toJobName(dataExportName, pvcName string) string {
-	return fmt.Sprintf("%s-%s", dataExportName, pvcName)
+func toJobName(dataExportName string) string {
+	return fmt.Sprintf("%s-%s", backupJobPrefix, dataExportName)
 }
 
 func toRepoName(pvcName, pvcNamespace string) string {
@@ -272,6 +276,7 @@ func buildJob(jobName string, o drivers.JobOpts) (*batchv1.Job, error) {
 			utils.FrameCredSecretName(o.DataExportName, o.SourcePVCName),
 			o.BackupLocationName,
 			o.BackupLocationNamespace,
+			o.Namespace,
 			pods[0],
 			resources,
 			o.Labels,
@@ -285,6 +290,7 @@ func buildJob(jobName string, o drivers.JobOpts) (*batchv1.Job, error) {
 		utils.FrameCredSecretName(o.DataExportName, o.SourcePVCName),
 		o.BackupLocationName,
 		o.BackupLocationNamespace,
+		o.Namespace,
 		resources,
 		o.Labels,
 	)
