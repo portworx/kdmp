@@ -29,6 +29,10 @@ const (
 	latestSnapshots       = "2147483647"
 )
 
+var (
+	bkpNamespace string
+)
+
 func newBackupCommand() *cobra.Command {
 	var (
 		sourcePath     string
@@ -47,7 +51,7 @@ func newBackupCommand() *cobra.Command {
 			executor.HandleErr(runBackup(srcPath))
 		},
 	}
-	backupCommand.Flags().StringVarP(&namespace, "backup-location-namespace", "n", "", "Namespace for backup command")
+	backupCommand.Flags().StringVarP(&bkpNamespace, "backup-namespace", "n", "", "Namespace for backup command")
 	backupCommand.Flags().StringVar(&sourcePath, "source-path", "", "Source for kopia backup")
 	backupCommand.Flags().StringVar(&sourcePathGlob, "source-path-glob", "", "The regexp should match only one path that will be used for backup")
 	backupCommand.Flags().StringVar(&volumeBackupName, "volume-backup-name", "", "Provided VolumeBackup CRD will be updated with the latest backup progress details")
@@ -70,9 +74,10 @@ func runBackup(sourcePath string) error {
 	if volumeBackupName != "" {
 		if err := executor.CreateVolumeBackup(
 			volumeBackupName,
-			namespace,
+			bkpNamespace,
 			repoName,
 			backupLocationName,
+			backupLocationNamespace,
 		); err != nil {
 			logrus.Errorf("%s: %v", fn, err)
 			return err
@@ -82,7 +87,7 @@ func runBackup(sourcePath string) error {
 		if statusErr := executor.WriteVolumeBackupStatus(
 			&executor.Status{LastKnownError: rErr},
 			volumeBackupName,
-			namespace,
+			bkpNamespace,
 		); statusErr != nil {
 			return statusErr
 		}
@@ -189,7 +194,7 @@ func runKopiaCreateRepo(repository *executor.Repository) error {
 				if err = executor.WriteVolumeBackupStatus(
 					status,
 					volumeBackupName,
-					namespace,
+					bkpNamespace,
 				); err != nil {
 					errMsg := fmt.Sprintf("failed to write a VolumeBackup status: %v", err)
 					logrus.Errorf("%v", errMsg)
@@ -203,7 +208,7 @@ func runKopiaCreateRepo(repository *executor.Repository) error {
 		if err = executor.WriteVolumeBackupStatus(
 			status,
 			volumeBackupName,
-			namespace,
+			bkpNamespace,
 		); err != nil {
 			errMsg := fmt.Sprintf("failed to write a VolumeBackup status: %v", err)
 			logrus.Errorf("%v", errMsg)
@@ -254,7 +259,7 @@ func runKopiaBackup(repository *executor.Repository, sourcePath string) error {
 			if err = executor.WriteVolumeBackupStatus(
 				status,
 				volumeBackupName,
-				namespace,
+				bkpNamespace,
 			); err != nil {
 				errMsg := fmt.Sprintf("failed to write a VolumeBackup status: %v", err)
 				logrus.Errorf("%v", errMsg)
@@ -266,7 +271,7 @@ func runKopiaBackup(repository *executor.Repository, sourcePath string) error {
 		if err = executor.WriteVolumeBackupStatus(
 			status,
 			volumeBackupName,
-			namespace,
+			bkpNamespace,
 		); err != nil {
 			errMsg := fmt.Sprintf("failed to write a VolumeBackup status: %v", err)
 			logrus.Errorf("%v", errMsg)
@@ -319,7 +324,7 @@ func runKopiaRepositoryConnect(repository *executor.Repository) error {
 			if err = executor.WriteVolumeBackupStatus(
 				status,
 				volumeBackupName,
-				namespace,
+				bkpNamespace,
 			); err != nil {
 				errMsg := fmt.Sprintf("failed to write a VolumeBackup status: %v", err)
 				logrus.Errorf("%v", errMsg)
@@ -367,7 +372,7 @@ func setGlobalPolicy() error {
 			if err = executor.WriteVolumeBackupStatus(
 				status,
 				volumeBackupName,
-				namespace,
+				bkpNamespace,
 			); err != nil {
 				errMsg := fmt.Sprintf("failed to write a VolumeBackup status: %v", err)
 				logrus.Errorf("%v", errMsg)

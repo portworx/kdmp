@@ -62,6 +62,7 @@ func runBackup(sourcePath string) error {
 			namespace,
 			repo.Name,
 			backupLocationName,
+			namespace,
 		); err != nil {
 			return err
 		}

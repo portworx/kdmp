@@ -20,6 +20,10 @@ import (
 // Driver is a kopiarestore implementation of the data export interface.
 type Driver struct{}
 
+const (
+	restoreJobPrefix = "restore"
+)
+
 // Name returns a name of the driver.
 func (d Driver) Name() string {
 	return drivers.KopiaRestore
@@ -45,7 +49,7 @@ func (d Driver) StartJob(opts ...drivers.JobOption) (id string, err error) {
 		return "", err
 	}
 
-	jobName := toJobName(o.DataExportName, o.DestinationPVCName)
+	jobName := toJobName(o.DataExportName)
 	job, err := jobFor(
 		jobName,
 		o.Namespace,
@@ -226,8 +230,8 @@ func jobFor(
 	}, nil
 }
 
-func toJobName(dataExportName, pvcName string) string {
-	return fmt.Sprintf("%s-%s", dataExportName, pvcName)
+func toJobName(dataExportName string) string {
+	return fmt.Sprintf("%s-%s", restoreJobPrefix, dataExportName)
 }
 
 func addJobLabels(labels map[string]string) map[string]string {

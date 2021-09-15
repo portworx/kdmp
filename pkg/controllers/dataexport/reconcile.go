@@ -123,10 +123,12 @@ func (c *Controller) sync(ctx context.Context, in *kdmpapi.DataExport) (bool, er
 		logrus.Debugf("drivername: %v", driverName)
 		if driverName == drivers.KopiaBackup {
 			// This will create a unique secret per PVC being backed up
+			// Create secret in source ns because in case of multi ns backup
+			// BL CR is created in kube-system ns
 			err = CreateCredentialsSecret(
 				utils.FrameCredSecretName(dataExport.Name, dataExport.Spec.Source.Name),
 				dataExport.Spec.Destination.Name,
-				dataExport.Spec.Destination.Namespace,
+				dataExport.Spec.Source.Namespace,
 			)
 			if err != nil {
 				msg := fmt.Sprintf("failed to create cloud credential secret during kopia backup: %v", err)
@@ -146,10 +148,11 @@ func (c *Controller) sync(ctx context.Context, in *kdmpapi.DataExport) (bool, er
 				return false, c.updateStatus(dataExport, kdmpapi.DataExportStatusFailed, msg)
 			}
 			// This will create a unique secret per PVC being restored
+			// For restore create the secret in the ns where PVC is referenced
 			err = CreateCredentialsSecret(
 				utils.FrameCredSecretName(dataExport.Name, dataExport.Spec.Destination.Name),
 				vb.Spec.BackupLocation.Name,
-				vb.Spec.BackupLocation.Namespace,
+				dataExport.Spec.Destination.Namespace,
 			)
 			if err != nil {
 				msg := fmt.Sprintf("failed to create cloud credential secret during kopia restore: %v", err)
@@ -197,6 +200,27 @@ func (c *Controller) sync(ctx context.Context, in *kdmpapi.DataExport) (bool, er
 	case kdmpapi.DataExportStageFinal:
 		if dataExport.Status.Status == kdmpapi.DataExportStatusSuccessful {
 			return false, nil
+		}
+		ns, name, err := utils.ParseJobID(dataExport.Status.TransferID)
+		if err != nil {
+			errMsg := fmt.Sprintf("failed to parse job ID %v from DataExport CR: %v: %v",
+				dataExport.Status.TransferID, dataExport.Name, err)
+			return false, c.updateStatus(dataExport, kdmpapi.DataExportStatusFailed, errMsg)
+		}
+		volumeBackupCR, err := kdmpopts.Instance().GetVolumeBackup(context.Background(),
+			name, ns)
+		if err != nil {
+			errMsg := fmt.Sprintf("failed to read VolumeBackup CR %v: %v", name, err)
+			return false, c.updateStatus(dataExport, kdmpapi.DataExportStatusFailed, errMsg)
+		}
+		dataExport.Status.SnapshotID = volumeBackupCR.Status.SnapshotID
+		dataExport.Status.Size = volumeBackupCR.Status.TotalBytes
+
+		// Delete VolumeBackup CR created
+		err = kdmpopts.Instance().DeleteVolumeBackup(context.Background(), name, ns)
+		if err != nil {
+			errMsg := fmt.Sprintf("failed to delete VolumeBackup CR %v: %v", name, err)
+			return false, c.updateStatus(dataExport, kdmpapi.DataExportStatusFailed, errMsg)
 		}
 
 		if err := c.cleanUp(driver, snapshotter, dataExport); err != nil {
@@ -481,7 +505,7 @@ func startTransferJob(drv drivers.Interface, srcPVCName string, dataExport *kdmp
 		return drv.StartJob(
 			drivers.WithSourcePVC(srcPVCName),
 			drivers.WithDestinationPVC(dataExport.Spec.Destination.Name),
-			drivers.WithNamespace(dataExport.Spec.Destination.Namespace),
+			drivers.WithNamespace(dataExport.Spec.Source.Namespace),
 			drivers.WithVolumeBackupName(dataExport.Spec.Source.Name),
 			drivers.WithVolumeBackupNamespace(dataExport.Spec.Source.Namespace),
 			drivers.WithLabels(jobLabels(dataExport.GetName())),
@@ -489,7 +513,7 @@ func startTransferJob(drv drivers.Interface, srcPVCName string, dataExport *kdmp
 	case drivers.KopiaBackup:
 		return drv.StartJob(
 			drivers.WithSourcePVC(srcPVCName),
-			drivers.WithNamespace(dataExport.Spec.Destination.Namespace),
+			drivers.WithNamespace(dataExport.Spec.Source.Namespace),
 			drivers.WithBackupLocationName(dataExport.Spec.Destination.Name),
 			drivers.WithBackupLocationNamespace(dataExport.Spec.Destination.Namespace),
 			drivers.WithLabels(jobLabels(dataExport.GetName())),
@@ -501,6 +525,7 @@ func startTransferJob(drv drivers.Interface, srcPVCName string, dataExport *kdmp
 			drivers.WithNamespace(dataExport.Spec.Destination.Namespace),
 			drivers.WithVolumeBackupName(dataExport.Spec.Source.Name),
 			drivers.WithVolumeBackupNamespace(dataExport.Spec.Source.Namespace),
+			drivers.WithBackupLocationNamespace(dataExport.Spec.Source.Namespace),
 			drivers.WithLabels(jobLabels(dataExport.GetName())),
 			drivers.WithDataExportName(dataExport.GetName()),
 		)
