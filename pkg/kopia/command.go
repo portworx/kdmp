@@ -36,6 +36,8 @@ type Command struct {
 	Provider string
 	// SnapshotID snapshot ID
 	SnapshotID string
+	// MaintenanceOwner owner of maintenance command
+	MaintenanceOwner string
 }
 
 // Executor interface defines APIs for implementing a command wrapper
@@ -214,6 +216,48 @@ func (c *Command) DeleteCmd() *exec.Cmd {
 		c.Name, // delete command
 		c.SnapshotID,
 		"--delete",
+	}
+	argsSlice = append(argsSlice, c.Flags...)
+	// Get the cmd args
+	argsSlice = append(argsSlice, c.Args...)
+	cmd := exec.Command(baseCmd, argsSlice...)
+	if len(c.Env) > 0 {
+		cmd.Env = append(os.Environ(), c.Env...)
+	}
+	cmd.Dir = c.Dir
+
+	return cmd
+}
+
+// MaintenanceRunCmd returns os/exec.Cmd object for the kopia maintenance run Command
+func (c *Command) MaintenanceRunCmd() *exec.Cmd {
+	// Get all the flags
+	argsSlice := []string{
+		c.Name, // maintenance command
+		"run",
+		"--full",
+	}
+	argsSlice = append(argsSlice, c.Flags...)
+	// Get the cmd args
+	argsSlice = append(argsSlice, c.Args...)
+	cmd := exec.Command(baseCmd, argsSlice...)
+	if len(c.Env) > 0 {
+		cmd.Env = append(os.Environ(), c.Env...)
+	}
+	cmd.Dir = c.Dir
+
+	return cmd
+}
+
+// MaintenanceSetCmd returns os/exec.Cmd object for the kopia maintenance set Command
+func (c *Command) MaintenanceSetCmd() *exec.Cmd {
+	// Get all the flags
+
+	argsSlice := []string{
+		c.Name, // maintenance command
+		"set",
+		"--owner",
+		c.MaintenanceOwner,
 	}
 	argsSlice = append(argsSlice, c.Flags...)
 	// Get the cmd args
