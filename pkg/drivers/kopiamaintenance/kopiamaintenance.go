@@ -48,7 +48,7 @@ func (d Driver) StartJob(opts ...drivers.JobOption) (id string, err error) {
 		logrus.Infof("%s %v", fn, errMsg)
 		return "", fmt.Errorf(errMsg)
 	}
-	jobName := toJobName(o.BackupLocationName)
+	jobName := toJobName(o.JobName, o.BackupLocationName)
 	job, err := buildJob(jobName, o)
 	if err != nil {
 		errMsg := fmt.Sprintf("building maintenance job [%s] for backuplocation [%v] failed: %v", jobName, o.BackupLocationName, err)
@@ -196,7 +196,10 @@ func jobFor(
 	}, nil
 }
 
-func toJobName(backupLocation string) string {
+func toJobName(jobName, backupLocation string) string {
+	if jobName != "" {
+		return jobName
+	}
 	return fmt.Sprintf("%s-%s", kopiaMaintenanceJobPrefix, backupLocation)
 }
 

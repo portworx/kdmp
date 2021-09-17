@@ -21,7 +21,16 @@ type JobOpts struct {
 	SnapshotID              string
 	CredSecretName          string
 	CredSecretNamespace     string
+	JobName                 string
 	Labels                  map[string]string
+}
+
+// WithJobName is job parameter.
+func WithJobName(name string) JobOption {
+	return func(opts *JobOpts) error {
+		opts.JobName = strings.TrimSpace(name)
+		return nil
+	}
 }
 
 // WithSnapshotID is job parameter.

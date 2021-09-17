@@ -43,7 +43,7 @@ func (d Driver) StartJob(opts ...drivers.JobOption) (id string, err error) {
 		logrus.Infof("%s %v", fn, errMsg)
 		return "", fmt.Errorf(errMsg)
 	}
-	jobName := toJobName(o.SnapshotID)
+	jobName := toJobName(o.JobName, o.SnapshotID)
 	job, err := buildJob(jobName, o)
 	if err != nil {
 		errMsg := fmt.Sprintf("building backup snapshot delete job [%s] failed: %v", jobName, err)
@@ -197,7 +197,10 @@ func jobFor(
 	}, nil
 }
 
-func toJobName(snapshotID string) string {
+func toJobName(jobName, snapshotID string) string {
+	if jobName != "" {
+		return jobName
+	}
 	return fmt.Sprintf("%s-%s", kopiaDeleteJobPrefix, snapshotID)
 }
 
