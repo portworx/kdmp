@@ -977,6 +977,7 @@ github.com/pkg/profile v1.2.1/go.mod h1:hJw3o1OdXxsrSjjVksARp5W95eeEaEfptyVZyv6J
 github.com/pmezard/go-difflib v0.0.0-20151028094244-d8ed2627bdf0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
 github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=
 github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
+github.com/portworx/kdmp v0.4.1-0.20210912113917-9ab5ca03f9ea/go.mod h1:y3gC3scahxunrBOWT/FyVjPTworM8JLBeeGHTlA48KQ=
 github.com/portworx/kvdb v0.0.0-20190105022415-cccaa09abfc9/go.mod h1:Q8YyrNDvPp3DVF96BDcQuaC7fAYUCuUX+l58S7OnD2M=
 github.com/portworx/kvdb v0.0.0-20191223203141-f42097b1fcd8/go.mod h1:Q8YyrNDvPp3DVF96BDcQuaC7fAYUCuUX+l58S7OnD2M=
 github.com/portworx/kvdb v0.0.0-20200311180812-b2c72382d652/go.mod h1:Q8YyrNDvPp3DVF96BDcQuaC7fAYUCuUX+l58S7OnD2M=
@@ -990,6 +991,10 @@ github.com/portworx/sched-ops v0.20.4-openstorage-rc3.0.20210325150944-0b2c20233
 github.com/portworx/sched-ops v1.20.0-rc1/go.mod h1:nl2AP/W8sWmhmW7ScwNQrm5OCHiHjLYQ2NmO3TUjIhE=
 github.com/portworx/sched-ops v1.20.4-rc1.0.20210805192436-d51186f75dc4 h1:T8YXH0Rc/fZMWsTjIiGVB7ypuav7QuXRcV4Cfk3wLaE=
 github.com/portworx/sched-ops v1.20.4-rc1.0.20210805192436-d51186f75dc4/go.mod h1:+R+28pHhZ2Go7LquCo1+9ctpxwFGWak7zNcTFyXVh4k=
+github.com/portworx/sched-ops v1.20.4-rc1.0.20210916140658-c3e20379e273 h1:8wiv47KQtFG8I5gBrlq5id9joneyAecvY6mPe4w5Kws=
+github.com/portworx/sched-ops v1.20.4-rc1.0.20210916140658-c3e20379e273/go.mod h1:y0JUD76QnRTNWv4tE2z9jpRxIWNB4RcP3S2g7UpAEOk=
+github.com/portworx/sched-ops v1.20.4-rc1.0.20210916142241-b43071d02b7d h1:DlVHd5DQpH/nkIgmKCzttJGv5Aum9H0IZXSGkP8cD/o=
+github.com/portworx/sched-ops v1.20.4-rc1.0.20210916142241-b43071d02b7d/go.mod h1:y0JUD76QnRTNWv4tE2z9jpRxIWNB4RcP3S2g7UpAEOk=
 github.com/portworx/talisman v0.0.0-20191007232806-837747f38224/go.mod h1:OjpMH9Uh5o9ntVGktm4FbjLNwubJ3ITih2OfYrAeWtA=
 github.com/portworx/talisman v0.0.0-20210302012732-8af4564777f7/go.mod h1:e8a6uFpSbOlRpZQlW9aXYogC+GWAo065G0RL9hDkD4Q=
 github.com/portworx/torpedo v0.20.4-rc1.0.20210325154352-eb81b0cdd145/go.mod h1:CkLAs/ojTzSu3SPyeDxc3qhsbRU78H5Xz1qJlj1Ap1U=
