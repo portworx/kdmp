@@ -10,25 +10,39 @@ type JobOption func(opts *JobOpts) error
 
 // JobOpts defines all job parameters.
 type JobOpts struct {
-	SourcePVCName           string
-	DestinationPVCName      string
-	Namespace               string
-	BackupLocationName      string
-	BackupLocationNamespace string
-	VolumeBackupName        string
-	VolumeBackupNamespace   string
-	DataExportName          string
-	SnapshotID              string
-	CredSecretName          string
-	CredSecretNamespace     string
-	JobName                 string
-	Labels                  map[string]string
+	SourcePVCName              string
+	DestinationPVCName         string
+	Namespace                  string
+	BackupLocationName         string
+	BackupLocationNamespace    string
+	VolumeBackupName           string
+	VolumeBackupNamespace      string
+	DataExportName             string
+	SnapshotID                 string
+	CredSecretName             string
+	CredSecretNamespace        string
+	MaintenanceStatusName      string
+	MaintenanceStatusNamespace string
+	JobName                    string
+	ServiceAccountName         string
+	Labels                     map[string]string
 }
 
 // WithJobName is job parameter.
 func WithJobName(name string) JobOption {
 	return func(opts *JobOpts) error {
 		opts.JobName = strings.TrimSpace(name)
+		return nil
+	}
+}
+
+// WithServiceAccountName is job parameter.
+func WithServiceAccountName(serviceAccountName string) JobOption {
+	return func(opts *JobOpts) error {
+		if strings.TrimSpace(serviceAccountName) == "" {
+			return fmt.Errorf("serviceAccountname should be set")
+		}
+		opts.ServiceAccountName = strings.TrimSpace(serviceAccountName)
 		return nil
 	}
 }
@@ -40,6 +54,28 @@ func WithSnapshotID(snapshotID string) JobOption {
 			return fmt.Errorf("snapshotID should be set")
 		}
 		opts.SnapshotID = strings.TrimSpace(snapshotID)
+		return nil
+	}
+}
+
+// WithMaintenanceStatusName is job parameter.
+func WithMaintenanceStatusName(name string) JobOption {
+	return func(opts *JobOpts) error {
+		if strings.TrimSpace(name) == "" {
+			return fmt.Errorf("maintenance status CR name should be set")
+		}
+		opts.MaintenanceStatusName = strings.TrimSpace(name)
+		return nil
+	}
+}
+
+// WithMaintenanceStatusNamespace is job parameter.
+func WithMaintenanceStatusNamespace(namespace string) JobOption {
+	return func(opts *JobOpts) error {
+		if strings.TrimSpace(namespace) == "" {
+			return fmt.Errorf("maintenance status CR namepace should be set")
+		}
+		opts.MaintenanceStatusNamespace = strings.TrimSpace(namespace)
 		return nil
 	}
 }

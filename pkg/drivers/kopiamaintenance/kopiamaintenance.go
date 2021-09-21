@@ -119,7 +119,10 @@ func (d Driver) validate(o drivers.JobOpts) error {
 func jobFor(
 	jobName,
 	credSecretName,
-	credSecretNamespace string,
+	credSecretNamespace,
+	maintenaceStatusName,
+	maintenacneStatusNamespace,
+	serviceAccountName string,
 	resources corev1.ResourceRequirements,
 	labels map[string]string) (*batchv1beta1.CronJob, error) {
 
@@ -132,6 +135,10 @@ func jobFor(
 		credSecretName,
 		"--cred-secret-namespace",
 		credSecretNamespace,
+		"--maintenance-status-name",
+		maintenaceStatusName,
+		"--maintenance-status-namespace",
+		maintenacneStatusNamespace,
 	}, " ")
 
 	return &batchv1beta1.CronJob{
@@ -154,8 +161,9 @@ func jobFor(
 							Labels: labels,
 						},
 						Spec: corev1.PodSpec{
-							RestartPolicy:    corev1.RestartPolicyOnFailure,
-							ImagePullSecrets: utils.ToImagePullSecret(utils.KopiaExecutorImageSecret()),
+							RestartPolicy:      corev1.RestartPolicyOnFailure,
+							ServiceAccountName: serviceAccountName,
+							ImagePullSecrets:   utils.ToImagePullSecret(utils.KopiaExecutorImageSecret()),
 							Containers: []corev1.Container{
 								{
 									Name:  "kopiaexecutor",
@@ -222,6 +230,9 @@ func buildJob(jobName string, o drivers.JobOpts) (*batchv1beta1.CronJob, error) 
 		jobName,
 		o.CredSecretName,
 		o.CredSecretNamespace,
+		o.MaintenanceStatusName,
+		o.MaintenanceStatusNamespace,
+		o.ServiceAccountName,
 		resources,
 		o.Labels,
 	)
