@@ -12,6 +12,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"gocloud.dev/blob"
+	_ "github.com/portworx/sched-ops/k8s/kdmp"
 )
 
 func newMaintenanceCommand() *cobra.Command {
