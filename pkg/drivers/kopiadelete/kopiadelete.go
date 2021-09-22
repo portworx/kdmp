@@ -122,8 +122,9 @@ func (d Driver) validate(o drivers.JobOpts) error {
 
 func jobFor(
 	jobName,
-	namespace,
+	jobNamespace,
 	pvcName,
+	pvcNamespace,
 	credSecretName,
 	credSecretNamespace,
 	snapshotID string,
@@ -136,7 +137,7 @@ func jobFor(
 		"/kopiaexecutor",
 		"delete",
 		"--repository",
-		toRepoName(pvcName, namespace),
+		toRepoName(pvcName, pvcNamespace),
 		"--cred-secret-name",
 		credSecretName,
 		"--cred-secret-namespace",
@@ -148,7 +149,7 @@ func jobFor(
 	return &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      jobName,
-			Namespace: namespace,
+			Namespace: jobNamespace,
 			Labels:    labels,
 		},
 		Spec: batchv1.JobSpec{
@@ -225,7 +226,8 @@ func buildJob(jobName string, o drivers.JobOpts) (*batchv1.Job, error) {
 
 	return jobFor(
 		jobName,
-		o.Namespace,
+		o.JobNamespace,
+		o.SourcePVCNamespace,
 		o.SourcePVCName,
 		o.CredSecretName,
 		o.CredSecretNamespace,

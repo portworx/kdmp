@@ -118,6 +118,7 @@ func (d Driver) validate(o drivers.JobOpts) error {
 
 func jobFor(
 	jobName,
+	jobNamespace,
 	credSecretName,
 	credSecretNamespace,
 	maintenaceStatusName,
@@ -144,7 +145,7 @@ func jobFor(
 	return &batchv1beta1.CronJob{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      jobName,
-			Namespace: credSecretNamespace,
+			Namespace: jobNamespace,
 			Labels:    labels,
 		},
 		Spec: batchv1beta1.CronJobSpec{
@@ -152,7 +153,7 @@ func jobFor(
 			JobTemplate: batchv1beta1.JobTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      jobName,
-					Namespace: credSecretNamespace,
+					Namespace: jobNamespace,
 					Labels:    labels,
 				},
 				Spec: batchv1.JobSpec{
@@ -228,6 +229,7 @@ func buildJob(jobName string, o drivers.JobOpts) (*batchv1beta1.CronJob, error) 
 
 	return jobFor(
 		jobName,
+		o.JobNamespace,
 		o.CredSecretName,
 		o.CredSecretNamespace,
 		o.MaintenanceStatusName,
