@@ -45,5 +45,5 @@ func JobCanRun(jobType string) bool {
 	jobsList := getJobsByType(jobType)
 	activeJobsCount := activeJobs(jobsList)
 	jobLimitCount := jobLimitByType(jobType)
-	return jobLimitCount >= activeJobsCount
+	return jobLimitCount > activeJobsCount
 }
