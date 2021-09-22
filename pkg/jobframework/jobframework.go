@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	DefaultNamespace = "kube-system"
+	defaultNamespace = "kube-system"
 )
 
 // getJobsByType takes the jobType as a param and returns the list of jobs matching the label
@@ -19,7 +19,7 @@ func getJobsByType(jobType string) *v1.JobList {
 	options := metav1.ListOptions{
 		LabelSelector: labelSelector,
 	}
-	allJobs, _ := batch.Instance().ListAllJobs(DefaultNamespace, options)
+	allJobs, _ := batch.Instance().ListAllJobs(defaultNamespace, options)
 	return allJobs
 }
 
