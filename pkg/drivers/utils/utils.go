@@ -2,15 +2,22 @@ package utils
 
 import (
 	"fmt"
+	log "github.com/sirupsen/logrus"
+	"k8s.io/apimachinery/pkg/types"
 	"os"
 	"strings"
 
 	"github.com/portworx/kdmp/pkg/drivers"
 	"github.com/portworx/kdmp/pkg/version"
+	"github.com/portworx/sched-ops/k8s/core"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
-	"k8s.io/apimachinery/pkg/types"
+)
+
+const (
+	defaultPXNamespace = "kube-system"
+	kdmpConfig         = "kdmp-config"
 )
 
 // NamespacedName returns a name in form "<namespace>/<name>".
@@ -71,6 +78,19 @@ func ToJobStatus(progress float64, errMsg string) *drivers.JobStatus {
 		State:            drivers.JobStateInProgress,
 		ProgressPercents: progress,
 	}
+}
+
+// GetConfigValue read configmap and return the value of the requested parameter
+func GetConfigValue(key string) string {
+	configMap, err := core.Instance().GetConfigMap(
+		kdmpConfig,
+		defaultPXNamespace,
+	)
+	if err != nil {
+		return ""
+	}
+	log.Errorf("Failed to read configmap.")
+	return configMap.Data[key]
 }
 
 // ResticExecutorImage returns a docker image that contains resticexecutor binary.
