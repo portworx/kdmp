@@ -1,7 +1,6 @@
 package jobframework
 
 import (
-	"fmt"
 	"github.com/portworx/kdmp/pkg/drivers/utils"
 	"github.com/portworx/sched-ops/k8s/batch"
 	"github.com/portworx/sched-ops/k8s/core"
@@ -14,7 +13,7 @@ import (
 
 // getJobsByType takes the jobType as a param and returns the list of jobs matching the label in all namespaces
 func getJobsByType(jobType string) []*v1.JobList {
-	labelSelector := fmt.Sprintf("jobtype=%s", jobType)
+	labelSelector := "jobtype="+jobType
 	options := metav1.ListOptions{
 		LabelSelector: labelSelector,
 	}
