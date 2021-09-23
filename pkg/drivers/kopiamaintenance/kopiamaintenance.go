@@ -118,8 +118,12 @@ func (d Driver) validate(o drivers.JobOpts) error {
 
 func jobFor(
 	jobName,
+	jobNamespace,
 	credSecretName,
-	credSecretNamespace string,
+	credSecretNamespace,
+	maintenaceStatusName,
+	maintenacneStatusNamespace,
+	serviceAccountName string,
 	resources corev1.ResourceRequirements,
 	labels map[string]string) (*batchv1beta1.CronJob, error) {
 
@@ -132,12 +136,16 @@ func jobFor(
 		credSecretName,
 		"--cred-secret-namespace",
 		credSecretNamespace,
+		"--maintenance-status-name",
+		maintenaceStatusName,
+		"--maintenance-status-namespace",
+		maintenacneStatusNamespace,
 	}, " ")
 
 	return &batchv1beta1.CronJob{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      jobName,
-			Namespace: credSecretNamespace,
+			Namespace: jobNamespace,
 			Labels:    labels,
 		},
 		Spec: batchv1beta1.CronJobSpec{
@@ -145,7 +153,7 @@ func jobFor(
 			JobTemplate: batchv1beta1.JobTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      jobName,
-					Namespace: credSecretNamespace,
+					Namespace: jobNamespace,
 					Labels:    labels,
 				},
 				Spec: batchv1.JobSpec{
@@ -154,8 +162,9 @@ func jobFor(
 							Labels: labels,
 						},
 						Spec: corev1.PodSpec{
-							RestartPolicy:    corev1.RestartPolicyOnFailure,
-							ImagePullSecrets: utils.ToImagePullSecret(utils.KopiaExecutorImageSecret()),
+							RestartPolicy:      corev1.RestartPolicyOnFailure,
+							ServiceAccountName: serviceAccountName,
+							ImagePullSecrets:   utils.ToImagePullSecret(utils.KopiaExecutorImageSecret()),
 							Containers: []corev1.Container{
 								{
 									Name:  "kopiaexecutor",
@@ -220,8 +229,12 @@ func buildJob(jobName string, o drivers.JobOpts) (*batchv1beta1.CronJob, error) 
 
 	return jobFor(
 		jobName,
+		o.JobNamespace,
 		o.CredSecretName,
 		o.CredSecretNamespace,
+		o.MaintenanceStatusName,
+		o.MaintenanceStatusNamespace,
+		o.ServiceAccountName,
 		resources,
 		o.Labels,
 	)
