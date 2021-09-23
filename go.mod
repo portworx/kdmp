@@ -4,8 +4,9 @@ go 1.15
 
 require (
 	github.com/aquilax/truncate v1.0.0
+	github.com/kubernetes-csi/external-snapshotter/client/v4 v4.0.0
 	github.com/kubernetes-incubator/external-storage v0.20.4-openstorage-rc2
-	github.com/libopenstorage/stork v1.4.1-0.20210903185636-5a1f8a4142bf
+	github.com/libopenstorage/stork v1.4.1-0.20210925152742-aaa75e7c457f
 	github.com/portworx/pxc v0.33.0
 	github.com/portworx/sched-ops v1.20.4-rc1.0.20210929114621-9001768f8eb7
 	github.com/sirupsen/logrus v1.8.1
