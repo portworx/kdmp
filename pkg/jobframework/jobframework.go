@@ -4,6 +4,7 @@ import (
 	"github.com/portworx/kdmp/pkg/drivers/utils"
 	"github.com/portworx/sched-ops/k8s/batch"
 	"github.com/portworx/sched-ops/k8s/core"
+	log "github.com/sirupsen/logrus"
 	v1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -19,7 +20,10 @@ func getJobsByType(jobType string) []*v1.JobList {
 	getAllNamespaces := getAllNamespaces()
 	var allJobList []*v1.JobList
 	for _, item := range getAllNamespaces.Items {
-		allJobs, _ := batch.Instance().ListAllJobs(item.Name, options)
+		allJobs, err := batch.Instance().ListAllJobs(item.Name, options)
+		if err != nil {
+			log.Errorf("failed to list all jobs %s", err)
+		}
 		allJobList = append(allJobList, allJobs)
 	}
 	return allJobList
@@ -27,7 +31,10 @@ func getJobsByType(jobType string) []*v1.JobList {
 
 func getAllNamespaces() *corev1.NamespaceList {
 	labelSelector := map[string]string{}
-	allNameSpaces, _ := core.Instance().ListNamespaces(labelSelector)
+	allNameSpaces, err := core.Instance().ListNamespaces(labelSelector)
+	if err != nil {
+		log.Errorf("failed to list all namespace %s", err)
+	}
 	return allNameSpaces
 }
 
@@ -49,6 +56,7 @@ func jobLimitByType(jobType string) int {
 	jobLimit, err := strconv.Atoi(utils.GetConfigValue(jobType))
 	// if its not found in configmap the strconv will through error
 	if err != nil {
+		log.Errorf("limit for the job not found %s", err)
 		return 10 // ToDo Decide on the default value if not found in the config map
 	}
 	return jobLimit

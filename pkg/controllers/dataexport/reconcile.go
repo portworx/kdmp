@@ -486,7 +486,7 @@ func startTransferJob(drv drivers.Interface, srcPVCName string, dataExport *kdmp
 		return "", fmt.Errorf("data transfer driver is not set")
 	}
 
-	if jobframework.JobCanRun(drv.Name()) == false {
+	if !jobframework.JobCanRun(drv.Name()) {
 		return "", fmt.Errorf("not enough resource for job")
 	}
 	switch drv.Name() {
