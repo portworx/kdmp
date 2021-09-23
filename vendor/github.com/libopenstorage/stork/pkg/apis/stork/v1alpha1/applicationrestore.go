@@ -30,6 +30,7 @@ type ApplicationRestoreSpec struct {
 	ReplacePolicy                ApplicationRestoreReplacePolicyType `json:"replacePolicy"`
 	IncludeOptionalResourceTypes []string                            `json:"includeOptionalResourceTypes"`
 	IncludeResources             []ObjectInfo                        `json:"includeResources"`
+	StorageClassMapping          map[string]string                   `json:"storageClassMapping"`
 }
 
 // ApplicationRestoreReplacePolicyType is the replace policy for the application restore
@@ -77,6 +78,7 @@ type ApplicationRestoreVolumeInfo struct {
 	Status                ApplicationRestoreStatusType `json:"status"`
 	Reason                string                       `json:"reason"`
 	TotalSize             uint64                       `json:"totalSize"`
+	Options               map[string]string            `json:"options"`
 }
 
 // ApplicationRestoreStatusType is the status of the application restore

@@ -3,8 +3,9 @@ module github.com/portworx/kdmp
 go 1.15
 
 require (
+	github.com/kubernetes-csi/external-snapshotter/client/v4 v4.0.0
 	github.com/kubernetes-incubator/external-storage v0.20.4-openstorage-rc2
-	github.com/libopenstorage/stork v1.4.1-0.20210903185636-5a1f8a4142bf
+	github.com/libopenstorage/stork v1.4.1-0.20210923201245-97089f8df635
 	github.com/portworx/pxc v0.33.0
 	github.com/portworx/sched-ops v1.20.4-rc1.0.20210921050234-561b707a5d96
 	github.com/sirupsen/logrus v1.8.1
