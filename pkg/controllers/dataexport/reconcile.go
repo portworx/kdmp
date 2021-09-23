@@ -482,13 +482,13 @@ func (c *Controller) checkResticRestore(de *kdmpapi.DataExport) error {
 }
 
 func startTransferJob(drv drivers.Interface, srcPVCName string, dataExport *kdmpapi.DataExport) (string, error) {
-	if jobframework.JobCanRun(drv.Name()) == false {
-		return "", fmt.Errorf("not enough resource for job")
-	}
 	if drv == nil {
 		return "", fmt.Errorf("data transfer driver is not set")
 	}
 
+	if jobframework.JobCanRun(drv.Name()) == false {
+		return "", fmt.Errorf("not enough resource for job")
+	}
 	switch drv.Name() {
 	case drivers.Rsync:
 		return drv.StartJob(

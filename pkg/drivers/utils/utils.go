@@ -87,9 +87,9 @@ func GetConfigValue(key string) string {
 		defaultPXNamespace,
 	)
 	if err != nil {
+		log.Errorf("Failed to read configmap.")
 		return ""
 	}
-	log.Errorf("Failed to read configmap.")
 	return configMap.Data[key]
 }
 
