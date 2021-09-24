@@ -54,7 +54,6 @@ func newBackupCommand() *cobra.Command {
 	backupCommand.Flags().StringVarP(&bkpNamespace, "backup-namespace", "n", "", "Namespace for backup command")
 	backupCommand.Flags().StringVar(&sourcePath, "source-path", "", "Source for kopia backup")
 	backupCommand.Flags().StringVar(&sourcePathGlob, "source-path-glob", "", "The regexp should match only one path that will be used for backup")
-	backupCommand.Flags().StringVar(&volumeBackupName, "volume-backup-name", "", "Provided VolumeBackup CRD will be updated with the latest backup progress details")
 	return backupCommand
 }
 

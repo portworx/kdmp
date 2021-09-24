@@ -28,6 +28,7 @@ func NewCommand() *cobra.Command {
 	cmds.PersistentFlags().StringVarP(&credentials, "credentials", "c", "", "Secret holding repository credentials")
 	cmds.PersistentFlags().StringVar(&backupLocationName, "backup-location", "", "Name of the BackupLocation object, used for authentication")
 	cmds.PersistentFlags().StringVar(&backupLocationNamespace, "backup-location-namespace", "", "Namespace of BackupLocation object, used for authentication")
+	cmds.PersistentFlags().StringVar(&volumeBackupName, "volume-backup-name", "", "Provided VolumeBackup CRD will be updated with the latest backup progress details")
 
 	cmds.AddCommand(
 		newBackupCommand(),
