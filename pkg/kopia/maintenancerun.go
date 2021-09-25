@@ -49,7 +49,7 @@ func (mr *maintenanceRunExecutor) Run() error {
 	go func() {
 		err := mr.execCmd.Wait()
 		if err != nil {
-			mr.lastError = fmt.Errorf("failed to run the repo maintenance command: %v", err)
+			mr.lastError = fmt.Errorf("failed to run the repo maintenance command: %v", mr.execCmd.Stderr)
 			logrus.Infof("stdout: %v", mr.execCmd.Stdout)
 			logrus.Infof("Stderr: %v", mr.execCmd.Stderr)
 		}
