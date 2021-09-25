@@ -20,6 +20,8 @@ type Interface interface {
 	DataExports() DataExportInformer
 	// VolumeBackups returns a VolumeBackupInformer.
 	VolumeBackups() VolumeBackupInformer
+	// VolumeBackupDeletes returns a VolumeBackupDeleteInformer.
+	VolumeBackupDeletes() VolumeBackupDeleteInformer
 }
 
 type version struct {
@@ -46,4 +48,9 @@ func (v *version) DataExports() DataExportInformer {
 // VolumeBackups returns a VolumeBackupInformer.
 func (v *version) VolumeBackups() VolumeBackupInformer {
 	return &volumeBackupInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
+}
+
+// VolumeBackupDeletes returns a VolumeBackupDeleteInformer.
+func (v *version) VolumeBackupDeletes() VolumeBackupDeleteInformer {
+	return &volumeBackupDeleteInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }

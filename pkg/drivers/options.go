@@ -18,6 +18,8 @@ type JobOpts struct {
 	BackupLocationNamespace    string
 	VolumeBackupName           string
 	VolumeBackupNamespace      string
+	VolumeDeleteName           string
+	VolumeDeleteNamespace      string
 	DataExportName             string
 	SnapshotID                 string
 	CredSecretName             string
@@ -184,6 +186,28 @@ func WithVolumeBackupName(name string) JobOption {
 func WithVolumeBackupNamespace(ns string) JobOption {
 	return func(opts *JobOpts) error {
 		opts.VolumeBackupNamespace = strings.TrimSpace(ns)
+		return nil
+	}
+}
+
+// WithVolumeDeleteName is job parameter.
+func WithVolumeDeleteName(name string) JobOption {
+	return func(opts *JobOpts) error {
+		if strings.TrimSpace(name) == "" {
+			return fmt.Errorf("volumeDelete name should be set")
+		}
+		opts.VolumeDeleteName = strings.TrimSpace(name)
+		return nil
+	}
+}
+
+// WithVolumeDeleteNamespace is job parameter.
+func WithVolumeDeleteNamespace(ns string) JobOption {
+	return func(opts *JobOpts) error {
+		if strings.TrimSpace(ns) == "" {
+			return fmt.Errorf("volumeDelete namespace should be set")
+		}
+		opts.VolumeDeleteNamespace = strings.TrimSpace(ns)
 		return nil
 	}
 }

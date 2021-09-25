@@ -12,9 +12,11 @@ import (
 
 func newDeleteCommand() *cobra.Command {
 	var (
-		snapshotID          string
-		credSecretName      string
-		credSecretNamespace string
+		snapshotID            string
+		credSecretName        string
+		credSecretNamespace   string
+		volumeDeleteName      string
+		volumeDeleteNamespace string
 	)
 	deleteCommand := &cobra.Command{
 		Use:   "delete",
@@ -26,6 +28,8 @@ func newDeleteCommand() *cobra.Command {
 	deleteCommand.Flags().StringVar(&snapshotID, "snapshot-id", "", "snapshot ID for kopia backup snapshot that need to be deleted")
 	deleteCommand.Flags().StringVar(&credSecretName, "cred-secret-name", "", " cred secret name for kopia backup snapshot that need to be deleted")
 	deleteCommand.Flags().StringVar(&credSecretNamespace, "cred-secret-namespace", "", "cred secret namespace for kopia backup snapshot that need to be deleted")
+	deleteCommand.Flags().StringVar(&volumeDeleteName, "volume-delete-name", "", "volumedelete CR name for kopia backup snapshot that need to be deleted")
+	deleteCommand.Flags().StringVar(&volumeDeleteNamespace, "volume-delete-namespace", "", "volumedelete CR namespace for kopia backup snapshot that need to be deleted")
 	return deleteCommand
 }
 
