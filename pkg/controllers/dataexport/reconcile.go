@@ -24,6 +24,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/utils/pointer"
+	_ "github.com/aquilax/truncate"
 )
 
 // Data export label names/keys.
