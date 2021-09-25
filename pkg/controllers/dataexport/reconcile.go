@@ -6,6 +6,7 @@ import (
 	"os"
 	"reflect"
 
+	"github.com/aquilax/truncate"
 	storkapi "github.com/libopenstorage/stork/pkg/apis/stork/v1alpha1"
 	"github.com/libopenstorage/stork/pkg/controllers"
 	kdmpapi "github.com/portworx/kdmp/pkg/apis/kdmp/v1alpha1"
@@ -24,7 +25,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/utils/pointer"
-	_ "github.com/aquilax/truncate"
 )
 
 // Data export label names/keys.
@@ -614,17 +614,25 @@ func jobLabels(dataExport *kdmpapi.DataExport) map[string]string {
 	if len(dataExport.GetName()) <= labelNamelimit {
 		labels[LabelController] = dataExport.GetName()
 		labels[LabelControllerName] = dataExport.GetName()
+	} else {
+		// truncating it to length of labelNamelimit and store it.
+		labels[LabelController] = truncate.Truncate(dataExport.GetName(), labelNamelimit, "", truncate.PositionEnd)
+		labels[LabelControllerName] = truncate.Truncate(dataExport.GetName(), labelNamelimit, "", truncate.PositionEnd)
 	}
 
 	if val, ok := dataExport.Labels[backupCRNameKey]; ok {
 		if len(val) <= labelNamelimit {
 			labels[backupCRNameKey] = val
+		} else {
+			labels[backupCRNameKey] = truncate.Truncate(val, labelNamelimit, "", truncate.PositionEnd)
 		}
 	}
 
 	if val, ok := dataExport.Labels[pvcNameKey]; ok {
 		if len(val) < labelNamelimit {
 			labels[pvcNameKey] = val
+		} else {
+			labels[pvcNameKey] = truncate.Truncate(val, labelNamelimit, "", truncate.PositionEnd)
 		}
 	}
 	return labels
