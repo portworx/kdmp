@@ -117,6 +117,14 @@ func runBackup(sourcePath string) error {
 	}
 
 	if err = runKopiaRepositoryConnect(repo); err != nil {
+		status := &executor.Status{
+			LastKnownError: err,
+		}
+		if err = executor.WriteVolumeBackupStatus(status, volumeBackupName, bkpNamespace); err != nil {
+			errMsg := fmt.Sprintf("failed to write a VolumeBackup status: %v", err)
+			logrus.Errorf("%v", errMsg)
+			return fmt.Errorf(errMsg)
+		}
 		errMsg := fmt.Sprintf("connecting to repository %s failed: %v", repo.Name, err)
 		logrus.Errorf("%s: %v", fn, errMsg)
 		return fmt.Errorf(errMsg)
@@ -320,15 +328,6 @@ func runKopiaRepositoryConnect(repository *executor.Repository) error {
 			return "", true, err
 		}
 		if status.LastKnownError != nil {
-			if err = executor.WriteVolumeBackupStatus(
-				status,
-				volumeBackupName,
-				bkpNamespace,
-			); err != nil {
-				errMsg := fmt.Sprintf("failed to write a VolumeBackup status: %v", err)
-				logrus.Errorf("%v", errMsg)
-				return "", false, fmt.Errorf(errMsg)
-			}
 			return "", false, status.LastKnownError
 		}
 		if status.Done {

@@ -66,6 +66,14 @@ func runRestore(snapshotID, targetPath string) error {
 	repo.Name = kopiaRepo
 
 	if err = runKopiaRepositoryConnect(repo); err != nil {
+		status := &executor.Status{
+			LastKnownError: err,
+		}
+		if err = executor.WriteVolumeBackupStatus(status, volumeBackupName, bkpNamespace); err != nil {
+			errMsg := fmt.Sprintf("failed to write a VolumeBackup status: %v", err)
+			logrus.Errorf("%v", errMsg)
+			return fmt.Errorf(errMsg)
+		}
 		errMsg := fmt.Sprintf("repository %s connect failed: %v", repo.Name, err)
 		logrus.Errorf("%s: %v", fn, errMsg)
 		return fmt.Errorf(errMsg)

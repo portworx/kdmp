@@ -73,6 +73,7 @@ func getRepoList(bucket *blob.Bucket) ([]string, error) {
 func updateBackupLocationMaintenace(
 	status kdmp_api.RepoMaintenanceStatusType,
 	repoName string,
+	reason string,
 ) error {
 	fn := "updateBackupLocationMaintenace"
 	// get BackupLocationMaintenance status CR for status update.
@@ -88,6 +89,7 @@ func updateBackupLocationMaintenace(
 	repoStatus := kdmp_api.RepoMaintenanceStatus{
 		LastRunTimestamp: metav1.Now(),
 		Status:           status,
+		Reason:           reason,
 	}
 	backupLocationMaintenance.Status.RepoStatus[repoName] = repoStatus
 	_, err = kdmpShedOps.Instance().UpdateBackupLocationMaintenance(backupLocationMaintenance)
@@ -131,39 +133,40 @@ func runMaintenance() error {
 		repo.Name = getBackupPathWithRepoName(repoName)
 
 		if err := runKopiaRepositoryConnect(repo); err != nil {
-			statusErr := updateBackupLocationMaintenace(kdmp_api.RepoMaintenanceStatusFailed, repo.Name)
-			if err != nil {
-				return statusErr
-			}
-
 			errMsg := fmt.Sprintf("repository [%v] connect failed: %v", repo.Name, err)
 			logrus.Errorf("%s: %v", fn, errMsg)
-			return fmt.Errorf(errMsg)
+			statusErr := updateBackupLocationMaintenace(kdmp_api.RepoMaintenanceStatusFailed, repo.Name, err.Error())
+			if statusErr != nil {
+				logrus.Warnf("update of status for repo [%v] failed: %v", repo.Name, statusErr)
+			}
+
+			continue
 		}
 		logrus.Infof("connect to repo completed successfully for repository [%v]", repo.Name)
 
 		if err := runKopiaMaintenanceSet(repo); err != nil {
-			statusErr := updateBackupLocationMaintenace(kdmp_api.RepoMaintenanceStatusFailed, repo.Name)
-			if err != nil {
-				return statusErr
-			}
 			errMsg := fmt.Sprintf("maintenance owner set command failed for repo [%v]: %v", repo.Name, err)
 			logrus.Errorf("%s: %v", fn, errMsg)
-			return fmt.Errorf(errMsg)
+			statusErr := updateBackupLocationMaintenace(kdmp_api.RepoMaintenanceStatusFailed, repo.Name, err.Error())
+			if statusErr != nil {
+				logrus.Warnf("update of status for repo [%v] failed: %v", repo.Name, statusErr)
+			}
+			continue
 		}
 		logrus.Infof("maintenance set owner command completed successfully for repository [%v]", repo.Name)
 		if err := runKopiaMaintenanceExecute(repo); err != nil {
-			statusErr := updateBackupLocationMaintenace(kdmp_api.RepoMaintenanceStatusFailed, repo.Name)
-			if err != nil {
-				return statusErr
-			}
 			errMsg := fmt.Sprintf("maintenance full run command failed for repo [%v]: %v", repo.Name, err)
 			logrus.Errorf("%s: %v", fn, errMsg)
-			return fmt.Errorf(errMsg)
+			statusErr := updateBackupLocationMaintenace(kdmp_api.RepoMaintenanceStatusFailed, repo.Name, err.Error())
+			if statusErr != nil {
+				logrus.Warnf("update of status for repo [%v] failed: %v", repo.Name, statusErr)
+			}
+			continue
 		}
-		statusErr := updateBackupLocationMaintenace(kdmp_api.RepoMaintenanceStatusSuccess, repo.Name)
+		statusErr := updateBackupLocationMaintenace(kdmp_api.RepoMaintenanceStatusSuccess, repo.Name, "")
 		if err != nil {
-			return statusErr
+			logrus.Warnf("update of status for repo [%v] failed: %v", repo.Name, statusErr)
+			continue
 		}
 		logrus.Infof("maintenance full run command completed successfully for repository [%v]", repo.Name)
 	}
