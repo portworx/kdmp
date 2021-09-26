@@ -30,7 +30,7 @@ const (
 )
 
 // GetConnectCommand returns a wrapper over the kopia connect command
-func GetConnectCommand(path, repoName, password, provider string) (*Command, error) {
+func GetConnectCommand(path, repoName, password, provider string, disableSsl bool) (*Command, error) {
 	if repoName == "" {
 		return nil, fmt.Errorf("repository name cannot be empty")
 	}
@@ -40,6 +40,7 @@ func GetConnectCommand(path, repoName, password, provider string) (*Command, err
 		RepositoryName: repoName,
 		Password:       password,
 		Path:           path,
+		DisableSsl:     disableSsl,
 	}, nil
 }
 

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"reflect"
+	"strconv"
 
 	"github.com/aquilax/truncate"
 	storkapi "github.com/libopenstorage/stork/pkg/apis/stork/v1alpha1"
@@ -762,6 +763,7 @@ func createS3Secret(secretName string, backupLocation *storkapi.BackupLocation, 
 	credentialData["path"] = []byte(backupLocation.Location.Path)
 	credentialData["type"] = []byte(backupLocation.Location.Type)
 	credentialData["password"] = []byte(backupLocation.Location.RepositoryPassword)
+	credentialData["disablessl"] = []byte(strconv.FormatBool(backupLocation.Location.S3Config.DisableSSL))
 	err := createCredSecret(secretName, namespace, credentialData)
 
 	return err
