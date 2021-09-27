@@ -130,7 +130,6 @@ func parseStdErr(stdErr []byte) error {
 		if bytes.Contains(out, []byte(alreadyRepoExistErrMsg)) {
 			return ErrAlreadyRepoExist
 		}
-
 	}
-	return fmt.Errorf("error while creating repository: %v", outLines)
+	return fmt.Errorf("error while creating repository: %v", string(stdErr))
 }

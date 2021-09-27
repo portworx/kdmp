@@ -62,9 +62,9 @@ func (ms *maintenanceSetExecutor) Run() error {
 	go func() {
 		err := ms.execCmd.Wait()
 		if err != nil {
-			ms.lastError = fmt.Errorf("failed to run the repo maintenance set command: %v", ms.execCmd.Stderr)
-			logrus.Infof("stdout: %v", ms.execCmd.Stdout)
-			logrus.Infof("Stderr: %v", ms.execCmd.Stderr)
+			ms.lastError = fmt.Errorf("failed to run the repo maintenance set command: %v"+
+				" stdout: %v stderr: %v", ms.execCmd.Stderr, ms.outBuf.String(), ms.errBuf.String())
+			logrus.Errorf("%v", ms.lastError)
 		}
 		ms.isRunning = false
 	}()

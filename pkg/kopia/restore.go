@@ -83,9 +83,9 @@ func (b *restoreExecutor) Run() error {
 	go func() {
 		err := b.execCmd.Wait()
 		if err != nil {
-			b.lastError = fmt.Errorf("failed to run the restore command: %v", err)
-			logrus.Infof("stdout: %v", b.execCmd.Stdout)
-			logrus.Infof("Stderr: %v", b.execCmd.Stderr)
+			b.lastError = fmt.Errorf("failed to run the restore command: %v"+
+				" stdout: %v stderr: %v", err, b.outBuf.String(), b.errBuf.String())
+			logrus.Errorf("%v", b.lastError)
 			return
 		}
 		b.isRunning = false

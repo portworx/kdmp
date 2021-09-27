@@ -67,10 +67,9 @@ func (b *connectExecutor) Run() error {
 		err := b.execCmd.Wait()
 
 		if err != nil {
-			b.lastError = fmt.Errorf("failed to run the kopia connect command: %v", b.execCmd.Stderr)
+			b.lastError = fmt.Errorf("failed to run the kopia connect command: %v"+
+				" stdout: %v stderr: %v", err, b.outBuf.String(), b.errBuf.String())
 			logrus.Errorf("%v", b.lastError)
-			logrus.Debugf("stdout: %v", b.execCmd.Stdout)
-			logrus.Debugf("stderr: %v", b.execCmd.Stderr)
 			return
 		}
 
