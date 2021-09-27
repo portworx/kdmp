@@ -50,9 +50,9 @@ func (d *deleteExecutor) Run() error {
 	go func() {
 		err := d.execCmd.Wait()
 		if err != nil {
-			d.lastError = fmt.Errorf("failed to run the snapshot delete command: %v", err)
-			logrus.Infof("stdout: %v", d.execCmd.Stdout)
-			logrus.Infof("Stderr: %v", d.execCmd.Stderr)
+			d.lastError = fmt.Errorf("failed to run the snapshot delete command: %v "+
+				" stdout: %v stderr: %v", err, d.outBuf.String(), d.errBuf.String())
+			logrus.Errorf("%v", d.lastError)
 		}
 		d.isRunning = false
 	}()

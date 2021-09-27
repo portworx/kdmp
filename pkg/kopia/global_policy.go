@@ -48,9 +48,9 @@ func (b *globalPolicyExecutor) Run() error {
 	go func() {
 		err := b.execCmd.Wait()
 		if err != nil {
-			b.lastError = fmt.Errorf("failed to run the kopia policy command: %v", err)
-			logrus.Errorf("stdout: %v", b.execCmd.Stdout)
-			logrus.Errorf("stderr: %v", b.execCmd.Stderr)
+			b.lastError = fmt.Errorf("failed to run the kopia policy command: %v"+
+				" stdout: %v stderr: %v", err, b.outBuf.String(), b.errBuf.String())
+			logrus.Errorf("%v", b.lastError)
 			return
 		}
 	}()
