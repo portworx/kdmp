@@ -2,10 +2,10 @@ package kopia
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/portworx/kdmp/pkg/executor"
 	"github.com/portworx/kdmp/pkg/kopia"
-	"github.com/portworx/sched-ops/task"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
@@ -73,23 +73,19 @@ func runKopiaDelete(repository *executor.Repository, snapshotID string) error {
 		return fmt.Errorf(errMsg)
 	}
 
-	t := func() (interface{}, bool, error) {
+	for {
+		time.Sleep(progressCheckInterval)
 		status, err := initExecutor.Status()
 		if err != nil {
-			return "", false, err
+			return err
 		}
 		if status.LastKnownError != nil {
-			return "", false, status.LastKnownError
+			return status.LastKnownError
 		}
 
 		if status.Done {
-			return "", false, nil
+			break
 		}
-		return "", true, fmt.Errorf("backup snapshot delete command status not available")
 	}
-	if _, err := task.DoRetryWithTimeout(t, executor.DefaultTimeout, progressCheckInterval); err != nil {
-		return err
-	}
-
 	return nil
 }

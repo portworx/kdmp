@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"time"
 
 	"github.com/libopenstorage/stork/pkg/objectstore"
 	kdmp_api "github.com/portworx/kdmp/pkg/apis/kdmp/v1alpha1"
@@ -191,25 +192,20 @@ func runKopiaMaintenanceExecute(repository *executor.Repository) error {
 		logrus.Errorf("%s %v", fn, errMsg)
 		return fmt.Errorf(errMsg)
 	}
-
-	t := func() (interface{}, bool, error) {
+	for {
+		time.Sleep(progressCheckInterval)
 		status, err := initExecutor.Status()
 		if err != nil {
-			return "", false, err
+			return err
 		}
 		if status.LastKnownError != nil {
-			return "", false, status.LastKnownError
+			return status.LastKnownError
 		}
 
 		if status.Done {
-			return "", false, nil
+			break
 		}
-		return "", true, fmt.Errorf("maintenance run command status not available")
 	}
-	if _, err := task.DoRetryWithTimeout(t, executor.DefaultTimeout, progressCheckInterval); err != nil {
-		return err
-	}
-
 	return nil
 }
 
