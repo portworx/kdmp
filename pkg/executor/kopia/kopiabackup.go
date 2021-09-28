@@ -262,24 +262,12 @@ func runKopiaBackup(repository *executor.Repository, sourcePath string) error {
 		return err
 	}
 
-	t := func() (interface{}, bool, error) {
+	for {
+		time.Sleep(progressCheckInterval)
 		status, err := backupExecutor.Status()
 		if err != nil {
-			return "", false, err
+			return err
 		}
-		if status.LastKnownError != nil {
-			if err = executor.WriteVolumeBackupStatus(
-				status,
-				volumeBackupName,
-				bkpNamespace,
-			); err != nil {
-				errMsg := fmt.Sprintf("failed to write a VolumeBackup status: %v", err)
-				logrus.Errorf("%v", errMsg)
-				return "", false, fmt.Errorf(errMsg)
-			}
-			return "", false, status.LastKnownError
-		}
-
 		if err = executor.WriteVolumeBackupStatus(
 			status,
 			volumeBackupName,
@@ -287,21 +275,17 @@ func runKopiaBackup(repository *executor.Repository, sourcePath string) error {
 		); err != nil {
 			errMsg := fmt.Sprintf("failed to write a VolumeBackup status: %v", err)
 			logrus.Errorf("%v", errMsg)
-			return "", false, fmt.Errorf(errMsg)
+			continue
+		}
+		if status.LastKnownError != nil {
+			return status.LastKnownError
 		}
 		if status.Done {
-			return "", false, nil
+			break
 		}
 
-		return "", true, fmt.Errorf("backup status not available")
 	}
-	if _, err := task.DoRetryWithTimeout(t, executor.DefaultTimeout, progressCheckInterval); err != nil {
-		logrus.Errorf("backup failed for repository %s: %v", repository.Name, err)
-		return err
-	}
-
 	logrus.Infof("Backup successful")
-
 	return nil
 }
 

@@ -2,10 +2,10 @@ package kopia
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/portworx/kdmp/pkg/executor"
 	"github.com/portworx/kdmp/pkg/kopia"
-	"github.com/portworx/sched-ops/task"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"k8s.io/kubectl/pkg/cmd/util"
@@ -106,11 +106,11 @@ func runKopiaRestore(repository *executor.Repository, targetPath, snapshotID str
 		err = fmt.Errorf("failed to run restore command: %v", err)
 		return err
 	}
-
-	t := func() (interface{}, bool, error) {
+	for {
+		time.Sleep(progressCheckInterval)
 		status, err := initExecutor.Status()
 		if err != nil {
-			return "", false, err
+			return err
 		}
 		if err = executor.WriteVolumeBackupStatus(
 			status,
@@ -119,22 +119,16 @@ func runKopiaRestore(repository *executor.Repository, targetPath, snapshotID str
 		); err != nil {
 			errMsg := fmt.Sprintf("failed to write a VolumeBackup status: %v", err)
 			logrus.Errorf("%v", errMsg)
-			return "", false, fmt.Errorf(errMsg)
+			continue
 		}
 		if status.LastKnownError != nil {
-			return "", false, status.LastKnownError
+			return status.LastKnownError
 		}
 		if status.Done {
-			return "", false, nil
+			break
 		}
 
-		return "", true, fmt.Errorf("restore status not available")
 	}
-	if _, err := task.DoRetryWithTimeout(t, executor.DefaultTimeout, progressCheckInterval); err != nil {
-		return err
-	}
-
 	logrus.Infof("kopia restore successful from snapshot %s", snapshotID)
-
 	return nil
 }
