@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strconv"
 	"time"
 
 	storkapi "github.com/libopenstorage/stork/pkg/apis/stork/v1alpha1"
@@ -30,6 +31,7 @@ const (
 	endpointPath          = "/etc/cred-secret/endpoint"
 	passwordPath          = "/etc/cred-secret/password"
 	regionPath            = "/etc/cred-secret/region"
+	disableSslPath        = "/etc/cred-secret/disablessl"
 	// AccountKeyPath gce account key path
 	AccountKeyPath         = "/etc/cred-secret/accountkey"
 	projectIDKeypath       = "/etc/cred-secret/projectid"
@@ -57,7 +59,8 @@ type S3Config struct {
 	AccessKeyID     string
 	SecretAccessKey string
 	// Region will be defaulted to us-east-1 if not provided
-	Region string
+	Region     string
+	DisableSSL bool
 }
 
 // AzureConfig specifies the config required to connect to Azure Blob Storage
@@ -296,9 +299,23 @@ func parseS3Creds() (*Repository, error) {
 		return nil, fmt.Errorf(errMsg)
 	}
 
+	disableSsl, err := ioutil.ReadFile(disableSslPath)
+	if err != nil {
+		errMsg := fmt.Sprintf("failed reading data from file %s : %s", disableSslPath, err)
+		logrus.Errorf("%v", errMsg)
+		return nil, fmt.Errorf(errMsg)
+	}
+
+	isSsl, err := strconv.ParseBool(string(disableSsl))
+	if err != nil {
+		errMsg := fmt.Sprintf("failed converting ssl value %v to bool: %s", disableSsl, err)
+		logrus.Errorf("%v", errMsg)
+		return nil, fmt.Errorf(errMsg)
+	}
 	repository.S3Config.AccessKeyID = string(accessKey)
 	repository.S3Config.SecretAccessKey = string(secretAccessKey)
 	repository.S3Config.Endpoint = string(endpoint)
+	repository.S3Config.DisableSSL = isSsl
 	repository.Type = storkapi.BackupLocationS3
 	region, err := ioutil.ReadFile(regionPath)
 	if err != nil {

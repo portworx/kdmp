@@ -38,6 +38,8 @@ type Command struct {
 	SnapshotID string
 	// MaintenanceOwner owner of maintenance command
 	MaintenanceOwner string
+	// DisableSsl option to disable ssl for s3
+	DisableSsl bool
 }
 
 // Executor interface defines APIs for implementing a command wrapper
@@ -98,7 +100,13 @@ func (c *Command) CreateCmd() *exec.Cmd {
 			c.RepositoryName,
 		}
 	}
-
+	var ssl []string
+	if c.DisableSsl {
+		ssl = []string{
+			"--disable-tls",
+		}
+	}
+	argsSlice = append(argsSlice, ssl...)
 	argsSlice = append(argsSlice, c.Flags...)
 	// Get the cmd args
 	argsSlice = append(argsSlice, c.Args...)
@@ -157,8 +165,14 @@ func (c *Command) ConnectCmd() *exec.Cmd {
 			c.RepositoryName,
 		}
 	}
-
+	var ssl []string
+	if c.DisableSsl {
+		ssl = []string{
+			"--disable-tls",
+		}
+	}
 	argsSlice = append(argsSlice, c.Flags...)
+	argsSlice = append(argsSlice, ssl...)
 	// Get the cmd args
 	argsSlice = append(argsSlice, c.Args...)
 	cmd := exec.Command(baseCmd, argsSlice...)
@@ -166,7 +180,6 @@ func (c *Command) ConnectCmd() *exec.Cmd {
 		cmd.Env = append(os.Environ(), c.Env...)
 	}
 	cmd.Dir = c.Dir
-
 	return cmd
 }
 

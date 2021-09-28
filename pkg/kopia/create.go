@@ -35,7 +35,7 @@ type createExecutor struct {
 }
 
 // GetCreateCommand returns a wrapper over the kopia repo create command
-func GetCreateCommand(path, repoName, password, provider string) (*Command, error) {
+func GetCreateCommand(path, repoName, password, provider string, disableSsl bool) (*Command, error) {
 	if repoName == "" {
 		return nil, fmt.Errorf("repository name cannot be empty")
 	}
@@ -45,6 +45,7 @@ func GetCreateCommand(path, repoName, password, provider string) (*Command, erro
 		RepositoryName: repoName,
 		Password:       password,
 		Path:           path,
+		DisableSsl:     disableSsl,
 	}, nil
 }
 

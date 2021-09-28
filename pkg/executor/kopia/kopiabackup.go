@@ -101,7 +101,6 @@ func runBackup(sourcePath string) error {
 		logrus.Errorf("%s: %v", fn, errMsg)
 		return fmt.Errorf("%s: %v", errMsg, err)
 	}
-
 	if !exists {
 		if err = runKopiaCreateRepo(repo); err != nil {
 			errMsg := fmt.Sprintf("repository %s creation failed", repo.Name)
@@ -171,7 +170,13 @@ func populateAzureccessDetails(initCmd *kopia.Command, repository *executor.Repo
 
 func runKopiaCreateRepo(repository *executor.Repository) error {
 	logrus.Infof("Repository creation started")
-	repoCreateCmd, err := kopia.GetCreateCommand(repository.Path, repository.Name, repository.Password, string(repository.Type))
+	repoCreateCmd, err := kopia.GetCreateCommand(
+		repository.Path,
+		repository.Name,
+		repository.Password,
+		string(repository.Type),
+		repository.S3Config.DisableSSL,
+	)
 	if err != nil {
 		return err
 	}
@@ -302,7 +307,13 @@ func runKopiaBackup(repository *executor.Repository, sourcePath string) error {
 
 func runKopiaRepositoryConnect(repository *executor.Repository) error {
 	logrus.Infof("Repository connect started")
-	connectCmd, err := kopia.GetConnectCommand(repository.Path, repository.Name, repository.Password, string(repository.Type))
+	connectCmd, err := kopia.GetConnectCommand(
+		repository.Path,
+		repository.Name,
+		repository.Password,
+		string(repository.Type),
+		repository.S3Config.DisableSSL,
+	)
 	if err != nil {
 		return err
 	}
@@ -416,6 +427,7 @@ func buildStorkBackupLocation(repository *executor.Repository) (*storkv1.BackupL
 			SecretAccessKey: repository.S3Config.SecretAccessKey,
 			Endpoint:        repository.S3Config.Endpoint,
 			Region:          repository.S3Config.Region,
+			DisableSSL:      repository.S3Config.DisableSSL,
 		}
 	case storkv1.BackupLocationGoogle:
 		backupType = storkv1.BackupLocationGoogle
