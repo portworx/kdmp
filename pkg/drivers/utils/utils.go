@@ -88,14 +88,19 @@ func GetConfigValue(key string) string {
 	)
 	if err != nil {
 		log.Errorf("Failed to read configmap.")
-		return ""
+		if os.Getenv(key) != "" {
+			return os.Getenv(key)
+		} else {
+			return ""
+		}
+
 	}
 	return configMap.Data[key]
 }
 
 // ResticExecutorImage returns a docker image that contains resticexecutor binary.
 func ResticExecutorImage() string {
-	if customImage := strings.TrimSpace(os.Getenv(drivers.ResticExecutorImageKey)); customImage != "" {
+	if customImage := strings.TrimSpace(GetConfigValue(drivers.ResticExecutorImageKey)); customImage != "" {
 		return customImage
 	}
 	// use a versioned docker image
@@ -104,12 +109,12 @@ func ResticExecutorImage() string {
 
 // ResticExecutorImageSecret returns an image pull secret for the resticexecutor image.
 func ResticExecutorImageSecret() string {
-	return strings.TrimSpace(os.Getenv(drivers.ResticExecutorImageSecretKey))
+	return strings.TrimSpace(GetConfigValue(drivers.ResticExecutorImageSecretKey))
 }
 
 // KopiaExecutorImage returns a docker image that contains kopiaexecutor binary.
 func KopiaExecutorImage() string {
-	if customImage := strings.TrimSpace(os.Getenv(drivers.KopiaExecutorImageKey)); customImage != "" {
+	if customImage := strings.TrimSpace(GetConfigValue(drivers.KopiaExecutorImageKey)); customImage != "" {
 		return customImage
 	}
 	// use a versioned docker image
@@ -118,12 +123,12 @@ func KopiaExecutorImage() string {
 
 // KopiaExecutorImageSecret returns an image pull secret for the resticexecutor image.
 func KopiaExecutorImageSecret() string {
-	return strings.TrimSpace(os.Getenv(drivers.KopiaExecutorImageSecretKey))
+	return strings.TrimSpace(GetConfigValue(drivers.KopiaExecutorImageSecretKey))
 }
 
 // RsyncImage returns a docker image that contains rsync binary.
 func RsyncImage() string {
-	if customImage := strings.TrimSpace(os.Getenv(drivers.RsyncImageKey)); customImage != "" {
+	if customImage := strings.TrimSpace(GetConfigValue(drivers.RsyncImageKey)); customImage != "" {
 		return customImage
 	}
 	return drivers.RsyncImage
@@ -131,17 +136,17 @@ func RsyncImage() string {
 
 // RsyncImageSecret returns an image pull secret for the rsync image.
 func RsyncImageSecret() string {
-	return strings.TrimSpace(os.Getenv(drivers.RsyncImageSecretKey))
+	return strings.TrimSpace(GetConfigValue(drivers.RsyncImageSecretKey))
 }
 
 // RsyncCommandFlags allows to change rsync command flags.
 func RsyncCommandFlags() string {
-	return strings.TrimSpace(os.Getenv(drivers.RsyncFlags))
+	return strings.TrimSpace(GetConfigValue(drivers.RsyncFlags))
 }
 
 // RsyncOpenshiftSCC is used to set a custom openshift security context constraints for a rsync deployment.
 func RsyncOpenshiftSCC() string {
-	return strings.TrimSpace(os.Getenv(drivers.RsyncOpenshiftSCC))
+	return strings.TrimSpace(GetConfigValue(drivers.RsyncOpenshiftSCC))
 }
 
 // ToImagePullSecret converts a secret name to the ImagePullSecret struct.
@@ -160,19 +165,19 @@ func ToImagePullSecret(name string) []corev1.LocalObjectReference {
 // JobResourceRequirements returns JobResourceRequirements for the executor container.
 func JobResourceRequirements() (corev1.ResourceRequirements, error) {
 	requestCPU := drivers.DefaultResticExecutorRequestCPU
-	if customRequestCPU := os.Getenv(drivers.ResticExecutorRequestCPU); customRequestCPU != "" {
+	if customRequestCPU := GetConfigValue(drivers.ResticExecutorRequestCPU); customRequestCPU != "" {
 		requestCPU = customRequestCPU
 	}
 	requestMem := drivers.DefaultResticExecutorRequestMemory
-	if customRequestMemory := os.Getenv(drivers.ResticExecutorRequestMemory); customRequestMemory != "" {
+	if customRequestMemory := GetConfigValue(drivers.ResticExecutorRequestMemory); customRequestMemory != "" {
 		requestMem = customRequestMemory
 	}
 	limitCPU := drivers.DefaultResticExecutorLimitCPU
-	if customLimitCPU := os.Getenv(drivers.ResticExecutorLimitCPU); customLimitCPU != "" {
+	if customLimitCPU := GetConfigValue(drivers.ResticExecutorLimitCPU); customLimitCPU != "" {
 		limitCPU = customLimitCPU
 	}
 	limitMem := drivers.DefaultResticExecutorLimitMemory
-	if customLimitMemory := os.Getenv(drivers.ResticExecutorLimitMemory); customLimitMemory != "" {
+	if customLimitMemory := GetConfigValue(drivers.ResticExecutorLimitMemory); customLimitMemory != "" {
 		limitMem = customLimitMemory
 	}
 	return toResourceRequirements(requestCPU, requestMem, limitCPU, limitMem)
@@ -181,19 +186,19 @@ func JobResourceRequirements() (corev1.ResourceRequirements, error) {
 // RsyncResourceRequirements returns ResourceRequirements for the rsync container.
 func RsyncResourceRequirements() (corev1.ResourceRequirements, error) {
 	requestCPU := drivers.DefaultRsyncRequestCPU
-	if customRequestCPU := os.Getenv(drivers.RsyncRequestCPU); customRequestCPU != "" {
+	if customRequestCPU := GetConfigValue(drivers.RsyncRequestCPU); customRequestCPU != "" {
 		requestCPU = customRequestCPU
 	}
 	requestMem := drivers.DefaultRsyncRequestMemory
-	if customRequestMemory := os.Getenv(drivers.RsyncRequestMemory); customRequestMemory != "" {
+	if customRequestMemory := GetConfigValue(drivers.RsyncRequestMemory); customRequestMemory != "" {
 		requestMem = customRequestMemory
 	}
 	limitCPU := drivers.DefaultRsyncLimitCPU
-	if customLimitCPU := os.Getenv(drivers.RsyncLimitCPU); customLimitCPU != "" {
+	if customLimitCPU := GetConfigValue(drivers.RsyncLimitCPU); customLimitCPU != "" {
 		limitCPU = customLimitCPU
 	}
 	limitMem := drivers.DefaultRsyncLimitMemory
-	if customLimitMemory := os.Getenv(drivers.RsyncLimitMemory); customLimitMemory != "" {
+	if customLimitMemory := GetConfigValue(drivers.RsyncLimitMemory); customLimitMemory != "" {
 		limitMem = customLimitMemory
 	}
 	return toResourceRequirements(requestCPU, requestMem, limitCPU, limitMem)

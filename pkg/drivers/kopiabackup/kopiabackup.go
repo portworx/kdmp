@@ -2,11 +2,11 @@ package kopiabackup
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"strings"
-
 	"github.com/portworx/kdmp/pkg/drivers"
 	"github.com/portworx/kdmp/pkg/drivers/utils"
+	"github.com/portworx/kdmp/pkg/jobframework"
 	kdmpops "github.com/portworx/kdmp/pkg/util/ops"
 	"github.com/portworx/sched-ops/k8s/batch"
 	coreops "github.com/portworx/sched-ops/k8s/core"
@@ -16,6 +16,7 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"strings"
 )
 
 const (
@@ -35,6 +36,13 @@ func (d Driver) Name() string {
 // StartJob creates a job for data transfer between volumes.
 func (d Driver) StartJob(opts ...drivers.JobOption) (id string, err error) {
 	fn := "StartJob"
+	name := d.Name()
+	canJobRun := jobframework.JobCanRun(name)
+
+	if !canJobRun {
+		errMsg := errors.New("NOT_ENOUGH_RESOURCE")
+		return "", errMsg
+	}
 	o := drivers.JobOpts{}
 	for _, opt := range opts {
 		if opt != nil {

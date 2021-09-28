@@ -3,7 +3,6 @@ package dataexport
 import (
 	"context"
 	"fmt"
-	"github.com/portworx/kdmp/pkg/jobframework"
 	"os"
 	"reflect"
 
@@ -166,10 +165,11 @@ func (c *Controller) sync(ctx context.Context, in *kdmpapi.DataExport) (bool, er
 
 		// start data transfer
 		id, err := startTransferJob(driver, srcPVCName, dataExport)
-		if err != nil {
-			msg := fmt.Sprintf("failed to start a data transfer job: %v", err)
-			logrus.Error(msg)
-			return false, c.updateStatus(dataExport, kdmpapi.DataExportStatusFailed, msg)
+		if err != nil && err.Error() != "NOT_ENOUGH_RESOURCE" {
+				msg := fmt.Sprintf("failed to start a data transfer job: %v", err)
+				logrus.Error(msg)
+				return false, c.updateStatus(dataExport, kdmpapi.DataExportStatusFailed, msg)
+
 		}
 
 		dataExport.Status.TransferID = id
@@ -486,9 +486,6 @@ func startTransferJob(drv drivers.Interface, srcPVCName string, dataExport *kdmp
 		return "", fmt.Errorf("data transfer driver is not set")
 	}
 
-	if !jobframework.JobCanRun(drv.Name()) {
-		return "", fmt.Errorf("not enough resource for job")
-	}
 	switch drv.Name() {
 	case drivers.Rsync:
 		return drv.StartJob(

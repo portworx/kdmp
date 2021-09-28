@@ -1,6 +1,7 @@
 package jobframework
 
 import (
+	"github.com/portworx/kdmp/pkg/drivers"
 	"github.com/portworx/kdmp/pkg/drivers/utils"
 	"github.com/portworx/sched-ops/k8s/batch"
 	"github.com/portworx/sched-ops/k8s/core"
@@ -13,7 +14,7 @@ import (
 
 // getJobsByType takes the jobType as a param and returns the list of jobs matching the label in all namespaces
 func getJobsByType(jobType string) []*v1.JobList {
-	labelSelector := "jobtype=" + jobType
+	labelSelector := drivers.DriverNameLabel + "=" + jobType
 	options := metav1.ListOptions{
 		LabelSelector: labelSelector,
 	}
@@ -57,7 +58,7 @@ func jobLimitByType(jobType string) int {
 	// if its not found in configmap the strconv will through error
 	if err != nil {
 		log.Errorf("limit for the job not found %s", err)
-		return 10 // ToDo Decide on the default value if not found in the config map
+		return 5 // ToDo Decide on the default value if not found in the config map
 	}
 	return jobLimit
 }
