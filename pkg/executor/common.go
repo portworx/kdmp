@@ -14,6 +14,7 @@ import (
 	kdmpapi "github.com/portworx/kdmp/pkg/apis/kdmp/v1alpha1"
 	"github.com/portworx/kdmp/pkg/drivers"
 	kdmpops "github.com/portworx/kdmp/pkg/util/ops"
+	kdmpschedops "github.com/portworx/sched-ops/k8s/kdmp"
 	storkops "github.com/portworx/sched-ops/k8s/stork"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -377,6 +378,26 @@ func parseAzureCreds() (*Repository, error) {
 	repository.AzureConfig.StorageAccountKey = string(storageAccountKey)
 
 	return repository, nil
+}
+
+// WriteVolumeBackupDeleteStatus writes a delete status to the Volumedelete cr.
+func WriteVolumeBackupDeleteStatus(
+	statusType kdmpapi.VolumeBackupDeleteStatusType,
+	errMsg string,
+	volumeBackupDeleteName,
+	volumeBackupDeleteNamespace string,
+) error {
+	vd, err := kdmpschedops.Instance().GetVolumeBackupDelete(volumeBackupDeleteName, volumeBackupDeleteNamespace)
+	if err != nil {
+		return fmt.Errorf("failed in getting VolumeBackupDelete CR  [%s/%s]: %v", volumeBackupDeleteName, volumeBackupDeleteNamespace, err)
+	}
+	vd.Status.Status = statusType
+	vd.Status.Reason = errMsg
+
+	if _, err = kdmpschedops.Instance().UpdateVolumeBackupDelete(vd); err != nil {
+		return fmt.Errorf("failed in updating VolumeBackupDelete CR %s/%s VolumeDelete: %v", volumeBackupDeleteName, volumeBackupDeleteNamespace, err)
+	}
+	return nil
 }
 
 // WriteVolumeBackupStatus writes a backup status to the VolumeBackup crd.

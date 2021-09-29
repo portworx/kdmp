@@ -13,7 +13,6 @@ import (
 	kdmpapi "github.com/portworx/kdmp/pkg/apis/kdmp/v1alpha1"
 	"github.com/portworx/kdmp/pkg/drivers"
 	"github.com/portworx/kdmp/pkg/drivers/driversinstance"
-	"github.com/portworx/kdmp/pkg/drivers/kopiabackup"
 	"github.com/portworx/kdmp/pkg/drivers/utils"
 	"github.com/portworx/kdmp/pkg/snapshots"
 	"github.com/portworx/kdmp/pkg/snapshots/snapshotsinstance"
@@ -803,7 +802,7 @@ func createCredSecret(
 			Name:      secretName,
 			Namespace: namespace,
 			Annotations: map[string]string{
-				kopiabackup.SkipResourceAnnotation: "true",
+				utils.SkipResourceAnnotation: "true",
 			},
 		},
 		Data: credentialData,

@@ -6,9 +6,9 @@ import (
 
 const (
 	// VolumeBackupDeleteResourceName is name for the VolumeBackupDelete resource.
-	VolumeBackupDeleteResourceName = "volumedelete"
+	VolumeBackupDeleteResourceName = "volumebackupdelete"
 	// VolumeBackupDeleteResourcePlural is the name for list of VolumeBackupDelete resources.
-	VolumeBackupDeleteResourcePlural = "volumedeletes"
+	VolumeBackupDeleteResourcePlural = "volumebackupdeletes"
 )
 
 // +genclient
