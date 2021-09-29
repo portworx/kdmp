@@ -223,7 +223,7 @@ github.com/portworx/pxc/pkg/component
 github.com/portworx/pxc/pkg/config
 github.com/portworx/pxc/pkg/kubernetes
 github.com/portworx/pxc/pkg/util
-# github.com/portworx/sched-ops v1.20.4-rc1.0.20210921050234-561b707a5d96
+# github.com/portworx/sched-ops v1.20.4-rc1.0.20210929114621-9001768f8eb7
 ## explicit
 github.com/portworx/sched-ops/k8s/apiextensions
 github.com/portworx/sched-ops/k8s/apps
