@@ -31,3 +31,11 @@ type VolumeBackupListerExpansion interface{}
 // VolumeBackupNamespaceListerExpansion allows custom methods to be added to
 // VolumeBackupNamespaceLister.
 type VolumeBackupNamespaceListerExpansion interface{}
+
+// VolumeBackupDeleteListerExpansion allows custom methods to be added to
+// VolumeBackupDeleteLister.
+type VolumeBackupDeleteListerExpansion interface{}
+
+// VolumeBackupDeleteNamespaceListerExpansion allows custom methods to be added to
+// VolumeBackupDeleteNamespaceLister.
+type VolumeBackupDeleteNamespaceListerExpansion interface{}
