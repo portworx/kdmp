@@ -8,10 +8,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"strconv"
-
 	"strings"
-
-	"github.com/aquilax/truncate"
 
 	kSnapshotClient "github.com/kubernetes-csi/external-snapshotter/client/v4/clientset/versioned"
 	storkapi "github.com/libopenstorage/stork/pkg/apis/stork/v1alpha1"
@@ -145,7 +142,7 @@ func (c *Controller) sync(ctx context.Context, in *kdmpapi.DataExport) (bool, er
 
 		// Check if the above env is present and read the certs file contents and
 		// secret for the job pod for kopia to access the same
-		err = createCertificateSecret(drivers.CertSecretName, dataExport.Spec.Source.Namespace)
+		err = createCertificateSecret(drivers.CertSecretName, dataExport.Spec.Source.Namespace, dataExport.Labels)
 		if err != nil {
 			return false, err
 		}
@@ -154,10 +151,11 @@ func (c *Controller) sync(ctx context.Context, in *kdmpapi.DataExport) (bool, er
 			// Create secret in source ns because in case of multi ns backup
 			// BL CR is created in kube-system ns
 			err = CreateCredentialsSecret(
-				utils.FrameCredSecretName(utils.BackupJobPrefix, dataExport.Name),
+				dataExport.Name,
 				dataExport.Spec.Destination.Name,
 				dataExport.Spec.Destination.Namespace,
 				dataExport.Spec.Source.Namespace,
+				dataExport.Labels,
 			)
 			if err != nil {
 				msg := fmt.Sprintf("failed to create cloud credential secret during kopia backup: %v", err)
@@ -181,10 +179,11 @@ func (c *Controller) sync(ctx context.Context, in *kdmpapi.DataExport) (bool, er
 			// For restore create the secret in the ns where PVC is referenced
 
 			err = CreateCredentialsSecret(
-				utils.FrameCredSecretName(utils.RestoreJobPrefix, dataExport.Name),
+				dataExport.Name,
 				vb.Spec.BackupLocation.Name,
 				vb.Spec.BackupLocation.Namespace,
 				dataExport.Spec.Destination.Namespace,
+				dataExport.Labels,
 			)
 			if err != nil {
 				msg := fmt.Sprintf("failed to create cloud credential secret during kopia restore: %v", err)
@@ -659,7 +658,7 @@ func startTransferJob(drv drivers.Interface, srcPVCName string, dataExport *kdmp
 			drivers.WithSourcePVC(srcPVCName),
 			drivers.WithNamespace(dataExport.Spec.Destination.Namespace),
 			drivers.WithDestinationPVC(dataExport.Spec.Destination.Name),
-			drivers.WithLabels(jobLabels(dataExport)),
+			drivers.WithLabels(dataExport.Labels),
 		)
 	case drivers.ResticBackup:
 		return drv.StartJob(
@@ -667,7 +666,7 @@ func startTransferJob(drv drivers.Interface, srcPVCName string, dataExport *kdmp
 			drivers.WithNamespace(dataExport.Spec.Destination.Namespace),
 			drivers.WithBackupLocationName(dataExport.Spec.Destination.Name),
 			drivers.WithBackupLocationNamespace(dataExport.Spec.Destination.Namespace),
-			drivers.WithLabels(jobLabels(dataExport)),
+			drivers.WithLabels(dataExport.Labels),
 		)
 	case drivers.ResticRestore:
 		return drv.StartJob(
@@ -676,7 +675,7 @@ func startTransferJob(drv drivers.Interface, srcPVCName string, dataExport *kdmp
 			drivers.WithNamespace(dataExport.Spec.Source.Namespace),
 			drivers.WithVolumeBackupName(dataExport.Spec.Source.Name),
 			drivers.WithVolumeBackupNamespace(dataExport.Spec.Source.Namespace),
-			drivers.WithLabels(jobLabels(dataExport)),
+			drivers.WithLabels(dataExport.Labels),
 		)
 	case drivers.KopiaBackup:
 		return drv.StartJob(
@@ -684,7 +683,7 @@ func startTransferJob(drv drivers.Interface, srcPVCName string, dataExport *kdmp
 			drivers.WithNamespace(dataExport.Spec.Source.Namespace),
 			drivers.WithBackupLocationName(dataExport.Spec.Destination.Name),
 			drivers.WithBackupLocationNamespace(dataExport.Spec.Destination.Namespace),
-			drivers.WithLabels(jobLabels(dataExport)),
+			drivers.WithLabels(dataExport.Labels),
 			drivers.WithDataExportName(dataExport.GetName()),
 			drivers.WithCertSecretName(drivers.CertSecretName),
 			drivers.WithCertSecretNamespace(dataExport.Spec.Source.Namespace),
@@ -696,7 +695,7 @@ func startTransferJob(drv drivers.Interface, srcPVCName string, dataExport *kdmp
 			drivers.WithVolumeBackupName(dataExport.Spec.Source.Name),
 			drivers.WithVolumeBackupNamespace(dataExport.Spec.Source.Namespace),
 			drivers.WithBackupLocationNamespace(dataExport.Spec.Source.Namespace),
-			drivers.WithLabels(jobLabels(dataExport)),
+			drivers.WithLabels(dataExport.Labels),
 			drivers.WithDataExportName(dataExport.GetName()),
 			drivers.WithCertSecretName(drivers.CertSecretName),
 			drivers.WithCertSecretNamespace(dataExport.Spec.Destination.Namespace),
@@ -765,35 +764,6 @@ func setStatus(de *kdmpapi.DataExport, status kdmpapi.DataExportStatus, reason s
 
 func isStatusEqual(de *kdmpapi.DataExport, status kdmpapi.DataExportStatus, reason string) bool {
 	return de.Status.Status == status && de.Status.Reason == reason
-}
-
-func jobLabels(dataExport *kdmpapi.DataExport) map[string]string {
-	labels := make(map[string]string)
-	if len(dataExport.GetName()) <= labelNamelimit {
-		labels[LabelController] = dataExport.GetName()
-		labels[LabelControllerName] = dataExport.GetName()
-	} else {
-		// truncating it to length of labelNamelimit and store it.
-		labels[LabelController] = truncate.Truncate(dataExport.GetName(), labelNamelimit, "", truncate.PositionEnd)
-		labels[LabelControllerName] = truncate.Truncate(dataExport.GetName(), labelNamelimit, "", truncate.PositionEnd)
-	}
-
-	if val, ok := dataExport.Labels[backupCRNameKey]; ok {
-		if len(val) <= labelNamelimit {
-			labels[backupCRNameKey] = val
-		} else {
-			labels[backupCRNameKey] = truncate.Truncate(val, labelNamelimit, "", truncate.PositionEnd)
-		}
-	}
-
-	if val, ok := dataExport.Labels[pvcNameKey]; ok {
-		if len(val) < labelNamelimit {
-			labels[pvcNameKey] = val
-		} else {
-			labels[pvcNameKey] = truncate.Truncate(val, labelNamelimit, "", truncate.PositionEnd)
-		}
-	}
-	return labels
 }
 
 func getDriverType(de *kdmpapi.DataExport) (string, error) {
@@ -869,7 +839,7 @@ func checkNameNamespace(ref kdmpapi.DataExportObjectReference) error {
 }
 
 // CreateCredentialsSecret parses the provided backup location and creates secret with cloud credentials
-func CreateCredentialsSecret(secretName, blName, blNamespace, namespace string) error {
+func CreateCredentialsSecret(secretName, blName, blNamespace, namespace string, labels map[string]string) error {
 	backupLocation, err := readBackupLocation(blName, blNamespace, "")
 	if err != nil {
 		return err
@@ -879,11 +849,11 @@ func CreateCredentialsSecret(secretName, blName, blNamespace, namespace string) 
 	// Creating cloud cred secret
 	switch backupLocation.Location.Type {
 	case storkapi.BackupLocationS3:
-		return createS3Secret(secretName, backupLocation, namespace)
+		return createS3Secret(secretName, backupLocation, namespace, labels)
 	case storkapi.BackupLocationGoogle:
-		return createGoogleSecret(secretName, backupLocation, namespace)
+		return createGoogleSecret(secretName, backupLocation, namespace, labels)
 	case storkapi.BackupLocationAzure:
-		return createAzureSecret(secretName, backupLocation, namespace)
+		return createAzureSecret(secretName, backupLocation, namespace, labels)
 	}
 
 	return fmt.Errorf("unsupported backup location: %v", backupLocation.Location.Type)
@@ -911,7 +881,7 @@ func readBackupLocation(name, namespace, filePath string) (*storkapi.BackupLocat
 	return out, nil
 }
 
-func createS3Secret(secretName string, backupLocation *storkapi.BackupLocation, namespace string) error {
+func createS3Secret(secretName string, backupLocation *storkapi.BackupLocation, namespace string, labels map[string]string) error {
 	credentialData := make(map[string][]byte)
 	credentialData["endpoint"] = []byte(backupLocation.Location.S3Config.Endpoint)
 	credentialData["accessKey"] = []byte(backupLocation.Location.S3Config.AccessKeyID)
@@ -921,36 +891,36 @@ func createS3Secret(secretName string, backupLocation *storkapi.BackupLocation, 
 	credentialData["type"] = []byte(backupLocation.Location.Type)
 	credentialData["password"] = []byte(backupLocation.Location.RepositoryPassword)
 	credentialData["disablessl"] = []byte(strconv.FormatBool(backupLocation.Location.S3Config.DisableSSL))
-	err := createJobSecret(secretName, namespace, credentialData)
+	err := createJobSecret(secretName, namespace, credentialData, labels)
 
 	return err
 }
 
-func createGoogleSecret(secretName string, backupLocation *storkapi.BackupLocation, namespace string) error {
+func createGoogleSecret(secretName string, backupLocation *storkapi.BackupLocation, namespace string, labels map[string]string) error {
 	credentialData := make(map[string][]byte)
 	credentialData["type"] = []byte(backupLocation.Location.Type)
 	credentialData["password"] = []byte(backupLocation.Location.RepositoryPassword)
 	credentialData["accountkey"] = []byte(backupLocation.Location.GoogleConfig.AccountKey)
 	credentialData["projectid"] = []byte(backupLocation.Location.GoogleConfig.ProjectID)
 	credentialData["path"] = []byte(backupLocation.Location.Path)
-	err := createJobSecret(secretName, namespace, credentialData)
+	err := createJobSecret(secretName, namespace, credentialData, labels)
 
 	return err
 }
 
-func createAzureSecret(secretName string, backupLocation *storkapi.BackupLocation, namespace string) error {
+func createAzureSecret(secretName string, backupLocation *storkapi.BackupLocation, namespace string, labels map[string]string) error {
 	credentialData := make(map[string][]byte)
 	credentialData["type"] = []byte(backupLocation.Location.Type)
 	credentialData["password"] = []byte(backupLocation.Location.RepositoryPassword)
 	credentialData["path"] = []byte(backupLocation.Location.Path)
 	credentialData["storageaccountname"] = []byte(backupLocation.Location.AzureConfig.StorageAccountName)
 	credentialData["storageaccountkey"] = []byte(backupLocation.Location.AzureConfig.StorageAccountKey)
-	err := createJobSecret(secretName, namespace, credentialData)
+	err := createJobSecret(secretName, namespace, credentialData, labels)
 
 	return err
 }
 
-func createCertificateSecret(secretName, namespace string) error {
+func createCertificateSecret(secretName, namespace string, labels map[string]string) error {
 	drivers.CertFilePath = os.Getenv(drivers.CertDirPath)
 	if drivers.CertFilePath != "" {
 		certificateData, err := ioutil.ReadFile(filepath.Join(drivers.CertFilePath, drivers.CertFileName))
@@ -962,7 +932,7 @@ func createCertificateSecret(secretName, namespace string) error {
 
 		certData := make(map[string][]byte)
 		certData[drivers.CertFileName] = certificateData
-		err = createJobSecret(secretName, namespace, certData)
+		err = createJobSecret(secretName, namespace, certData, labels)
 
 		return err
 	}
@@ -974,11 +944,13 @@ func createJobSecret(
 	secretName string,
 	namespace string,
 	credentialData map[string][]byte,
+	labels map[string]string,
 ) error {
 	secret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      secretName,
 			Namespace: namespace,
+			Labels:    labels,
 			Annotations: map[string]string{
 				utils.SkipResourceAnnotation: "true",
 			},

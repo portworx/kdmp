@@ -45,13 +45,12 @@ func (d Driver) StartJob(opts ...drivers.JobOption) (id string, err error) {
 		return "", err
 	}
 
-	jobName := toJobName(o.DestinationPVCName)
+	jobName := o.DataExportName
 	job, err := jobFor(
 		o,
 		vb,
 		jobName,
 		utils.FrameCredSecretName(utils.RestoreJobPrefix, o.DataExportName),
-		o.Labels,
 	)
 	if err != nil {
 		return "", err
@@ -126,9 +125,8 @@ func jobFor(
 	vb *v1alpha1.VolumeBackup,
 	jobName,
 	credSecretName string,
-	labels map[string]string,
 ) (*batchv1.Job, error) {
-	labels = addJobLabels(labels)
+	labels := addJobLabels(jobOption.Labels)
 
 	resources, err := utils.JobResourceRequirements()
 	if err != nil {
@@ -257,10 +255,6 @@ func jobFor(
 	}
 
 	return job, nil
-}
-
-func toJobName(destinationPVC string) string {
-	return fmt.Sprintf("%s-%s", utils.RestoreJobPrefix, destinationPVC)
 }
 
 func addJobLabels(labels map[string]string) map[string]string {
