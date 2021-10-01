@@ -474,7 +474,9 @@ func (c *Controller) cleanUp(driver drivers.Interface, de *kdmpapi.DataExport) e
 		}
 
 		if de.Status.SnapshotID != "" && de.Status.SnapshotNamespace != "" {
-			if err := snapshotDriver.DeleteSnapshot(de.Status.SnapshotID, de.Status.SnapshotNamespace, false); err != nil && !errors.IsNotFound(err) {
+
+			snapName := toSnapName(de.Spec.Source.Name, string(de.UID))
+			if err := snapshotDriver.DeleteSnapshot(snapName, de.Status.SnapshotNamespace, false); err != nil && !errors.IsNotFound(err) {
 				return fmt.Errorf("delete %s/%s snapshot: %s", de.Status.SnapshotNamespace, de.Status.SnapshotID, err)
 			}
 		}
