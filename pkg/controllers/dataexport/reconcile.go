@@ -3,7 +3,9 @@ package dataexport
 import (
 	"context"
 	"fmt"
+	"io/ioutil"
 	"os"
+	"path/filepath"
 	"reflect"
 	"strconv"
 
@@ -131,8 +133,22 @@ func (c *Controller) sync(ctx context.Context, in *kdmpapi.DataExport) (bool, er
 		if dataExport.Status.SnapshotPVCName != "" {
 			srcPVCName = dataExport.Status.SnapshotPVCName
 		}
-		// Create the credential secret
+
 		logrus.Debugf("drivername: %v", driverName)
+		// Creating a secret for ssl enabled objectstore with custom certificates
+		// User creates a secret in kube-system ns, mounts it to stork and recommendation is
+		// secret data is 'public.crt' always which contains the certificate content
+		// This secret path is provided as env section as follows
+		// env:
+		// - name: SSL_CERT_DIR
+		//   value: "/etc/tls-secrets" (can be any path)
+
+		// Check if the above env is present and read the certs file contents and
+		// secret for the job pod for kopia to access the same
+		err = createCertificateSecret(drivers.CertSecretName, dataExport.Spec.Source.Namespace)
+		if err != nil {
+			return false, err
+		}
 		if driverName == drivers.KopiaBackup {
 			// This will create a unique secret per PVC being backed up
 			// Create secret in source ns because in case of multi ns backup
@@ -148,6 +164,7 @@ func (c *Controller) sync(ctx context.Context, in *kdmpapi.DataExport) (bool, er
 				logrus.Errorf(msg)
 				return false, c.updateStatus(dataExport, kdmpapi.DataExportStatusFailed, msg)
 			}
+
 		}
 
 		if driverName == drivers.KopiaRestore {
@@ -240,7 +257,13 @@ func (c *Controller) sync(ctx context.Context, in *kdmpapi.DataExport) (bool, er
 		}
 		dataExport.Status.SnapshotID = volumeBackupCR.Status.SnapshotID
 		dataExport.Status.Size = volumeBackupCR.Status.TotalBytes
-
+		// Delete the tls certificate secret created
+		err = core.Instance().DeleteSecret(drivers.CertSecretName, dataExport.Spec.Source.Namespace)
+		if err != nil && errors.IsAlreadyExists(err) {
+			errMsg := fmt.Sprintf("failed to delete [%s:%s] secret", dataExport.Spec.Source.Namespace, drivers.CertSecretName)
+			logrus.Errorf("%v", errMsg)
+			return false, c.updateStatus(dataExport, kdmpapi.DataExportStatusFailed, errMsg)
+		}
 		if err := c.cleanUp(driver, dataExport); err != nil {
 			msg := fmt.Sprintf("failed to remove resources: %s", err)
 			return false, c.updateStatus(dataExport, kdmpapi.DataExportStatusFailed, msg)
@@ -663,6 +686,8 @@ func startTransferJob(drv drivers.Interface, srcPVCName string, dataExport *kdmp
 			drivers.WithBackupLocationNamespace(dataExport.Spec.Destination.Namespace),
 			drivers.WithLabels(jobLabels(dataExport)),
 			drivers.WithDataExportName(dataExport.GetName()),
+			drivers.WithCertSecretName(drivers.CertSecretName),
+			drivers.WithCertSecretNamespace(dataExport.Spec.Source.Namespace),
 		)
 	case drivers.KopiaRestore:
 		return drv.StartJob(
@@ -673,6 +698,8 @@ func startTransferJob(drv drivers.Interface, srcPVCName string, dataExport *kdmp
 			drivers.WithBackupLocationNamespace(dataExport.Spec.Source.Namespace),
 			drivers.WithLabels(jobLabels(dataExport)),
 			drivers.WithDataExportName(dataExport.GetName()),
+			drivers.WithCertSecretName(drivers.CertSecretName),
+			drivers.WithCertSecretNamespace(dataExport.Spec.Destination.Namespace),
 		)
 	}
 
@@ -894,7 +921,7 @@ func createS3Secret(secretName string, backupLocation *storkapi.BackupLocation, 
 	credentialData["type"] = []byte(backupLocation.Location.Type)
 	credentialData["password"] = []byte(backupLocation.Location.RepositoryPassword)
 	credentialData["disablessl"] = []byte(strconv.FormatBool(backupLocation.Location.S3Config.DisableSSL))
-	err := createCredSecret(secretName, namespace, credentialData)
+	err := createJobSecret(secretName, namespace, credentialData)
 
 	return err
 }
@@ -906,7 +933,7 @@ func createGoogleSecret(secretName string, backupLocation *storkapi.BackupLocati
 	credentialData["accountkey"] = []byte(backupLocation.Location.GoogleConfig.AccountKey)
 	credentialData["projectid"] = []byte(backupLocation.Location.GoogleConfig.ProjectID)
 	credentialData["path"] = []byte(backupLocation.Location.Path)
-	err := createCredSecret(secretName, namespace, credentialData)
+	err := createJobSecret(secretName, namespace, credentialData)
 
 	return err
 }
@@ -918,12 +945,32 @@ func createAzureSecret(secretName string, backupLocation *storkapi.BackupLocatio
 	credentialData["path"] = []byte(backupLocation.Location.Path)
 	credentialData["storageaccountname"] = []byte(backupLocation.Location.AzureConfig.StorageAccountName)
 	credentialData["storageaccountkey"] = []byte(backupLocation.Location.AzureConfig.StorageAccountKey)
-	err := createCredSecret(secretName, namespace, credentialData)
+	err := createJobSecret(secretName, namespace, credentialData)
 
 	return err
 }
 
-func createCredSecret(
+func createCertificateSecret(secretName, namespace string) error {
+	drivers.CertFilePath = os.Getenv(drivers.CertDirPath)
+	if drivers.CertFilePath != "" {
+		certificateData, err := ioutil.ReadFile(filepath.Join(drivers.CertFilePath, drivers.CertFileName))
+		if err != nil {
+			errMsg := fmt.Sprintf("failed reading data from file %s : %s", drivers.CertFilePath, err)
+			logrus.Errorf("%v", errMsg)
+			return fmt.Errorf(errMsg)
+		}
+
+		certData := make(map[string][]byte)
+		certData[drivers.CertFileName] = certificateData
+		err = createJobSecret(secretName, namespace, certData)
+
+		return err
+	}
+
+	return nil
+}
+
+func createJobSecret(
 	secretName string,
 	namespace string,
 	credentialData map[string][]byte,

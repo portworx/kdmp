@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/portworx/kdmp/pkg/apis/kdmp/v1alpha1"
 	"github.com/portworx/kdmp/pkg/drivers"
 	"github.com/portworx/kdmp/pkg/drivers/utils"
 	kdmpops "github.com/portworx/kdmp/pkg/util/ops"
@@ -46,17 +47,12 @@ func (d Driver) StartJob(opts ...drivers.JobOption) (id string, err error) {
 
 	jobName := toJobName(o.DestinationPVCName)
 	job, err := jobFor(
+		o,
+		vb,
 		jobName,
-		o.Namespace,
-		o.DestinationPVCName,
-		o.VolumeBackupName,
 		utils.FrameCredSecretName(utils.RestoreJobPrefix, o.DataExportName),
-		vb.Spec.BackupLocation.Name,
-		vb.Spec.BackupLocation.Namespace,
-		o.Namespace,
-		vb.Status.SnapshotID,
-		vb.Spec.Repository,
-		o.Labels)
+		o.Labels,
+	)
 	if err != nil {
 		return "", err
 	}
@@ -126,17 +122,12 @@ func (d Driver) validate(o drivers.JobOpts) error {
 }
 
 func jobFor(
+	jobOption drivers.JobOpts,
+	vb *v1alpha1.VolumeBackup,
 	jobName,
-	namespace,
-	pvcName,
-	volumeBackupName,
-	credSecretName,
-	backuplocationName,
-	backuplocationNamespace,
-	restoreNamespace,
-	snapshotID,
-	repository string,
-	labels map[string]string) (*batchv1.Job, error) {
+	credSecretName string,
+	labels map[string]string,
+) (*batchv1.Job, error) {
 	labels = addJobLabels(labels)
 
 	resources, err := utils.JobResourceRequirements()
@@ -144,7 +135,7 @@ func jobFor(
 		return nil, err
 	}
 
-	if err := utils.SetupServiceAccount(jobName, namespace, roleFor()); err != nil {
+	if err := utils.SetupServiceAccount(jobName, jobOption.Namespace, roleFor()); err != nil {
 		return nil, err
 	}
 
@@ -152,27 +143,27 @@ func jobFor(
 		"/kopiaexecutor",
 		"restore",
 		"--volume-backup-name",
-		volumeBackupName,
+		jobOption.VolumeBackupName,
 		"--backup-location",
-		backuplocationName,
+		vb.Spec.BackupLocation.Name,
 		"--backup-location-namespace",
-		backuplocationNamespace,
+		vb.Spec.BackupLocation.Namespace,
 		"--repository",
-		repository,
+		vb.Spec.Repository,
 		"--restore-namespace",
-		restoreNamespace,
+		jobOption.Namespace,
 		"--credentials",
 		credSecretName,
 		"--target-path",
 		"/data",
 		"--snapshot-id",
-		snapshotID,
+		vb.Status.SnapshotID,
 	}, " ")
 
-	return &batchv1.Job{
+	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      jobName,
-			Namespace: namespace,
+			Namespace: jobOption.Namespace,
 			Labels:    labels,
 		},
 		Spec: batchv1.JobSpec{
@@ -214,7 +205,7 @@ func jobFor(
 							Name: "vol",
 							VolumeSource: corev1.VolumeSource{
 								PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-									ClaimName: pvcName,
+									ClaimName: jobOption.DestinationPVCName,
 								},
 							},
 						},
@@ -230,7 +221,42 @@ func jobFor(
 				},
 			},
 		},
-	}, nil
+	}
+
+	if drivers.CertFilePath != "" {
+		volumeMount := corev1.VolumeMount{
+			Name:      "tls-secret",
+			MountPath: drivers.CertMount,
+			ReadOnly:  true,
+		}
+
+		job.Spec.Template.Spec.Containers[0].VolumeMounts = append(
+			job.Spec.Template.Spec.Containers[0].VolumeMounts,
+			volumeMount,
+		)
+
+		volume := corev1.Volume{
+			Name: "tls-secret",
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName: jobOption.CertSecretName,
+				},
+			},
+		}
+
+		job.Spec.Template.Spec.Volumes = append(job.Spec.Template.Spec.Volumes, volume)
+
+		env := []corev1.EnvVar{
+			{
+				Name:  drivers.CertDirPath,
+				Value: drivers.CertMount,
+			},
+		}
+
+		job.Spec.Template.Spec.Containers[0].Env = env
+	}
+
+	return job, nil
 }
 
 func toJobName(destinationPVC string) string {
