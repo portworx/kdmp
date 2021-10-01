@@ -310,7 +310,6 @@ func runKopiaRepositoryConnect(repository *executor.Repository) error {
 	case storkv1.BackupLocationAzure:
 		connectCmd = populateAzureccessDetails(connectCmd, repository)
 	}
-
 	connectExecutor := kopia.NewConnectExecutor(connectCmd)
 	if err := connectExecutor.Run(); err != nil {
 		err = fmt.Errorf("failed to run repository connect  command: %v", err)
