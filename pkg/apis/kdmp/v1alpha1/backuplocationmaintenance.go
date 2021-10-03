@@ -43,7 +43,8 @@ type BackupLocationMaintenanceSpec struct {
 
 // BackupLocationMaintenanceStatus defines  the status for BackupLocationMaintenance
 type BackupLocationMaintenanceStatus struct {
-	RepoStatus map[string]RepoMaintenanceStatus
+	FullMaintenacneRepoStatus  map[string]RepoMaintenanceStatus
+	QuickMaintenacneRepoStatus map[string]RepoMaintenanceStatus
 }
 
 // RepoMaintenanceStatusType is the status of the repository maintenance run.

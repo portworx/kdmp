@@ -19,7 +19,10 @@ const (
 	kopiaMaintenanceJobPrefix = "repo-maintenance"
 	// TODO: for now setting it to 30 mints for testing purpose.
 	// Will change it to 24 hours later.
-	defaultSchedule = "*/30 * * * *"
+	defaultFullSchedule  = "*/10 * * * *"
+	defaultQuickSchedule = "*/5 * * * *"
+	fullMaintenanceType  = "full"
+	quickMaintenaceTye   = "quick"
 )
 
 // Driver is a kopia maintenance snapshot implementation
@@ -125,9 +128,15 @@ func jobFor(
 	maintenacneStatusNamespace,
 	serviceAccountName string,
 	resources corev1.ResourceRequirements,
-	labels map[string]string) (*batchv1beta1.CronJob, error) {
+	labels map[string]string,
+	maintenanceType string,
+) (*batchv1beta1.CronJob, error) {
 
 	labels = addJobLabels(labels)
+	scheduleInterval := defaultQuickSchedule
+	if maintenanceType == fullMaintenanceType {
+		scheduleInterval = defaultFullSchedule
+	}
 
 	cmd := strings.Join([]string{
 		"/kopiaexecutor",
@@ -140,6 +149,8 @@ func jobFor(
 		maintenaceStatusName,
 		"--maintenance-status-namespace",
 		maintenacneStatusNamespace,
+		"--maintenance-type",
+		maintenanceType,
 	}, " ")
 
 	return &batchv1beta1.CronJob{
@@ -149,7 +160,7 @@ func jobFor(
 			Labels:    labels,
 		},
 		Spec: batchv1beta1.CronJobSpec{
-			Schedule: defaultSchedule,
+			Schedule: scheduleInterval,
 			JobTemplate: batchv1beta1.JobTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      jobName,
@@ -237,5 +248,6 @@ func buildJob(jobName string, o drivers.JobOpts) (*batchv1beta1.CronJob, error) 
 		o.ServiceAccountName,
 		resources,
 		o.Labels,
+		o.MaintenanceType,
 	)
 }

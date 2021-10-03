@@ -32,6 +32,7 @@ type JobOpts struct {
 	BackupObjectName            string
 	BackupObjectUID             string
 	Labels                      map[string]string
+	MaintenanceType             string
 }
 
 // WithBackupObjectName is job parameter.
@@ -269,6 +270,14 @@ func WithDataExportName(name string) JobOption {
 			return fmt.Errorf("dataexport namespace should be set")
 		}
 		opts.DataExportName = name
+		return nil
+	}
+}
+
+// WithMaintenaceType is job parameter.
+func WithMaintenaceType(maintenanceType string) JobOption {
+	return func(opts *JobOpts) error {
+		opts.MaintenanceType = maintenanceType
 		return nil
 	}
 }
