@@ -7,6 +7,7 @@ import (
 
 	"github.com/portworx/kdmp/pkg/drivers"
 	"github.com/portworx/kdmp/pkg/version"
+	"github.com/portworx/sched-ops/k8s/core"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -45,6 +46,30 @@ func IsJobCompleted(j *batchv1.Job) bool {
 func IsJobFailed(j *batchv1.Job) bool {
 	for _, c := range j.Status.Conditions {
 		if c.Type == batchv1.JobFailed && c.Status == corev1.ConditionTrue {
+			return true
+		}
+	}
+	return false
+}
+
+// IsJobPending checks if a kubernetes job is in pending state
+func IsJobPending(j *batchv1.Job) bool {
+	// Check if the pod is in running state
+	pods, err := core.Instance().GetPods(
+		j.Namespace,
+		map[string]string{
+			"job-name": j.Name,
+		},
+	)
+	if err != nil {
+		// Cannot determine job state
+		return false
+	} else if len(pods.Items) == 0 {
+		return true
+	}
+	for _, c := range pods.Items[0].Status.ContainerStatuses {
+		if c.State.Waiting != nil {
+			// container is in waiting state
 			return true
 		}
 	}
