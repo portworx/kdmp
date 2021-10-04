@@ -44,7 +44,7 @@ func (d Driver) StartJob(opts ...drivers.JobOption) (id string, err error) {
 	}
 	// DataExportName will be unique name when also generated from stork
 	// if there are multiple backups being triggered
-	jobName := toJobName(o.SourcePVCName)
+	jobName := o.DataExportName
 	logrus.Debugf("backup jobname: %s", jobName)
 	job, err := buildJob(jobName, o)
 	if err != nil {
@@ -261,10 +261,6 @@ func jobFor(
 	}
 
 	return job, nil
-}
-
-func toJobName(sourcePVCName string) string {
-	return fmt.Sprintf("%s-%s", utils.BackupJobPrefix, sourcePVCName)
 }
 
 func toRepoName(pvcName, pvcNamespace string) string {

@@ -69,7 +69,7 @@ func runRestore(snapshotID, targetPath string) error {
 		status := &executor.Status{
 			LastKnownError: err,
 		}
-		if err = executor.WriteVolumeBackupStatus(status, volumeBackupName, bkpNamespace); err != nil {
+		if err = executor.WriteVolumeBackupStatus(status, volumeBackupName, restoreNamespace); err != nil {
 			errMsg := fmt.Sprintf("failed to write a VolumeBackup status: %v", err)
 			logrus.Errorf("%v", errMsg)
 			return fmt.Errorf(errMsg)
