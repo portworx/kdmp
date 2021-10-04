@@ -242,6 +242,26 @@ func (c *Command) DeleteCmd() *exec.Cmd {
 	return cmd
 }
 
+// QuickMaintenanceRunCmd returns os/exec.Cmd object for the kopia quick maintenance run Command
+// For quick maintenance, we need not to give "--full" option.
+func (c *Command) QuickMaintenanceRunCmd() *exec.Cmd {
+	// Get all the flags
+	argsSlice := []string{
+		c.Name, // maintenance command
+		"run",
+	}
+	argsSlice = append(argsSlice, c.Flags...)
+	// Get the cmd args
+	argsSlice = append(argsSlice, c.Args...)
+	cmd := exec.Command(baseCmd, argsSlice...)
+	if len(c.Env) > 0 {
+		cmd.Env = append(os.Environ(), c.Env...)
+	}
+	cmd.Dir = c.Dir
+
+	return cmd
+}
+
 // MaintenanceRunCmd returns os/exec.Cmd object for the kopia maintenance run Command
 func (c *Command) MaintenanceRunCmd() *exec.Cmd {
 	// Get all the flags
