@@ -117,6 +117,11 @@ func (d Driver) JobStatus(id string) (*drivers.JobStatus, error) {
 
 	vb, err := kdmpops.Instance().GetVolumeBackup(context.Background(), name, namespace)
 	if err != nil {
+		if apierrors.IsNotFound(err) {
+			if utils.IsJobPending(job) {
+				return utils.ToJobStatus(0, "job is in pending state"), nil
+			}
+		}
 		errMsg := fmt.Sprintf("failed to fetch volumebackup %s/%s status: %v", namespace, name, err)
 		logrus.Errorf("%s: %v", fn, errMsg)
 		return nil, fmt.Errorf(errMsg)
