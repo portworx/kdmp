@@ -14,15 +14,25 @@ import (
 
 // BackupSummaryResponse describes single snapshot entry.
 type BackupSummaryResponse struct {
-	ID               string           `json:"id"`
-	Source           SourceInfo       `json:"source"`
-	Description      string           `json:"description"`
-	StartTime        time.Time        `json:"startTime"`
-	EndTime          time.Time        `json:"endTime"`
-	IncompleteReason string           `json:"incomplete,omitempty"`
+	ID               string     `json:"id"`
+	Source           SourceInfo `json:"source"`
+	Description      string     `json:"description"`
+	StartTime        time.Time  `json:"startTime"`
+	EndTime          time.Time  `json:"endTime"`
+	IncompleteReason string     `json:"incomplete,omitempty"`
+	RootEntry        RootEntry  `json:"rootEntry"`
+	RetentionReasons []string   `json:"retention"`
+}
+
+// RootEntry storing directory information
+type RootEntry struct {
+	Name             string           `json:"name"`
+	Type             string           `json:"type"`
+	Mode             string           `json:"mode"`
+	ModifiedTime     time.Time        `json:"mtime"`
+	UID              uint64           `json:"uid"`
+	ObjectIdentifier string           `json:"obj"`
 	Summary          DirectorySummary `json:"summ"`
-	RootEntry        string           `json:"rootID"`
-	RetentionReasons []string         `json:"retention"`
 }
 
 // SourceInfo represents the information about snapshot source.
@@ -34,7 +44,7 @@ type SourceInfo struct {
 
 // DirectorySummary represents summary information about a directory.
 type DirectorySummary struct {
-	TotalFileSize     int64     `json:"size"`
+	TotalFileSize     uint64    `json:"size"`
 	TotalFileCount    int64     `json:"files"`
 	TotalSymlinkCount int64     `json:"symlinks"`
 	TotalDirCount     int64     `json:"dirs"`
@@ -130,8 +140,8 @@ func (b *backupExecutor) Status() (*cmdexec.Status, error) {
 		return &cmdexec.Status{
 			ProgressPercentage: 100,
 			// TODO: We don't need totalbytes processed as size is same?
-			TotalBytesProcessed: uint64(b.summaryResponse.Summary.TotalFileSize),
-			TotalBytes:          uint64(b.summaryResponse.Summary.TotalFileSize),
+			TotalBytesProcessed: uint64(b.summaryResponse.RootEntry.Summary.TotalFileSize),
+			TotalBytes:          uint64(b.summaryResponse.RootEntry.Summary.TotalFileSize),
 			SnapshotID:          b.summaryResponse.ID,
 			Done:                true,
 			LastKnownError:      nil,
@@ -156,9 +166,10 @@ func getBackupSummary(outBytes []byte, errBytes []byte) (*BackupSummaryResponse,
 
 	outResponse := outLines[0]
 	summaryResponse := &BackupSummaryResponse{
-		Summary: DirectorySummary{},
+		RootEntry: RootEntry{
+			Summary: DirectorySummary{},
+		},
 	}
-
 	if err := json.Unmarshal(outResponse, summaryResponse); err != nil {
 		return nil, &cmdexec.Error{
 			Reason:    fmt.Sprintf("failed to parse backup summary: %v", err),
@@ -175,12 +186,13 @@ func getBackupSummary(outBytes []byte, errBytes []byte) (*BackupSummaryResponse,
 		}
 	}
 	// If numFailed is non-zero, fail the backup
-	if summaryResponse.Summary.FatalErrorCount != 0 {
+	if summaryResponse.RootEntry.Summary.FatalErrorCount != 0 {
 		return nil, &cmdexec.Error{
-			Reason:    fmt.Sprintf("failed to backup as FatalErrorCount is %v", summaryResponse.Summary.FatalErrorCount),
+			Reason:    fmt.Sprintf("failed to backup as FatalErrorCount is %v", summaryResponse.RootEntry.Summary.FatalErrorCount),
 			CmdOutput: string(outResponse),
 			CmdErr:    string(errBytes),
 		}
 	}
+
 	return summaryResponse, nil
 }
