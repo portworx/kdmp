@@ -137,8 +137,7 @@ func (d Driver) validate(o drivers.JobOpts) error {
 
 func jobFor(
 	jobOption drivers.JobOpts,
-	jobName,
-	credSecretName string,
+	jobName string,
 	resources corev1.ResourceRequirements,
 ) (*batchv1.Job, error) {
 	backupName := jobName
@@ -153,7 +152,7 @@ func jobFor(
 		"--repository",
 		toRepoName(jobOption.SourcePVCName, jobOption.Namespace),
 		"--credentials",
-		credSecretName,
+		jobOption.DataExportName,
 		"--backup-location",
 		jobOption.BackupLocationName,
 		"--backup-location-namespace",
@@ -217,7 +216,7 @@ func jobFor(
 							Name: "cred-secret",
 							VolumeSource: corev1.VolumeSource{
 								Secret: &corev1.SecretVolumeSource{
-									SecretName: credSecretName,
+									SecretName: jobOption.DataExportName,
 								},
 							},
 						},
@@ -300,7 +299,6 @@ func buildJob(jobName string, jobOptions drivers.JobOpts) (*batchv1.Job, error) 
 		return jobForLiveBackup(
 			jobOptions,
 			jobName,
-			utils.FrameCredSecretName(utils.BackupJobPrefix, jobOptions.DataExportName),
 			pods[0],
 			resources,
 		)
@@ -309,7 +307,6 @@ func buildJob(jobName string, jobOptions drivers.JobOpts) (*batchv1.Job, error) 
 	return jobFor(
 		jobOptions,
 		jobName,
-		utils.FrameCredSecretName(utils.BackupJobPrefix, jobOptions.DataExportName),
 		resources,
 	)
 }
