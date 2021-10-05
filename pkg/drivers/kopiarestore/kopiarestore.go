@@ -50,7 +50,6 @@ func (d Driver) StartJob(opts ...drivers.JobOption) (id string, err error) {
 		o,
 		vb,
 		jobName,
-		utils.FrameCredSecretName(utils.RestoreJobPrefix, o.DataExportName),
 	)
 	if err != nil {
 		return "", err
@@ -123,8 +122,7 @@ func (d Driver) validate(o drivers.JobOpts) error {
 func jobFor(
 	jobOption drivers.JobOpts,
 	vb *v1alpha1.VolumeBackup,
-	jobName,
-	credSecretName string,
+	jobName string,
 ) (*batchv1.Job, error) {
 	labels := addJobLabels(jobOption.Labels)
 
@@ -151,7 +149,7 @@ func jobFor(
 		"--restore-namespace",
 		jobOption.Namespace,
 		"--credentials",
-		credSecretName,
+		jobOption.DataExportName,
 		"--target-path",
 		"/data",
 		"--snapshot-id",
@@ -211,7 +209,7 @@ func jobFor(
 							Name: "cred-secret",
 							VolumeSource: corev1.VolumeSource{
 								Secret: &corev1.SecretVolumeSource{
-									SecretName: credSecretName,
+									SecretName: jobOption.DataExportName,
 								},
 							},
 						},
