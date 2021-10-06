@@ -126,7 +126,7 @@ func jobFor(
 ) (*batchv1.Job, error) {
 	labels := addJobLabels(jobOption.Labels)
 
-	resources, err := utils.JobResourceRequirements()
+	resources, err := utils.KopiaResourceRequirements()
 	if err != nil {
 		return nil, err
 	}
