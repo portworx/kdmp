@@ -5,8 +5,8 @@ go 1.15
 require (
 	github.com/aquilax/truncate v1.0.0
 	github.com/kubernetes-csi/external-snapshotter/client/v4 v4.0.0
-	github.com/kubernetes-incubator/external-storage v0.20.4-openstorage-rc2
-	github.com/libopenstorage/stork v1.4.1-0.20210925152742-aaa75e7c457f
+	github.com/kubernetes-incubator/external-storage v0.20.4-openstorage-rc6
+	github.com/libopenstorage/stork v1.4.1-0.20211005135736-c670be7925d2
 	github.com/portworx/pxc v0.33.0
 	github.com/portworx/sched-ops v1.20.4-rc1.0.20210929114621-9001768f8eb7
 	github.com/sirupsen/logrus v1.8.1
@@ -29,7 +29,7 @@ require (
 replace (
 	github.com/googleapis/gnostic => github.com/googleapis/gnostic v0.4.1
 	github.com/kubernetes-csi/external-snapshotter/v2 => github.com/kubernetes-csi/external-snapshotter/v2 v2.1.1
-	github.com/kubernetes-incubator/external-storage => github.com/libopenstorage/external-storage v0.20.4-openstorage-rc3
+	github.com/kubernetes-incubator/external-storage => github.com/libopenstorage/external-storage v0.20.4-openstorage-rc6
 	github.com/kubernetes-incubator/external-storage v0.0.0-00010101000000-000000000000 => github.com/libopenstorage/external-storage v5.3.0-alpha.1.0.20200130041458-d2b33d4448ea+incompatible
 	k8s.io/api => k8s.io/api v0.20.4
 	k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.20.4
