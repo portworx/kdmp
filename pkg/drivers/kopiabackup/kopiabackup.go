@@ -7,6 +7,7 @@ import (
 
 	"github.com/portworx/kdmp/pkg/drivers"
 	"github.com/portworx/kdmp/pkg/drivers/utils"
+	"github.com/portworx/kdmp/pkg/jobratelimit"
 	kdmpops "github.com/portworx/kdmp/pkg/util/ops"
 	"github.com/portworx/sched-ops/k8s/batch"
 	coreops "github.com/portworx/sched-ops/k8s/core"
@@ -29,6 +30,12 @@ func (d Driver) Name() string {
 // StartJob creates a job for data transfer between volumes.
 func (d Driver) StartJob(opts ...drivers.JobOption) (id string, err error) {
 	fn := "StartJob"
+	// Check whether there is slot to schedule the job.
+	driverType := d.Name()
+	available := jobratelimit.JobCanRun(driverType)
+	if !available {
+		return "", utils.ErrOutOfJobResources
+	}
 	o := drivers.JobOpts{}
 	for _, opt := range opts {
 		if opt != nil {
