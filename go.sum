@@ -793,8 +793,11 @@ github.com/libopenstorage/stork v1.4.1-0.20210925152742-aaa75e7c457f h1:6hcYQ0zI
 github.com/libopenstorage/stork v1.4.1-0.20210925152742-aaa75e7c457f/go.mod h1:V9fTbUFPOO/Ap3rfwz4bQJTB8L8rya1YiIbAfFhSPLA=
 github.com/libopenstorage/stork v1.4.1-0.20211005135736-c670be7925d2 h1:zeu6l74KCZdhBffM1fpZxukkVCgCgn1MnV4uIRMhGgU=
 github.com/libopenstorage/stork v1.4.1-0.20211005135736-c670be7925d2/go.mod h1:iPI/Hy/+nR+O0swmX0IBkD7QjjFNYoWvdafVrPSauPg=
+github.com/libopenstorage/stork v1.4.1-0.20211005182718-1c9b1186e228/go.mod h1:iPI/Hy/+nR+O0swmX0IBkD7QjjFNYoWvdafVrPSauPg=
 github.com/libopenstorage/stork v1.4.1-0.20211007173333-ae7f793dcb5c h1:lkxViR230BnkBLxX/Bc3oiQmzIbmffZRNIo3bInMPfM=
 github.com/libopenstorage/stork v1.4.1-0.20211007173333-ae7f793dcb5c/go.mod h1:xrUHkvEq/8Pw74Wje2bLgd40Iv92gCUf1ck1jUg8YI8=
+github.com/libopenstorage/stork v1.4.1-0.20211012172837-b4d489e3aac8 h1:4162lmIT77TzUgA/2DSt+Bm4axSaDVLH/4l2GGe4sII=
+github.com/libopenstorage/stork v1.4.1-0.20211012172837-b4d489e3aac8/go.mod h1:UyIEpfnhai7e9wlrSL4wgd1QXrAzN1zhaE2eMvckhx8=
 github.com/liggitt/tabwriter v0.0.0-20181228230101-89fcab3d43de h1:9TO3cAIGXtEhnIaL+V+BEER86oLrvS+kWobKpbJuye0=
 github.com/liggitt/tabwriter v0.0.0-20181228230101-89fcab3d43de/go.mod h1:zAbeS9B/r2mtpb6U+EI2rYA5OAXxsYw6wTamcNW+zcE=
 github.com/lightstep/lightstep-tracer-common/golang/gogo v0.0.0-20190605223551-bc2310a04743/go.mod h1:qklhhLq1aX+mtWk9cPHPzaBjWImj5ULL6C7HFJtXQMM=
@@ -998,6 +1001,7 @@ github.com/portworx/kdmp v0.4.1-0.20210925150700-f53aaa2c7696/go.mod h1:2iVeU1Op
 github.com/portworx/kdmp v0.4.1-0.20210929095959-dbee7f98b06f/go.mod h1:k9yJD2Kvv9dyEkSv4J82t4nAsHJkPaV6jN0wq28MSmI=
 github.com/portworx/kdmp v0.4.1-0.20211004132125-118c8be62b32/go.mod h1:XuR8mr500GAXdW/lW2ASeyney3f/SlfP4140YjAIeec=
 github.com/portworx/kdmp v0.4.1-0.20211007020540-ca77d6d2ade1/go.mod h1:bTzLxUEmYhrft5MWnDRekNeU3KDngbzosbnY88p5jwA=
+github.com/portworx/kdmp v0.4.1-0.20211008122639-3554850ec03c/go.mod h1:a1NbL4OPJE9JfcMIB1BdJbZEVZocd8+aYNVnLLDDLHE=
 github.com/portworx/kvdb v0.0.0-20190105022415-cccaa09abfc9/go.mod h1:Q8YyrNDvPp3DVF96BDcQuaC7fAYUCuUX+l58S7OnD2M=
 github.com/portworx/kvdb v0.0.0-20191223203141-f42097b1fcd8/go.mod h1:Q8YyrNDvPp3DVF96BDcQuaC7fAYUCuUX+l58S7OnD2M=
 github.com/portworx/kvdb v0.0.0-20200311180812-b2c72382d652/go.mod h1:Q8YyrNDvPp3DVF96BDcQuaC7fAYUCuUX+l58S7OnD2M=
