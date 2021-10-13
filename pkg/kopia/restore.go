@@ -5,9 +5,36 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"strconv"
+	"strings"
 
 	cmdexec "github.com/portworx/kdmp/pkg/executor"
 	"github.com/sirupsen/logrus"
+)
+
+const (
+	restoreMsg = "Restored"
+)
+
+const (
+	// KB 1000 bytes
+	KB = 1000
+	// MB 1000 KB
+	MB = KB * 1000
+	// GB 1000 MB
+	GB = MB * 1000
+	// TB 1000 GB
+	TB = GB * 1000
+	// PB 1000 TB
+	PB = TB * 1000
+)
+
+const (
+	kb = "KB"
+	mb = "MB"
+	gb = "GB"
+	tb = "TB"
+	pb = "PB"
 )
 
 // GetRestoreCommand returns a wrapper over the kopia restore command.
@@ -94,6 +121,8 @@ func (b *restoreExecutor) Run() error {
 }
 
 func (b *restoreExecutor) Status() (*cmdexec.Status, error) {
+	errBytes := b.errBuf.Bytes()
+
 	if b.lastError != nil {
 		fmt.Fprintln(os.Stderr, b.errBuf.String())
 		return &cmdexec.Status{
@@ -101,13 +130,51 @@ func (b *restoreExecutor) Status() (*cmdexec.Status, error) {
 			Done:           true,
 		}, nil
 	}
-
 	if !b.isRunning {
-		return &cmdexec.Status{
-			ProgressPercentage: 100,
-			Done:               true,
-		}, nil
-	}
+		errLines := bytes.Split(errBytes, []byte("\n"))
+		var size float64
+		for _, lines := range errLines {
+			if bytes.Contains(lines, []byte(restoreMsg)) {
+				// Sample message of output
+				// [Restored 136 files, 3 directories and 0 symbolic links (120.9 MB).]
+				modStrings := strings.Split(string(lines), " ")
+				mstr := modStrings[len(modStrings)-2]
+				trimstr := strings.Trim(mstr, "(")
+				trimstr = strings.Trim(trimstr, ".")
+				var err error
+				size, err = strconv.ParseFloat(trimstr, 32)
+				if err != nil {
+					// On failure, don't want to fail restore thats the current
+					// behavior for other providers also
+					logrus.Errorf("%v", err)
+				}
 
-	return &cmdexec.Status{}, nil
+				// Convert size to bytes
+				if bytes.Contains(lines, []byte(kb)) {
+					size = size * KB
+				} else if bytes.Contains(lines, []byte(mb)) {
+					size = size * MB
+				} else if bytes.Contains(lines, []byte(gb)) {
+					size = size * GB
+				} else if bytes.Contains(lines, []byte(tb)) {
+					size = size * TB
+				} else if bytes.Contains(lines, []byte(pb)) {
+					size = size * PB
+				}
+			}
+		}
+		logrus.Infof("restore size: %v", size)
+		status := &cmdexec.Status{
+			TotalBytes:          uint64(size),
+			TotalBytesProcessed: uint64(size),
+			LastKnownError:      nil,
+			Done:                true,
+		}
+		return status, nil
+
+	}
+	return &cmdexec.Status{
+		LastKnownError: nil,
+		Done:           false,
+	}, nil
 }
