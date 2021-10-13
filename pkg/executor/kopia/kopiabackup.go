@@ -33,6 +33,14 @@ var (
 	bkpNamespace string
 )
 
+var (
+	kopiaProvderType = map[storkv1.BackupLocationType]string{
+		storkv1.BackupLocationS3:     "s3",
+		storkv1.BackupLocationGoogle: "gcs",
+		storkv1.BackupLocationAzure:  "azure",
+	}
+)
+
 func newBackupCommand() *cobra.Command {
 	var (
 		sourcePath     string
@@ -169,18 +177,31 @@ func populateAzureccessDetails(initCmd *kopia.Command, repository *executor.Repo
 }
 
 func runKopiaCreateRepo(repository *executor.Repository) error {
+	var err error
+	var repoCreateCmd *kopia.Command
+
 	logrus.Infof("Repository creation started")
-	repoCreateCmd, err := kopia.GetCreateCommand(
-		repository.Path,
-		repository.Name,
-		repository.Password,
-		string(repository.Type),
-		repository.S3Config.DisableSSL,
-	)
+	switch repository.Type {
+	case storkv1.BackupLocationS3:
+		repoCreateCmd, err = kopia.GetCreateCommand(
+			repository.Path,
+			repository.Name,
+			repository.Password,
+			kopiaProvderType[repository.Type],
+			repository.S3Config.DisableSSL,
+		)
+	default:
+		repoCreateCmd, err = kopia.GetCreateCommand(
+			repository.Path,
+			repository.Name,
+			repository.Password,
+			kopiaProvderType[repository.Type],
+			false,
+		)
+	}
 	if err != nil {
 		return err
 	}
-
 	switch repository.Type {
 	case storkv1.BackupLocationS3:
 		repoCreateCmd = populateS3AccessDetails(repoCreateCmd, repository)
@@ -290,14 +311,27 @@ func runKopiaBackup(repository *executor.Repository, sourcePath string) error {
 }
 
 func runKopiaRepositoryConnect(repository *executor.Repository) error {
+	var err error
+	var connectCmd *kopia.Command
 	logrus.Infof("Repository connect started")
-	connectCmd, err := kopia.GetConnectCommand(
-		repository.Path,
-		repository.Name,
-		repository.Password,
-		string(repository.Type),
-		repository.S3Config.DisableSSL,
-	)
+	switch repository.Type {
+	case storkv1.BackupLocationS3:
+		connectCmd, err = kopia.GetConnectCommand(
+			repository.Path,
+			repository.Name,
+			repository.Password,
+			kopiaProvderType[repository.Type],
+			repository.S3Config.DisableSSL,
+		)
+	default:
+		connectCmd, err = kopia.GetConnectCommand(
+			repository.Path,
+			repository.Name,
+			repository.Password,
+			kopiaProvderType[repository.Type],
+			false,
+		)
+	}
 	if err != nil {
 		return err
 	}
