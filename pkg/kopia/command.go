@@ -87,7 +87,26 @@ func (c *Command) CreateCmd() *exec.Cmd {
 			"--prefix",
 			c.RepositoryName,
 		}
-	case "s3", "google":
+	case "s3":
+		argsSlice = []string{
+			"repository",
+			c.Name, // create command
+			c.Provider,
+			"--bucket",
+			c.Path,
+			"--password",
+			c.Password,
+			"--prefix",
+			c.RepositoryName,
+		}
+
+		if c.DisableSsl {
+			ssl := []string{
+				"--disable-tls",
+			}
+			argsSlice = append(argsSlice, ssl...)
+		}
+	case "gcs":
 		argsSlice = []string{
 			"repository",
 			c.Name, // create command
@@ -100,13 +119,7 @@ func (c *Command) CreateCmd() *exec.Cmd {
 			c.RepositoryName,
 		}
 	}
-	var ssl []string
-	if c.DisableSsl {
-		ssl = []string{
-			"--disable-tls",
-		}
-	}
-	argsSlice = append(argsSlice, ssl...)
+
 	argsSlice = append(argsSlice, c.Flags...)
 	// Get the cmd args
 	argsSlice = append(argsSlice, c.Args...)
@@ -152,7 +165,25 @@ func (c *Command) ConnectCmd() *exec.Cmd {
 			"--prefix",
 			c.RepositoryName,
 		}
-	case "s3", "google":
+	case "s3":
+		argsSlice = []string{
+			"repository",
+			c.Name, // connect command
+			c.Provider,
+			"--bucket",
+			c.Path,
+			"--password",
+			c.Password,
+			"--prefix",
+			c.RepositoryName,
+		}
+		if c.DisableSsl {
+			ssl := []string{
+				"--disable-tls",
+			}
+			argsSlice = append(argsSlice, ssl...)
+		}
+	case "gcs":
 		argsSlice = []string{
 			"repository",
 			c.Name, // connect command
@@ -165,14 +196,8 @@ func (c *Command) ConnectCmd() *exec.Cmd {
 			c.RepositoryName,
 		}
 	}
-	var ssl []string
-	if c.DisableSsl {
-		ssl = []string{
-			"--disable-tls",
-		}
-	}
+
 	argsSlice = append(argsSlice, c.Flags...)
-	argsSlice = append(argsSlice, ssl...)
 	// Get the cmd args
 	argsSlice = append(argsSlice, c.Args...)
 	cmd := exec.Command(baseCmd, argsSlice...)
