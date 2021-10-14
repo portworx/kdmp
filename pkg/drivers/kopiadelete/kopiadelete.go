@@ -281,7 +281,7 @@ func addJobLabels(labels map[string]string, jobOpts drivers.JobOpts) map[string]
 		labels = make(map[string]string)
 	}
 
-	labels[drivers.DriverNameLabel] = drivers.KopiaBackup
+	labels[drivers.DriverNameLabel] = drivers.KopiaDelete
 	labels[utils.BackupObjectNameKey] = jobOpts.BackupObjectName
 	labels[utils.BackupObjectUIDKey] = jobOpts.BackupObjectUID
 	return labels
