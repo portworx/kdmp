@@ -13,6 +13,7 @@ import (
 	storkapi "github.com/libopenstorage/stork/pkg/apis/stork/v1alpha1"
 	kdmpapi "github.com/portworx/kdmp/pkg/apis/kdmp/v1alpha1"
 	"github.com/portworx/kdmp/pkg/drivers"
+	"github.com/portworx/kdmp/pkg/drivers/utils"
 	kdmpops "github.com/portworx/kdmp/pkg/util/ops"
 	kdmpschedops "github.com/portworx/sched-ops/k8s/kdmp"
 	storkops "github.com/portworx/sched-ops/k8s/stork"
@@ -437,6 +438,9 @@ func CreateVolumeBackup(name, namespace, repository, blName, blNamespace string)
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: namespace,
+			Annotations: map[string]string{
+				utils.SkipResourceAnnotation: "true",
+			},
 		},
 		Spec: kdmpapi.VolumeBackupSpec{
 			Repository: repository,
