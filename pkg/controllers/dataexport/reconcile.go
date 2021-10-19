@@ -208,7 +208,7 @@ func (c *Controller) sync(ctx context.Context, in *kdmpapi.DataExport) (bool, er
 		id, err := startTransferJob(driver, srcPVCName, dataExport)
 		if err != nil {
 			msg := fmt.Sprintf("failed to start a data transfer job, dataexport [%v]: %v", dataExport.Name, err)
-			logrus.Error(msg)
+			logrus.Warnf(msg)
 			return false, c.updateStatus(dataExport, kdmpapi.DataExportStatusFailed, msg)
 		}
 
