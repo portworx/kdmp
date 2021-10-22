@@ -62,11 +62,13 @@ var volumeAPICallBackoff = wait.Backoff{
 	Steps:    volumeSteps,
 }
 
+var lastKnownStatusOfInProgress kdmpapi.DataExportStatus
+var lastKnownInProgressErrMsg string
+
 func (c *Controller) sync(ctx context.Context, in *kdmpapi.DataExport) (bool, error) {
 	if in == nil {
 		return false, nil
 	}
-
 	dataExport := in.DeepCopy()
 
 	// set the initial stage
@@ -119,7 +121,6 @@ func (c *Controller) sync(ctx context.Context, in *kdmpapi.DataExport) (bool, er
 		controllers.RemoveFinalizer(dataExport, cleanupFinalizer)
 		return true, c.client.Update(ctx, dataExport)
 	}
-
 	switch dataExport.Status.Stage {
 	case kdmpapi.DataExportStageInitial:
 		return c.stageInitial(ctx, dataExport)
@@ -218,106 +219,86 @@ func (c *Controller) sync(ctx context.Context, in *kdmpapi.DataExport) (bool, er
 		dataExport.Status.TransferID = id
 		return true, c.client.Update(ctx, setStatus(dataExport, kdmpapi.DataExportStatusSuccessful, ""))
 	case kdmpapi.DataExportStageTransferInProgress:
-		if dataExport.Status.Status == kdmpapi.DataExportStatusSuccessful {
+		// Remember the state so that we populate the same in the final stage if cleanup
+		// pass but InProgress failed. Need to propogate failure to caller
+		lastKnownStatusOfInProgress = dataExport.Status.Status
+		lastKnownInProgressErrMsg = dataExport.Status.Reason
+		if dataExport.Status.Status == kdmpapi.DataExportStatusSuccessful ||
+			dataExport.Status.Status == kdmpapi.DataExportStatusFailed {
 			// set to the next stage
-			dataExport.Status.Stage = kdmpapi.DataExportStageFinal
-			return true, c.client.Update(ctx, setStatus(dataExport, kdmpapi.DataExportStatusInitial, ""))
+			dataExport.Status.Stage = kdmpapi.DataExportStageCleanup
+			return false, c.client.Update(ctx, setStatus(dataExport, kdmpapi.DataExportStatusInitial, ""))
 		}
 
 		// get transfer job status
 		progress, err := driver.JobStatus(dataExport.Status.TransferID)
 		if err != nil {
-			msg := fmt.Sprintf("failed to get %s job status: %s", dataExport.Status.TransferID, err)
-			return false, c.updateStatus(dataExport, kdmpapi.DataExportStatusFailed, msg)
+			errMsg := fmt.Sprintf("failed to get %s job status: %s", dataExport.Status.TransferID, err)
+			return false, c.updateStatus(dataExport, kdmpapi.DataExportStatusFailed, errMsg)
 		}
 
 		switch progress.State {
 		case drivers.JobStateFailed:
-			msg := fmt.Sprintf("%s transfer job failed: %s", dataExport.Status.TransferID, progress.Reason)
-			return false, c.updateStatus(dataExport, kdmpapi.DataExportStatusFailed, msg)
+			errMsg := fmt.Sprintf("%s transfer job failed: %s", dataExport.Status.TransferID, progress.Reason)
+			// If a job has failed it means it has tried all possible retires and given up.
+			// In such a scenario we need to fail DE CR and move to clean up stage
+			return true, c.updateStatus(dataExport, kdmpapi.DataExportStatusFailed, errMsg)
 		case drivers.JobStateCompleted:
-			return false, c.updateStatus(dataExport, kdmpapi.DataExportStatusSuccessful, "")
-		}
+			var vbName string
+			var vbNamespace string
+			if driverName == drivers.KopiaBackup {
+				vbNamespace, vbName, err = utils.ParseJobID(dataExport.Status.TransferID)
+				if err != nil {
+					errMsg := fmt.Sprintf("failed to parse job ID %v from DataExport CR: %v: %v",
+						dataExport.Status.TransferID, dataExport.Name, err)
+					return false, c.updateStatus(dataExport, kdmpapi.DataExportStatusFailed, errMsg)
+				}
+			}
+			if driverName == drivers.KopiaRestore {
+				vbName = dataExport.Spec.Source.Name
+				vbNamespace = dataExport.Spec.Source.Namespace
+			}
+			var volumeBackupCR *kdmpapi.VolumeBackup
+			var vbErr error
+			vbTask := func() (interface{}, bool, error) {
+				volumeBackupCR, vbErr = kdmpopts.Instance().GetVolumeBackup(context.Background(),
+					vbName, vbNamespace)
+				if errors.IsNotFound(vbErr) {
+					errMsg := fmt.Sprintf("volumebackup CR %v/%v not found", vbNamespace, vbName)
+					logrus.Errorf("%v", errMsg)
+					return "", false, fmt.Errorf(errMsg)
+				}
 
-		dataExport.Status.ProgressPercentage = int(progress.ProgressPercents)
-		return false, c.updateStatus(dataExport, kdmpapi.DataExportStatusInProgress, "")
-	case kdmpapi.DataExportStageFinal:
-		// If we have a failure case in this stage it means in the previous stage
-		// all retries were done in cleaning up resources and failed.
-		// In such a case we don't want to proceed further as stork will
-		// eventually clean up DE CR.
-		// Without this, we would again see the resource cleanup error and move
-		// the status to DataExportStatusInProgress which is not desireable
-		if dataExport.Status.Status == kdmpapi.DataExportStatusSuccessful ||
-			dataExport.Status.Status == kdmpapi.DataExportStatusFailed {
-			return false, nil
-		}
-
-		var vbName string
-		var vbNamespace string
-		if driverName == drivers.KopiaBackup {
-			vbNamespace, vbName, err = utils.ParseJobID(dataExport.Status.TransferID)
-			if err != nil {
-				errMsg := fmt.Sprintf("failed to parse job ID %v from DataExport CR: %v: %v",
-					dataExport.Status.TransferID, dataExport.Name, err)
+				if vbErr != nil {
+					errMsg := fmt.Sprintf("failed to read VolumeBackup CR %v: %v", vbName, err)
+					logrus.Errorf("%v", errMsg)
+					err := c.updateStatus(dataExport, kdmpapi.DataExportStatusInProgress, "")
+					if err != nil {
+						return "", false, fmt.Errorf("%v", err)
+					}
+					return "", true, fmt.Errorf("%v", errMsg)
+				}
+				return "", false, nil
+			}
+			if _, err := task.DoRetryWithTimeout(vbTask, defaultTimeout, progressCheckInterval); err != nil {
+				errMsg := fmt.Sprintf("max retries done, failed to read VolumeBackup CR %v: %v", vbName, err)
+				logrus.Errorf("%v", errMsg)
+				// Exhausted all retries, fail the CR
 				return false, c.updateStatus(dataExport, kdmpapi.DataExportStatusFailed, errMsg)
 			}
-		}
 
-		if driverName == drivers.KopiaRestore {
-			vbName = dataExport.Spec.Source.Name
-			vbNamespace = dataExport.Spec.Source.Namespace
+			dataExport.Status.SnapshotID = volumeBackupCR.Status.SnapshotID
+			dataExport.Status.Size = volumeBackupCR.Status.TotalBytes
+			dataExport.Status.ProgressPercentage = int(progress.ProgressPercents)
+			return false, c.updateStatus(dataExport, kdmpapi.DataExportStatusSuccessful, "")
 		}
-		var volumeBackupCR *kdmpapi.VolumeBackup
-		var vbErr error
-		vbTask := func() (interface{}, bool, error) {
-			volumeBackupCR, vbErr = kdmpopts.Instance().GetVolumeBackup(context.Background(),
-				vbName, vbNamespace)
-			if errors.IsNotFound(vbErr) {
-				errMsg := fmt.Sprintf("volumebackup CR %v/%v not found", vbNamespace, vbName)
-				logrus.Errorf("%v", errMsg)
-				return "", false, fmt.Errorf(errMsg)
-			}
-
-			if vbErr != nil {
-				errMsg := fmt.Sprintf("failed to read VolumeBackup CR %v: %v", vbName, err)
-				logrus.Errorf("%v", errMsg)
-				err := c.updateStatus(dataExport, kdmpapi.DataExportStatusInProgress, "")
-				if err != nil {
-					return "", false, fmt.Errorf("%v", err)
-				}
-				return "", true, fmt.Errorf("%v", errMsg)
-			}
-			return "", false, nil
-		}
-		if _, err := task.DoRetryWithTimeout(vbTask, defaultTimeout, progressCheckInterval); err != nil {
-			errMsg := fmt.Sprintf("max retries done, failed to read VolumeBackup CR %v: %v", vbName, err)
-			logrus.Errorf("%v", errMsg)
-			// Exhausted all retries, fail the CR
-			return false, c.updateStatus(dataExport, kdmpapi.DataExportStatusFailed, errMsg)
-		}
-
-		dataExport.Status.SnapshotID = volumeBackupCR.Status.SnapshotID
-		dataExport.Status.Size = volumeBackupCR.Status.TotalBytes
-		tlsTask := func() (interface{}, bool, error) {
-			// Delete the tls certificate secret created
-			err = core.Instance().DeleteSecret(drivers.CertSecretName, dataExport.Spec.Source.Namespace)
-			if err != nil && !errors.IsNotFound(err) {
-				errMsg := fmt.Sprintf("failed to delete [%s/%s] secret", dataExport.Spec.Source.Namespace, drivers.CertSecretName)
-				logrus.Errorf("%v", errMsg)
-				err := c.updateStatus(dataExport, kdmpapi.DataExportStatusInProgress, "")
-				if err != nil {
-					return "", false, fmt.Errorf("%v", err)
-				}
-				return "", true, fmt.Errorf("%v", errMsg)
-			}
-			return "", false, nil
-		}
-		if _, err := task.DoRetryWithTimeout(tlsTask, defaultTimeout, progressCheckInterval); err != nil {
-			errMsg := fmt.Sprintf("max retries done, failed to delete [%s/%s] secret", dataExport.Spec.Source.Namespace, drivers.CertSecretName)
-			logrus.Errorf("%v", errMsg)
-			// Exhausted all retries, fail the CR
-			return false, c.updateStatus(dataExport, kdmpapi.DataExportStatusFailed, errMsg)
+		return false, c.updateStatus(dataExport, kdmpapi.DataExportStatusInProgress, "")
+	case kdmpapi.DataExportStageCleanup:
+		if dataExport.Status.Status == kdmpapi.DataExportStatusSuccessful ||
+			dataExport.Status.Status == kdmpapi.DataExportStatusFailed {
+			// set to the next stage
+			dataExport.Status.Stage = kdmpapi.DataExportStageFinal
+			return true, c.client.Update(ctx, dataExport)
 		}
 
 		cleanupTask := func() (interface{}, bool, error) {
@@ -340,9 +321,10 @@ func (c *Controller) sync(ctx context.Context, in *kdmpapi.DataExport) (bool, er
 			// Exhausted all retries, fail the CR
 			return false, c.updateStatus(dataExport, kdmpapi.DataExportStatusFailed, errMsg)
 		}
-		return true, c.client.Update(ctx, setStatus(dataExport, kdmpapi.DataExportStatusSuccessful, ""))
+		return true, c.client.Update(ctx, setStatus(dataExport, lastKnownStatusOfInProgress, lastKnownInProgressErrMsg))
+	case kdmpapi.DataExportStageFinal:
+		return false, nil
 	}
-
 	return false, nil
 }
 
@@ -581,9 +563,17 @@ func (c *Controller) cleanUp(driver drivers.Interface, de *kdmpapi.DataExport) e
 			}
 		}
 	}
+	// Delete the tls certificate secret created
+	err := core.Instance().DeleteSecret(drivers.CertSecretName, de.Spec.Source.Namespace)
+	if err != nil && !errors.IsNotFound(err) {
+		errMsg := fmt.Sprintf("failed to delete [%s/%s] secret", de.Spec.Source.Namespace, drivers.CertSecretName)
+		logrus.Errorf("%v", errMsg)
+		return fmt.Errorf("%v", errMsg)
+	}
 
 	if de.Status.TransferID != "" {
-		if err := driver.DeleteJob(de.Status.TransferID); err != nil {
+		err := driver.DeleteJob(de.Status.TransferID)
+		if err != nil && !errors.IsNotFound(err) {
 			return fmt.Errorf("delete %s job: %s", de.Status.TransferID, err)
 		}
 	}
