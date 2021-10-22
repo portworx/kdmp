@@ -3,6 +3,8 @@ package kopia
 import (
 	"flag"
 
+	"github.com/portworx/kdmp/pkg/version"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
 	"k8s.io/kubectl/pkg/cmd/util"
@@ -36,6 +38,8 @@ func NewCommand() *cobra.Command {
 		newDeleteCommand(),
 		newMaintenanceCommand(),
 	)
+	// Printing build version
+	logrus.Infof("Starting kopiaexecutor version: %v", version.ToString(version.Get()))
 	cmds.PersistentFlags().AddGoFlagSet(flag.CommandLine)
 	err := flag.CommandLine.Parse([]string{})
 	if err != nil {

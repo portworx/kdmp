@@ -23,6 +23,10 @@ KOPIAEXECUTOR_DOCKER_IMAGE=$(DOCKER_IMAGE_REPO)/$(KOPIAEXECUTOR_DOCKER_IMAGE_NAM
 export GO111MODULE=on
 export GOFLAGS = -mod=vendor
 
+MAJOR_VERSION := 1
+MINOR_VERSION := 0
+PATCH_VERSION := 0
+
 ifndef PKGS
 	PKGS := $(shell GOFLAGS=-mod=vendor go list ./... 2>&1 | grep -v 'go: ' | grep -v 'github.com/portworx/kdmp/vendor' | grep -v versioned | grep -v 'pkg/apis/v1')
 endif
@@ -121,7 +125,10 @@ build-kdmp:
 	go build -o ${BIN}/kdmp -ldflags="-s -w \
 	-X github.com/portworx/kdmp/pkg/version.gitVersion=${RELEASE_VER} \
 	-X github.com/portworx/kdmp/pkg/version.gitCommit=${GIT_SHA} \
-	-X github.com/portworx/kdmp/pkg/version.buildDate=${BUILD_DATE}" \
+	-X github.com/portworx/kdmp/pkg/version.buildDate=${BUILD_DATE} \
+	-X github.com/portworx/kdmp/pkg/version.major=${MAJOR_VERSION} \
+	-X github.com/portworx/kdmp/pkg/version.minor=${MINOR_VERSION} \
+	-X github.com/portworx/kdmp/pkg/version.patch=${PATCH_VERSION}" \
 	$(BASE_DIR)/cmd/kdmp
 
 container-kdmp:
@@ -154,7 +161,10 @@ build-kopia-executor:
 	go build -o $(BIN)/kopiaexecutor -ldflags="-s -w \
 	-X github.com/portworx/kdmp/pkg/version.gitVersion=${RELEASE_VER} \
 	-X github.com/portworx/kdmp/pkg/version.gitCommit=${GIT_SHA} \
-	-X github.com/portworx/kdmp/pkg/version.buildDate=${BUILD_DATE}" \
+	-X github.com/portworx/kdmp/pkg/version.buildDate=${BUILD_DATE} \
+	-X github.com/portworx/kdmp/pkg/version.major=${MAJOR_VERSION} \
+	-X github.com/portworx/kdmp/pkg/version.minor=${MINOR_VERSION} \
+	-X github.com/portworx/kdmp/pkg/version.patch=${PATCH_VERSION}" \
 	$(BASE_DIR)/cmd/executor/kopia
 
 container-restic-executor:
