@@ -17,7 +17,7 @@ RUN apt-get update \
 
 RUN apt update
 
-RUN apt install kopia
+RUN apt install kopia=0.9.4
 WORKDIR /
 
 COPY ./bin/kopiaexecutor /
