@@ -55,7 +55,6 @@ const (
 	backupObjectUIDKey              = kdmpAnnotationPrefix + "backupobject-uid"
 	pvcUIDKey                       = kdmpAnnotationPrefix + "pvc-uid"
 	volumeSnapShotCRDirectory       = "csi-generic"
-	localCSIRetention               = 1
 	snapDeleteAnnotation            = "snapshotScheduledForDeletion"
 	snapRestoreAnnotation           = "snapshotScheduledForRestore"
 
@@ -77,12 +76,6 @@ var volumeAPICallBackoff = wait.Backoff{
 
 var lastKnownStatusOfInProgress kdmpapi.DataExportStatus
 var lastKnownInProgressErrMsg string
-
-type csiBackupObject struct {
-	VolumeSnapshots        map[string]*kSnapshotv1beta1.VolumeSnapshot        `json:"volumeSnapshots"`
-	VolumeSnapshotContents map[string]*kSnapshotv1beta1.VolumeSnapshotContent `json:"volumeSnapshotContents"`
-	VolumeSnapshotClasses  map[string]*kSnapshotv1beta1.VolumeSnapshotClass   `json:"volumeSnapshotClasses"`
-}
 
 func (c *Controller) sync(ctx context.Context, in *kdmpapi.DataExport) (bool, error) {
 	if in == nil {

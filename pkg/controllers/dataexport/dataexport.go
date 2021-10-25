@@ -5,7 +5,6 @@ import (
 	"reflect"
 	"time"
 
-	kSnapshotClient "github.com/kubernetes-csi/external-snapshotter/client/v4/clientset/versioned"
 	"github.com/libopenstorage/stork/pkg/controllers"
 	"github.com/libopenstorage/stork/pkg/snapshotter"
 	kdmpapi "github.com/portworx/kdmp/pkg/apis/kdmp/v1alpha1"
@@ -31,7 +30,6 @@ var (
 type Controller struct {
 	client      runtimeclient.Client
 	snapshotter snapshotter.Snapshotter
-	csiclient   *kSnapshotClient.Clientset
 }
 
 // NewController returns a new instance of the controller.
@@ -39,7 +37,6 @@ func NewController(mgr manager.Manager) (*Controller, error) {
 	return &Controller{
 		client:      mgr.GetClient(),
 		snapshotter: snapshotter.NewDefaultSnapshotter(),
-		csiclient:   nil,
 	}, nil
 }
 
