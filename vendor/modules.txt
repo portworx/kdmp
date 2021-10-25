@@ -179,13 +179,13 @@ github.com/kubernetes-csi/external-snapshotter/client/v4/clientset/versioned
 github.com/kubernetes-csi/external-snapshotter/client/v4/clientset/versioned/scheme
 github.com/kubernetes-csi/external-snapshotter/client/v4/clientset/versioned/typed/volumesnapshot/v1
 github.com/kubernetes-csi/external-snapshotter/client/v4/clientset/versioned/typed/volumesnapshot/v1beta1
-# github.com/kubernetes-incubator/external-storage v0.20.4-openstorage-rc6 => github.com/libopenstorage/external-storage v0.20.4-openstorage-rc6
+# github.com/kubernetes-incubator/external-storage v0.20.4-openstorage-rc7 => github.com/libopenstorage/external-storage v0.20.4-openstorage-rc6
 ## explicit
 github.com/kubernetes-incubator/external-storage/snapshot/pkg/apis/crd/v1
 github.com/kubernetes-incubator/external-storage/snapshot/pkg/client
 # github.com/libopenstorage/openstorage-sdk-clients v0.109.0
 github.com/libopenstorage/openstorage-sdk-clients/sdk/golang
-# github.com/libopenstorage/stork v1.4.1-0.20211007173333-ae7f793dcb5c
+# github.com/libopenstorage/stork v1.4.1-0.20211025085547-964e1d8300eb
 ## explicit
 github.com/libopenstorage/stork/pkg/apis/stork
 github.com/libopenstorage/stork/pkg/apis/stork/v1alpha1
@@ -193,6 +193,7 @@ github.com/libopenstorage/stork/pkg/client/clientset/versioned
 github.com/libopenstorage/stork/pkg/client/clientset/versioned/scheme
 github.com/libopenstorage/stork/pkg/client/clientset/versioned/typed/stork/v1alpha1
 github.com/libopenstorage/stork/pkg/controllers
+github.com/libopenstorage/stork/pkg/crypto
 github.com/libopenstorage/stork/pkg/objectstore
 github.com/libopenstorage/stork/pkg/objectstore/azure
 github.com/libopenstorage/stork/pkg/objectstore/google

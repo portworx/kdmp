@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	kSnapshotv1beta1 "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1beta1"
 	kSnapshotClient "github.com/kubernetes-csi/external-snapshotter/client/v4/clientset/versioned"
 	storkapi "github.com/libopenstorage/stork/pkg/apis/stork/v1alpha1"
 	"github.com/libopenstorage/stork/pkg/controllers"
@@ -26,7 +27,7 @@ import (
 	"github.com/portworx/sched-ops/task"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/util/yaml"
@@ -46,6 +47,17 @@ const (
 	dataExportUIDAnnotation  = "portworx.io/dataexport-uid"
 	dataExportNameAnnotation = "portworx.io/dataexport-name"
 	skipResourceAnnotation   = "stork.libopenstorage.org/skip-resource"
+
+	pxbackupAnnotationPrefix        = "portworx.io/"
+	kdmpAnnotationPrefix            = "kdmp.portworx.com/"
+	pxbackupAnnotationCreateByKey   = pxbackupAnnotationPrefix + "created-by"
+	pxbackupAnnotationCreateByValue = "px-backup"
+	backupObjectUIDKey              = kdmpAnnotationPrefix + "backupobject-uid"
+	pvcUIDKey                       = kdmpAnnotationPrefix + "pvc-uid"
+	volumeSnapShotCRDirectory       = "csi-generic"
+	snapDeleteAnnotation            = "snapshotScheduledForDeletion"
+	snapRestoreAnnotation           = "snapshotScheduledForRestore"
+
 	// pvcNameLenLimit is the max length of PVC name that DataExport related CRs
 	// will incorporate in their names
 	pvcNameLenLimit       = 247
@@ -263,12 +275,11 @@ func (c *Controller) sync(ctx context.Context, in *kdmpapi.DataExport) (bool, er
 			vbTask := func() (interface{}, bool, error) {
 				volumeBackupCR, vbErr = kdmpopts.Instance().GetVolumeBackup(context.Background(),
 					vbName, vbNamespace)
-				if errors.IsNotFound(vbErr) {
+				if k8sErrors.IsNotFound(vbErr) {
 					errMsg := fmt.Sprintf("volumebackup CR %v/%v not found", vbNamespace, vbName)
 					logrus.Errorf("%v", errMsg)
 					return "", false, fmt.Errorf(errMsg)
 				}
-
 				if vbErr != nil {
 					errMsg := fmt.Sprintf("failed to read VolumeBackup CR %v: %v", vbName, err)
 					logrus.Errorf("%v", errMsg)
@@ -380,11 +391,17 @@ func (c *Controller) stageSnapshotScheduled(ctx context.Context, dataExport *kdm
 		return false, fmt.Errorf("failed to get snapshot driver for %v: %v", snapshotDriverName, err)
 	}
 
+	backupUID := getAnnotationValue(dataExport, backupObjectUIDKey)
+	pvcUID := getAnnotationValue(dataExport, pvcUIDKey)
 	// First check if a snapshot has already been triggered
 	snapName := toSnapName(dataExport.Spec.Source.Name, string(dataExport.UID))
 	annotations := make(map[string]string)
 	annotations[dataExportUIDAnnotation] = string(dataExport.UID)
 	annotations[dataExportNameAnnotation] = trimLabel(dataExport.Name)
+	annotations[backupObjectUIDKey] = backupUID
+	annotations[pvcUIDKey] = pvcUID
+	labels := make(map[string]string)
+	labels[pvcNameKey] = dataExport.Spec.Source.Name
 	name, namespace, _, err := snapshotDriver.CreateSnapshot(
 		snapshotter.Name(snapName),
 		snapshotter.PVCName(dataExport.Spec.Source.Name),
@@ -393,6 +410,7 @@ func (c *Controller) stageSnapshotScheduled(ctx context.Context, dataExport *kdm
 		//snapshots.RestoreNamespaces(dataExport.Spec.Destination.Namespace),
 		snapshotter.SnapshotClassName(dataExport.Spec.SnapshotStorageClass),
 		snapshotter.Annotations(annotations),
+		snapshotter.Labels(labels),
 	)
 	if err != nil {
 		msg := fmt.Sprintf("failed to create a snapshot: %s", err)
@@ -422,7 +440,7 @@ func (c *Controller) getSnapshotDriverName(dataExport *kdmpapi.DataExport) (stri
 	if err == nil {
 		return csiProvider, nil
 	}
-	if err != nil && !errors.IsNotFound(err) {
+	if err != nil && !k8sErrors.IsNotFound(err) {
 		return "", nil
 	}
 	// Default to external-storage snapshot class
@@ -458,6 +476,31 @@ func (c *Controller) stageSnapshotInProgress(ctx context.Context, dataExport *kd
 
 	if snapInfo.Status != snapshotter.StatusReady {
 		return false, c.updateStatus(dataExport, kdmpapi.DataExportStatusInProgress, snapInfo.Reason)
+	}
+	// upload the CRs to the objectstore
+	var bl *storkapi.BackupLocation
+	if bl, err = checkBackupLocation(dataExport.Spec.Destination); err != nil {
+		return false, c.updateStatus(dataExport, kdmpapi.DataExportStatusFailed, fmt.Sprintf("backuplocation fetch error for %s: %v", dataExport.Spec.Destination.Name, err))
+	}
+
+	backupUID := getAnnotationValue(dataExport, backupObjectUIDKey)
+	if err != nil {
+		return false, c.updateStatus(dataExport, kdmpapi.DataExportStatusFailed, fmt.Sprintf("backup UID annotation is not set in dataexport cr %s/%s: %v", dataExport.Namespace, dataExport.Name, err))
+	}
+
+	pvcUID := getAnnotationValue(dataExport, pvcUIDKey)
+	if err != nil {
+		return false, c.updateStatus(dataExport, kdmpapi.DataExportStatusFailed, fmt.Sprintf("pvc UID annotation is not set in dataexport cr %s/%s: %v", dataExport.Namespace, dataExport.Name, err))
+	}
+
+	vs := snapInfo.SnapshotRequest.(*kSnapshotv1beta1.VolumeSnapshot)
+	timestampEpoch := strconv.FormatInt(vs.GetObjectMeta().GetCreationTimestamp().Unix(), 10)
+	snapInfoList := []snapshotter.SnapshotInfo{snapInfo}
+	err = snapshotDriver.UploadSnapshotObjects(bl, snapInfoList, getCSICRUploadDirectory(pvcUID), getVSFileName(backupUID, timestampEpoch))
+	msg := fmt.Sprintf("uploading snapshot objects for pvc %s/%s failed with error : %v", vs.Namespace, vs.Name, err)
+	if err != nil {
+		logrus.Errorf(msg)
+		return false, c.updateStatus(dataExport, kdmpapi.DataExportStatusFailed, msg)
 	}
 
 	return true, c.client.Update(ctx, setStatus(dataExport, kdmpapi.DataExportStatusSuccessful, snapInfo.Reason))
@@ -534,6 +577,8 @@ func (c *Controller) stageSnapshotRestoreInProgress(ctx context.Context, dataExp
 }
 
 func (c *Controller) cleanUp(driver drivers.Interface, de *kdmpapi.DataExport) error {
+	var bl *storkapi.BackupLocation
+
 	if driver == nil {
 		return fmt.Errorf("driver is nil")
 	}
@@ -548,24 +593,29 @@ func (c *Controller) cleanUp(driver drivers.Interface, de *kdmpapi.DataExport) e
 		if err != nil {
 			return fmt.Errorf("failed to get snapshot driver for %v: %v", snapshotDriverName, err)
 		}
-
-		if de.Status.SnapshotID != "" && de.Status.SnapshotNamespace != "" {
-
-			snapName := toSnapName(de.Spec.Source.Name, string(de.UID))
-			if err := snapshotDriver.DeleteSnapshot(snapName, de.Status.SnapshotNamespace, false); err != nil && !errors.IsNotFound(err) {
-				return fmt.Errorf("delete %s/%s snapshot: %s", de.Status.SnapshotNamespace, de.Status.SnapshotID, err)
+		if de.Status.SnapshotPVCName != "" && de.Status.SnapshotPVCNamespace != "" {
+			pvcUID := getAnnotationValue(de, pvcUIDKey)
+			if bl, err = checkBackupLocation(de.Spec.Destination); err != nil {
+				return fmt.Errorf("backuplocation fetch error: %v", err)
+			}
+			objectPath := getCSICRUploadDirectory(pvcUID)
+			err = snapshotDriver.RetainLocalSnapshots(bl, snapshotDriverName, de.Spec.SnapshotStorageClass, de.Status.SnapshotPVCNamespace, pvcUID, objectPath, false)
+			msg := fmt.Sprintf("failed in removing older local snapshots for %s/%s: %v", de.Status.SnapshotPVCNamespace, de.Status.SnapshotPVCName, err)
+			if err != nil {
+				logrus.Errorf(msg)
+				return fmt.Errorf(msg)
 			}
 		}
 
 		if de.Status.SnapshotPVCName != "" && de.Status.SnapshotPVCNamespace != "" {
-			if err := core.Instance().DeletePersistentVolumeClaim(de.Status.SnapshotPVCName, de.Status.SnapshotPVCNamespace); err != nil && !errors.IsNotFound(err) {
+			if err := core.Instance().DeletePersistentVolumeClaim(de.Status.SnapshotPVCName, de.Status.SnapshotPVCNamespace); err != nil && !k8sErrors.IsNotFound(err) {
 				return fmt.Errorf("delete %s/%s pvc: %s", de.Status.SnapshotPVCNamespace, de.Status.SnapshotPVCName, err)
 			}
 		}
 	}
 	// Delete the tls certificate secret created
 	err := core.Instance().DeleteSecret(drivers.CertSecretName, de.Spec.Source.Namespace)
-	if err != nil && !errors.IsNotFound(err) {
+	if err != nil && !k8sErrors.IsNotFound(err) {
 		errMsg := fmt.Sprintf("failed to delete [%s/%s] secret", de.Spec.Source.Namespace, drivers.CertSecretName)
 		logrus.Errorf("%v", errMsg)
 		return fmt.Errorf("%v", errMsg)
@@ -573,7 +623,7 @@ func (c *Controller) cleanUp(driver drivers.Interface, de *kdmpapi.DataExport) e
 
 	if de.Status.TransferID != "" {
 		err := driver.DeleteJob(de.Status.TransferID)
-		if err != nil && !errors.IsNotFound(err) {
+		if err != nil && !k8sErrors.IsNotFound(err) {
 			return fmt.Errorf("delete %s job: %s", de.Status.TransferID, err)
 		}
 	}
@@ -1052,7 +1102,7 @@ func createJobSecret(
 		Type: corev1.SecretTypeOpaque,
 	}
 	_, err := core.Instance().CreateSecret(secret)
-	if err != nil && errors.IsAlreadyExists(err) {
+	if err != nil && k8sErrors.IsAlreadyExists(err) {
 		return nil
 	}
 
@@ -1082,4 +1132,20 @@ func trimLabel(label string) string {
 		return label[:63]
 	}
 	return label
+}
+
+func getAnnotationValue(de *kdmpapi.DataExport, key string) string {
+	var val string
+	if _, ok := de.Annotations[key]; ok {
+		val = de.Annotations[key]
+	}
+	return val
+}
+
+func getVSFileName(backupUUID, timestamp string) string {
+	return fmt.Sprintf("%s-%s.json", backupUUID, timestamp)
+}
+
+func getCSICRUploadDirectory(pvcUID string) string {
+	return filepath.Join(volumeSnapShotCRDirectory, pvcUID)
 }
