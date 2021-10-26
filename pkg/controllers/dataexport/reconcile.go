@@ -80,9 +80,6 @@ type updateDataExportDetail struct {
 	progressPercentage   int
 	snapshotPVCName      string
 	snapshotPVCNamespace string
-	snapshotNamespace    string
-	removeFinalizer      bool
-	volumeSnapshot       string
 }
 
 var volumeAPICallBackoff = wait.Backoff{
@@ -237,19 +234,6 @@ func (c *Controller) sync(ctx context.Context, in *kdmpapi.DataExport) (bool, er
 			if err != nil {
 				msg := fmt.Sprintf("Error accessing volumebackup %s in namespace %s : %v",
 					dataExport.Spec.Source.Name, dataExport.Spec.Source.Namespace, err)
-				logrus.Errorf(msg)
-				data := updateDataExportDetail{
-					status: kdmpapi.DataExportStatusFailed,
-					reason: msg,
-				}
-				return false, c.updateStatus(dataExport, data)
-			}
-
-			// Create the pvc from the spec provided in the dataexport CR
-			pvcSpec := dataExport.Status.RestorePVC
-			_, err = c.createPVC(dataExport)
-			if err != nil {
-				msg := fmt.Sprintf("Error creating pvc %s/%s for restore: %v", pvcSpec.Namespace, pvcSpec.Name, err)
 				logrus.Errorf(msg)
 				data := updateDataExportDetail{
 					status: kdmpapi.DataExportStatusFailed,
@@ -459,10 +443,6 @@ func (c *Controller) sync(ctx context.Context, in *kdmpapi.DataExport) (bool, er
 			}
 			return false, c.updateStatus(dataExport, data)
 		}
-		data := updateDataExportDetail{
-			status: lastKnownStatusOfInProgress,
-			reason: lastKnownInProgressErrMsg,
-		}
 		return true, c.updateStatus(dataExport, data)
 	case kdmpapi.DataExportStageFinal:
 		return false, nil
@@ -654,50 +634,6 @@ func (c *Controller) stageSnapshotInProgress(ctx context.Context, dataExport *kd
 		}
 		return false, c.updateStatus(dataExport, data)
 	}
-	// upload the CRs to the objectstore
-	var bl *storkapi.BackupLocation
-	if bl, err = checkBackupLocation(dataExport.Spec.Destination); err != nil {
-		msg := fmt.Sprintf("backuplocation fetch error for %s: %v", dataExport.Spec.Destination.Name, err)
-		data := updateDataExportDetail{
-			status: kdmpapi.DataExportStatusFailed,
-			reason: msg,
-		}
-		return false, c.updateStatus(dataExport, data)
-	}
-
-	backupUID := getAnnotationValue(dataExport, backupObjectUIDKey)
-	if err != nil {
-		msg := fmt.Sprintf("backup UID annotation is not set in dataexport cr %s/%s: %v", dataExport.Namespace, dataExport.Name, err)
-		data := updateDataExportDetail{
-			status: kdmpapi.DataExportStatusFailed,
-			reason: msg,
-		}
-		return false, c.updateStatus(dataExport, data)
-	}
-
-	pvcUID := getAnnotationValue(dataExport, pvcUIDKey)
-	if err != nil {
-		msg := fmt.Sprintf("pvc UID annotation is not set in dataexport cr %s/%s: %v", dataExport.Namespace, dataExport.Name, err)
-		data := updateDataExportDetail{
-			status: kdmpapi.DataExportStatusFailed,
-			reason: msg,
-		}
-		return false, c.updateStatus(dataExport, data)
-	}
-
-	vs := snapInfo.SnapshotRequest.(*kSnapshotv1beta1.VolumeSnapshot)
-	timestampEpoch := strconv.FormatInt(vs.GetObjectMeta().GetCreationTimestamp().Unix(), 10)
-	snapInfoList := []snapshotter.SnapshotInfo{snapInfo}
-	err = snapshotDriver.UploadSnapshotObjects(bl, snapInfoList, getCSICRUploadDirectory(pvcUID), getVSFileName(backupUID, timestampEpoch))
-	if err != nil {
-		msg := fmt.Sprintf("uploading snapshot objects for pvc %s/%s failed with error : %v", vs.Namespace, vs.Name, err)
-		logrus.Errorf(msg)
-		data := updateDataExportDetail{
-			status: kdmpapi.DataExportStatusFailed,
-			reason: msg,
-		}
-		return false, c.updateStatus(dataExport, data)
-	}
 
 	data := updateDataExportDetail{
 		status: kdmpapi.DataExportStatusSuccessful,
@@ -802,11 +738,6 @@ func (c *Controller) stageSnapshotRestoreInProgress(ctx context.Context, dataExp
 			reason: restoreInfo.Reason,
 		}
 		return false, c.updateStatus(dataExport, data)
-	}
-
-	data := updateDataExportDetail{
-		status: kdmpapi.DataExportStatusSuccessful,
-		reason: restoreInfo.Reason,
 	}
 	return true, c.updateStatus(dataExport, data)
 
@@ -957,18 +888,6 @@ func (c *Controller) updateStatus(de *kdmpapi.DataExport, data updateDataExportD
 		}
 		if data.snapshotPVCNamespace != "" {
 			de.Status.SnapshotPVCNamespace = data.snapshotPVCNamespace
-		}
-		if data.snapshotID != "" {
-			de.Status.SnapshotID = data.snapshotID
-		}
-		if data.snapshotNamespace != "" {
-			de.Status.SnapshotNamespace = data.snapshotNamespace
-		}
-		if data.removeFinalizer {
-			controllers.RemoveFinalizer(de, cleanupFinalizer)
-		}
-		if data.volumeSnapshot != "" {
-			de.Status.VolumeSnapshot = data.volumeSnapshot
 		}
 
 		err = c.client.Update(context.TODO(), de)
@@ -1303,6 +1222,13 @@ func toPodNames(objs []corev1.Pod) []string {
 
 func hasSnapshotStage(de *kdmpapi.DataExport) bool {
 	return de.Spec.SnapshotStorageClass != ""
+}
+
+func setStatus(de *kdmpapi.DataExport, status kdmpapi.DataExportStatus, reason string) *kdmpapi.DataExport {
+	de.Status.Status = status
+	de.Status.Reason = reason
+
+	return de
 }
 
 func getDriverType(de *kdmpapi.DataExport) (string, error) {
