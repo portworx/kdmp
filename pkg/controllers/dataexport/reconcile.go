@@ -569,27 +569,46 @@ func (c *Controller) stageSnapshotInProgress(ctx context.Context, dataExport *kd
 	// upload the CRs to the objectstore
 	var bl *storkapi.BackupLocation
 	if bl, err = checkBackupLocation(dataExport.Spec.Destination); err != nil {
-		return false, c.updateStatus(dataExport, kdmpapi.DataExportStatusFailed, fmt.Sprintf("backuplocation fetch error for %s: %v", dataExport.Spec.Destination.Name, err))
+		msg := fmt.Sprintf("backuplocation fetch error for %s: %v", dataExport.Spec.Destination.Name, err)
+		data := updateDataExportDetail{
+			status: kdmpapi.DataExportStatusFailed,
+			reason: msg,
+		}
+		return false, c.updateStatus(dataExport, data)
 	}
 
 	backupUID := getAnnotationValue(dataExport, backupObjectUIDKey)
 	if err != nil {
-		return false, c.updateStatus(dataExport, kdmpapi.DataExportStatusFailed, fmt.Sprintf("backup UID annotation is not set in dataexport cr %s/%s: %v", dataExport.Namespace, dataExport.Name, err))
+		msg := fmt.Sprintf("backup UID annotation is not set in dataexport cr %s/%s: %v", dataExport.Namespace, dataExport.Name, err)
+		data := updateDataExportDetail{
+			status: kdmpapi.DataExportStatusFailed,
+			reason: msg,
+		}
+		return false, c.updateStatus(dataExport, data)
 	}
 
 	pvcUID := getAnnotationValue(dataExport, pvcUIDKey)
 	if err != nil {
-		return false, c.updateStatus(dataExport, kdmpapi.DataExportStatusFailed, fmt.Sprintf("pvc UID annotation is not set in dataexport cr %s/%s: %v", dataExport.Namespace, dataExport.Name, err))
+		msg := fmt.Sprintf("pvc UID annotation is not set in dataexport cr %s/%s: %v", dataExport.Namespace, dataExport.Name, err)
+		data := updateDataExportDetail{
+			status: kdmpapi.DataExportStatusFailed,
+			reason: msg,
+		}
+		return false, c.updateStatus(dataExport, data)
 	}
 
 	vs := snapInfo.SnapshotRequest.(*kSnapshotv1beta1.VolumeSnapshot)
 	timestampEpoch := strconv.FormatInt(vs.GetObjectMeta().GetCreationTimestamp().Unix(), 10)
 	snapInfoList := []snapshotter.SnapshotInfo{snapInfo}
 	err = snapshotDriver.UploadSnapshotObjects(bl, snapInfoList, getCSICRUploadDirectory(pvcUID), getVSFileName(backupUID, timestampEpoch))
-	msg := fmt.Sprintf("uploading snapshot objects for pvc %s/%s failed with error : %v", vs.Namespace, vs.Name, err)
 	if err != nil {
+		msg := fmt.Sprintf("uploading snapshot objects for pvc %s/%s failed with error : %v", vs.Namespace, vs.Name, err)
 		logrus.Errorf(msg)
-		return false, c.updateStatus(dataExport, kdmpapi.DataExportStatusFailed, msg)
+		data := updateDataExportDetail{
+			status: kdmpapi.DataExportStatusFailed,
+			reason: msg,
+		}
+		return false, c.updateStatus(dataExport, data)
 	}
 
 	return true, c.client.Update(ctx, setStatus(dataExport, kdmpapi.DataExportStatusSuccessful, snapInfo.Reason))
