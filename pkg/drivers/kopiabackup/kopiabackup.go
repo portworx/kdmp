@@ -35,6 +35,13 @@ func (d Driver) StartJob(opts ...drivers.JobOption) (id string, err error) {
 	fn := "StartJob"
 	backupJobLock.Lock()
 	defer backupJobLock.Unlock()
+	// Some times the StartJob is getting called for the same dataexport CR,
+	// If the status update to the CR fails in the reconciler. In that case, if we 
+	// the find job already created, we will exit from here with out doing anything.
+	present := jobratelimit.IsJobAlreadyPresent(o.DataExportName, o.Namespace)
+	if present {
+		return utils.NamespacedName(o.Namespace, o.DataExportName), nil
+	}
 	o := drivers.JobOpts{}
 	for _, opt := range opts {
 		if opt != nil {
