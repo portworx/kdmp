@@ -31,6 +31,7 @@ const (
 
 var (
 	bkpNamespace string
+	compression  string
 )
 
 var (
@@ -62,6 +63,8 @@ func newBackupCommand() *cobra.Command {
 	backupCommand.Flags().StringVarP(&bkpNamespace, "backup-namespace", "n", "", "Namespace for backup command")
 	backupCommand.Flags().StringVar(&sourcePath, "source-path", "", "Source for kopia backup")
 	backupCommand.Flags().StringVar(&sourcePathGlob, "source-path-glob", "", "The regexp should match only one path that will be used for backup")
+	backupCommand.Flags().StringVar(&compression, "compression", "", "Compression type to be used")
+
 	return backupCommand
 }
 
@@ -135,6 +138,14 @@ func runBackup(sourcePath string) error {
 		errMsg := fmt.Sprintf("connecting to repository %s failed: %v", repo.Name, err)
 		logrus.Errorf("%s: %v", fn, errMsg)
 		return fmt.Errorf(errMsg)
+	}
+	// if compression is not set in config map, it means no need of enabling compression
+	if compression != "" {
+		if err = runKopiaCompression(repo, sourcePath); err != nil {
+			errMsg := fmt.Sprintf("compression failed for path %s: %v", sourcePath, err)
+			logrus.Errorf("%s: %v", fn, errMsg)
+			return fmt.Errorf(errMsg)
+		}
 	}
 
 	if err = runKopiaBackup(repo, sourcePath); err != nil {
@@ -420,6 +431,52 @@ func setGlobalPolicy() error {
 	}
 	logrus.Infof("Global policy set successfully")
 
+	return nil
+}
+
+func runKopiaCompression(repository *executor.Repository, sourcePath string) error {
+	logrus.Infof("Compression started")
+	compressionCmd, err := kopia.GetCompressionCommand(
+		sourcePath,
+		compression,
+	)
+	if err != nil {
+		return err
+	}
+	compressionExecutor := kopia.NewCompressionExecutor(compressionCmd)
+	if err := compressionExecutor.Run(); err != nil {
+		err = fmt.Errorf("failed to run compression command: %v", err)
+		return err
+	}
+	t := func() (interface{}, bool, error) {
+		status, err := compressionExecutor.Status()
+		if err != nil {
+			return "", true, err
+		}
+		if status.LastKnownError != nil {
+			if err = executor.WriteVolumeBackupStatus(
+				status,
+				volumeBackupName,
+				bkpNamespace,
+			); err != nil {
+				errMsg := fmt.Sprintf("failed to write a VolumeBackup status: %v", err)
+				logrus.Errorf("%v", errMsg)
+				return "", false, fmt.Errorf(errMsg)
+			}
+			return "", false, status.LastKnownError
+		}
+		if status.Done {
+			return "", false, nil
+		}
+
+		return "", true, fmt.Errorf("enabling compression command status not available")
+	}
+	if _, err := task.DoRetryWithTimeout(t, executor.DefaultTimeout, progressCheckInterval); err != nil {
+		logrus.Errorf("failed setting compression for path %v: %v", sourcePath, err)
+		return err
+	}
+
+	logrus.Infof("compression set successfully")
 	return nil
 }
 
