@@ -40,6 +40,8 @@ type Command struct {
 	MaintenanceOwner string
 	// DisableSsl option to disable ssl for s3
 	DisableSsl bool
+	// Compression to be used for backup
+	Compression string
 }
 
 // Executor interface defines APIs for implementing a command wrapper
@@ -316,6 +318,28 @@ func (c *Command) MaintenanceSetCmd() *exec.Cmd {
 		"set",
 		"--owner",
 		c.MaintenanceOwner,
+	}
+	argsSlice = append(argsSlice, c.Flags...)
+	// Get the cmd args
+	argsSlice = append(argsSlice, c.Args...)
+	cmd := exec.Command(baseCmd, argsSlice...)
+	if len(c.Env) > 0 {
+		cmd.Env = append(os.Environ(), c.Env...)
+	}
+	cmd.Dir = c.Dir
+
+	return cmd
+}
+
+// CompressionCmd returns os/exec.Cmd object for the kopia policy set
+func (c *Command) CompressionCmd() *exec.Cmd {
+	// Get all the flags
+	argsSlice := []string{
+		c.Name, // compression command
+		"set",
+		c.Path,
+		"--compression",
+		c.Compression,
 	}
 	argsSlice = append(argsSlice, c.Flags...)
 	// Get the cmd args
