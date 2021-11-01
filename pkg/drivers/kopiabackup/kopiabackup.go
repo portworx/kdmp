@@ -250,7 +250,7 @@ func jobFor(
 		"--volume-backup-name",
 		backupName,
 		"--repository",
-		toRepoName(jobOption.SourcePVCName, jobOption.Namespace),
+		toRepoName(jobOption.RepoPVCName, jobOption.Namespace),
 		"--credentials",
 		jobOption.DataExportName,
 		"--backup-location",
