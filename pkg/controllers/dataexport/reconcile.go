@@ -80,6 +80,9 @@ type updateDataExportDetail struct {
 	progressPercentage   int
 	snapshotPVCName      string
 	snapshotPVCNamespace string
+	snapshotNamespace    string
+	removeFinalizer      bool
+	volumeSnapshot       string
 }
 
 var volumeAPICallBackoff = wait.Backoff{
@@ -443,6 +446,10 @@ func (c *Controller) sync(ctx context.Context, in *kdmpapi.DataExport) (bool, er
 			}
 			return false, c.updateStatus(dataExport, data)
 		}
+		data := updateDataExportDetail{
+			status: lastKnownStatusOfInProgress,
+			reason: lastKnownInProgressErrMsg,
+		}
 		return true, c.updateStatus(dataExport, data)
 	case kdmpapi.DataExportStageFinal:
 		return false, nil
@@ -741,6 +748,12 @@ func (c *Controller) stageSnapshotRestoreInProgress(ctx context.Context, dataExp
 	}
 	return true, c.updateStatus(dataExport, data)
 
+	data := updateDataExportDetail{
+		status: kdmpapi.DataExportStatusSuccessful,
+		reason: restoreInfo.Reason,
+	}
+	return true, c.updateStatus(dataExport, data)
+
 }
 
 func getBackuplocationFromSecret(secretName, namespace string) (*storkapi.BackupLocation, error) {
@@ -888,6 +901,15 @@ func (c *Controller) updateStatus(de *kdmpapi.DataExport, data updateDataExportD
 		}
 		if data.snapshotPVCNamespace != "" {
 			de.Status.SnapshotPVCNamespace = data.snapshotPVCNamespace
+		}
+		if data.snapshotID != "" {
+			de.Status.SnapshotID = data.snapshotID
+		}
+		if data.snapshotNamespace != "" {
+			de.Status.SnapshotNamespace = data.snapshotNamespace
+		}
+		if data.removeFinalizer {
+			controllers.RemoveFinalizer(de, cleanupFinalizer)
 		}
 
 		err = c.client.Update(context.TODO(), de)
@@ -1222,13 +1244,6 @@ func toPodNames(objs []corev1.Pod) []string {
 
 func hasSnapshotStage(de *kdmpapi.DataExport) bool {
 	return de.Spec.SnapshotStorageClass != ""
-}
-
-func setStatus(de *kdmpapi.DataExport, status kdmpapi.DataExportStatus, reason string) *kdmpapi.DataExport {
-	de.Status.Status = status
-	de.Status.Reason = reason
-
-	return de
 }
 
 func getDriverType(de *kdmpapi.DataExport) (string, error) {
