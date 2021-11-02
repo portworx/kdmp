@@ -36,7 +36,6 @@ type JobOpts struct {
 	CertSecretNamespace         string
 	MaintenanceType             string
 	RepoPVCName                 string
-	Compression                 string
 }
 
 // WithBackupObjectName is job parameter.
