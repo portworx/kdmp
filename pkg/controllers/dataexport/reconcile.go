@@ -496,6 +496,7 @@ func (c *Controller) stageSnapshotScheduled(ctx context.Context, dataExport *kdm
 
 	dataExport.Status.SnapshotID = name
 	dataExport.Status.SnapshotNamespace = namespace
+	dataExport.Status.VolumeSnapshot = snapName
 	return true, c.client.Update(ctx, setStatus(dataExport, kdmpapi.DataExportStatusSuccessful, ""))
 }
 
