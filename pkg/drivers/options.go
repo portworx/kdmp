@@ -185,7 +185,7 @@ func WithDestinationPVC(name string) JobOption {
 func WithRepoPVC(name string) JobOption {
 	return func(opts *JobOpts) error {
 		if strings.TrimSpace(name) == "" {
-			return fmt.Errorf("source pvc name should be set")
+			return fmt.Errorf("repo pvc name should be set")
 		}
 		opts.RepoPVCName = strings.TrimSpace(name)
 		return nil
