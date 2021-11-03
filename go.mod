@@ -6,7 +6,7 @@ require (
 	github.com/aquilax/truncate v1.0.0
 	github.com/kubernetes-csi/external-snapshotter/client/v4 v4.0.0
 	github.com/kubernetes-incubator/external-storage v0.20.4-openstorage-rc7
-	github.com/libopenstorage/stork v1.4.1-0.20211025085547-964e1d8300eb
+	github.com/libopenstorage/stork v1.4.1-0.20211103064004-088d8fdeaa37
 	github.com/portworx/pxc v0.33.0
 	github.com/portworx/sched-ops v1.20.4-rc1.0.20211026113317-db80e47fe929
 	github.com/sirupsen/logrus v1.8.1
