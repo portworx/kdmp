@@ -10,7 +10,7 @@ const (
 	// ApplicationBackupResourcePlural is plural for "applicationbackup" resource
 	ApplicationBackupResourcePlural = "applicationbackups"
 	// ApplicationBackupGeneric for using generic driver for backups/restore
-	ApplicationBackupGeneric = "generic"
+	ApplicationBackupGeneric = "Generic"
 	// GenericDriver is name for generic driver
 	GenericDriver = "kdmp"
 )
@@ -95,6 +95,8 @@ type ApplicationBackupVolumeInfo struct {
 	TotalSize                uint64                      `json:"totalSize"`
 	ActualSize               uint64                      `json:"actualSize"`
 	StorageClass             string                      `json:"storageClass"`
+	Provisioner              string                      `json:"provisioner"`
+	VolumeSnapshot           string                      `json:"volumeSnapshot"`
 }
 
 // ApplicationBackupStatusType is the status of the application backup
