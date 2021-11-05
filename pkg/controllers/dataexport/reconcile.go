@@ -942,6 +942,9 @@ func (c *Controller) updateStatus(de *kdmpapi.DataExport, data updateDataExportD
 		if data.removeFinalizer {
 			controllers.RemoveFinalizer(de, cleanupFinalizer)
 		}
+		if data.volumeSnapshot != "" {
+			de.Status.VolumeSnapshot = data.volumeSnapshot
+		}
 
 		err = c.client.Update(context.TODO(), de)
 		if err != nil {
