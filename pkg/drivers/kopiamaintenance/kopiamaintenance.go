@@ -50,6 +50,11 @@ func (d Driver) StartJob(opts ...drivers.JobOption) (id string, err error) {
 			}
 		}
 	}
+	if err := d.validate(o); err != nil {
+		errMsg := fmt.Sprintf("validation failed for maintenance job for backuplocation [%v]: %v", o.BackupLocationName, err)
+		logrus.Infof("%s %v", fn, errMsg)
+		return "", fmt.Errorf(errMsg)
+	}
 	jobName := toJobName(o.JobName, o.BackupLocationName)
 	job, err := buildJob(jobName, o)
 	if err != nil {
