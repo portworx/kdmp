@@ -926,7 +926,7 @@ func (c *Controller) updateStatus(de *kdmpapi.DataExport, data updateDataExportD
 		namespacedName.Name = de.Name
 		namespacedName.Namespace = de.Namespace
 		err := c.client.Get(context.TODO(), namespacedName, de)
-		if err != nil && !errors.IsNotFound(err) {
+		if err != nil && !k8sErrors.IsNotFound(err) {
 			errMsg := fmt.Sprintf("failed in getting DE CR %v/%v: %v", de.Namespace, de.Name, err)
 			logrus.Infof("%v", errMsg)
 			return "", true, fmt.Errorf("%v", errMsg)
