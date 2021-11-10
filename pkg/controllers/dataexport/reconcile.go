@@ -20,7 +20,6 @@ import (
 	"github.com/portworx/kdmp/pkg/drivers"
 	"github.com/portworx/kdmp/pkg/drivers/driversinstance"
 	"github.com/portworx/kdmp/pkg/drivers/utils"
-	"github.com/portworx/kdmp/pkg/snapshots"
 	kdmpopts "github.com/portworx/kdmp/pkg/util/ops"
 	"github.com/portworx/sched-ops/k8s/core"
 	"github.com/portworx/sched-ops/k8s/stork"
@@ -175,6 +174,10 @@ func (c *Controller) sync(ctx context.Context, in *kdmpapi.DataExport) (bool, er
 		return c.stageSnapshotRestore(ctx, dataExport)
 	case kdmpapi.DataExportStageSnapshotRestoreInProgress:
 		return c.stageSnapshotRestoreInProgress(ctx, dataExport)
+	case kdmpapi.DataExportStageLocalSnapshotRestore:
+		return c.stageLocalSnapshotRestore(ctx, dataExport)
+	case kdmpapi.DataExportStageLocalSnapshotRestoreInProgress:
+		return c.stageLocalSnapshotRestoreInProgress(ctx, dataExport)
 	case kdmpapi.DataExportStageTransferScheduled:
 		if dataExport.Status.Status == kdmpapi.DataExportStatusSuccessful {
 			// set to the next stage
@@ -431,7 +434,6 @@ func (c *Controller) sync(ctx context.Context, in *kdmpapi.DataExport) (bool, er
 			}
 			return true, c.updateStatus(dataExport, data)
 		}
-
 		cleanupTask := func() (interface{}, bool, error) {
 			err := c.cleanUp(driver, dataExport)
 			if err != nil {
@@ -474,7 +476,9 @@ func (c *Controller) stageInitial(ctx context.Context, dataExport *kdmpapi.DataE
 	if dataExport.Status.Status == kdmpapi.DataExportStatusSuccessful {
 		// set to the next stage
 		dataExport.Status.Stage = kdmpapi.DataExportStageTransferScheduled
-		if hasSnapshotStage(dataExport) {
+		if hasLocalRestoreStage(dataExport) {
+			dataExport.Status.Stage = kdmpapi.DataExportStageLocalSnapshotRestore
+		} else if hasSnapshotStage(dataExport) {
 			dataExport.Status.Stage = kdmpapi.DataExportStageSnapshotScheduled
 		}
 		data := updateDataExportDetail{
@@ -604,8 +608,7 @@ func (c *Controller) getSnapshotDriverName(dataExport *kdmpapi.DataExport) (stri
 	if err != nil && !k8sErrors.IsNotFound(err) {
 		return "", nil
 	}
-	// Default to external-storage snapshot class
-	return snapshots.ExternalStorage, nil
+	return "", fmt.Errorf("did not find any supported snapshot driver for snapshot storage class %s", dataExport.Spec.SnapshotStorageClass)
 }
 
 func (c *Controller) stageSnapshotInProgress(ctx context.Context, dataExport *kdmpapi.DataExport) (bool, error) {
@@ -859,14 +862,205 @@ func getBackuplocationFromSecret(secretName, namespace string) (*storkapi.Backup
 	return backupLocation, nil
 }
 
+func (c *Controller) stageLocalSnapshotRestore(ctx context.Context, dataExport *kdmpapi.DataExport) (bool, error) {
+	if dataExport.Status.Status == kdmpapi.DataExportStatusSuccessful {
+		// set to the next stage
+		data := updateDataExportDetail{
+			stage:  kdmpapi.DataExportStageLocalSnapshotRestoreInProgress,
+			status: kdmpapi.DataExportStatusInitial,
+			reason: "",
+		}
+		return true, c.updateStatus(dataExport, data)
+	} else if dataExport.Status.Status == kdmpapi.DataExportStatusFailed {
+		err := c.cleanupLocalRestoredSnapshotResources(dataExport, false)
+		msg := fmt.Sprintf("failed in cleaning up resources restored for local snapshot restore for dataexport %s/%s: %v", dataExport.Namespace, dataExport.Name, err)
+		if err != nil {
+			logrus.Debugf(msg)
+			data := updateDataExportDetail{
+				status: kdmpapi.DataExportStatusFailed,
+				reason: msg,
+			}
+			return false, c.updateStatus(dataExport, data)
+		}
+		data := updateDataExportDetail{
+			stage:  kdmpapi.DataExportStageTransferScheduled,
+			status: kdmpapi.DataExportStatusInitial,
+			reason: "",
+		}
+		return false, c.updateStatus(dataExport, data)
+	}
+
+	snapshotDriverName, err := c.getSnapshotDriverName(dataExport)
+	if err != nil {
+		msg := fmt.Sprintf("failed to get snapshot driver name: %v", err)
+		data := updateDataExportDetail{
+			status: kdmpapi.DataExportStatusFailed,
+			reason: msg,
+		}
+		return false, c.updateStatus(dataExport, data)
+	}
+
+	snapshotDriver, err := c.snapshotter.Driver(snapshotDriverName)
+	if err != nil {
+		msg := fmt.Sprintf("failed to get snapshot driver for %v: %v", snapshotDriverName, err)
+		data := updateDataExportDetail{
+			status: kdmpapi.DataExportStatusFailed,
+			reason: msg,
+		}
+		return false, c.updateStatus(dataExport, data)
+	}
+
+	vb, err := kdmpopts.Instance().GetVolumeBackup(context.Background(),
+		dataExport.Spec.Source.Name, dataExport.Spec.Source.Namespace)
+	if err != nil {
+		msg := fmt.Sprintf("Error accessing volumebackup %s in namespace %s : %v",
+			dataExport.Spec.Source.Name, dataExport.Spec.Source.Namespace, err)
+		logrus.Errorf(msg)
+		data := updateDataExportDetail{
+			status: kdmpapi.DataExportStatusFailed,
+			reason: msg,
+		}
+		return false, c.updateStatus(dataExport, data)
+	}
+
+	bl, err := stork.Instance().GetBackupLocation(vb.Spec.BackupLocation.Name, vb.Spec.BackupLocation.Namespace)
+	if err != nil {
+		msg := fmt.Sprintf("Error while getting backuplocation %s/%s : %v",
+			dataExport.Spec.Source.Namespace, dataExport.Spec.Source.Name, err)
+		data := updateDataExportDetail{
+			status: kdmpapi.DataExportStatusFailed,
+			reason: msg,
+		}
+		return false, c.updateStatus(dataExport, data)
+	}
+
+	backupUID := getAnnotationValue(dataExport, backupObjectUIDKey)
+	pvcUID := getAnnotationValue(dataExport, pvcUIDKey)
+	status, err := snapshotDriver.RestoreFromLocalSnapshot(bl, dataExport.Status.RestorePVC, snapshotDriverName, pvcUID, backupUID, getCSICRUploadDirectory(pvcUID), dataExport.Namespace)
+	if err != nil {
+		msg := fmt.Sprintf("Error while restoring from local snapshot with volumebackup %s in namespace %s : %v",
+			dataExport.Spec.Source.Name, dataExport.Spec.Source.Namespace, err)
+		data := updateDataExportDetail{
+			status: kdmpapi.DataExportStatusFailed,
+			reason: msg,
+		}
+		return false, c.updateStatus(dataExport, data)
+	}
+
+	if !status {
+		msg := fmt.Sprintf("Error while restoring from local snapshot with volumebackup %s in namespace %s : %v",
+			dataExport.Spec.Source.Name, dataExport.Spec.Source.Namespace, err)
+		data := updateDataExportDetail{
+			status: kdmpapi.DataExportStatusFailed,
+			reason: msg,
+		}
+		return false, c.updateStatus(dataExport, data)
+	}
+
+	data := updateDataExportDetail{
+		status: kdmpapi.DataExportStatusSuccessful,
+		reason: fmt.Sprintf("Started restore from local snapshot for volumebackup %s in namespace %s", dataExport.Spec.Source.Name, dataExport.Spec.Source.Namespace),
+	}
+	return true, c.updateStatus(dataExport, data)
+}
+
+func (c *Controller) stageLocalSnapshotRestoreInProgress(ctx context.Context, dataExport *kdmpapi.DataExport) (bool, error) {
+	if dataExport.Status.Status == kdmpapi.DataExportStatusSuccessful {
+		// update following vars before moving to the last clean up stage
+		lastKnownStatusOfInProgress = dataExport.Status.Status
+		lastKnownInProgressErrMsg = dataExport.Status.Reason
+		// set to the next stage
+		data := updateDataExportDetail{
+			stage:  kdmpapi.DataExportStageCleanup,
+			status: kdmpapi.DataExportStatusInitial,
+			reason: "",
+		}
+		return true, c.updateStatus(dataExport, data)
+	} else if dataExport.Status.Status == kdmpapi.DataExportStatusFailed {
+		err := c.cleanupLocalRestoredSnapshotResources(dataExport, false)
+		msg := fmt.Sprintf("failed in cleaning up resources restored for local snapshot restore for dataexport %s/%s: %v", dataExport.Namespace, dataExport.Name, err)
+		if err != nil {
+			logrus.Errorf(msg)
+			data := updateDataExportDetail{
+				status: kdmpapi.DataExportStatusFailed,
+				reason: msg,
+			}
+			return false, c.updateStatus(dataExport, data)
+		}
+		data := updateDataExportDetail{
+			stage:  kdmpapi.DataExportStageTransferScheduled,
+			status: kdmpapi.DataExportStatusInitial,
+			reason: "",
+		}
+		return false, c.updateStatus(dataExport, data)
+	}
+
+	snapshotDriverName, err := c.getSnapshotDriverName(dataExport)
+	if err != nil {
+		msg := fmt.Sprintf("failed to get snapshot driver name: %v", err)
+		data := updateDataExportDetail{
+			status: kdmpapi.DataExportStatusFailed,
+			reason: msg,
+		}
+		return false, c.updateStatus(dataExport, data)
+	}
+
+	snapshotDriver, err := c.snapshotter.Driver(snapshotDriverName)
+	if err != nil {
+		msg := fmt.Sprintf("failed to get snapshot driver for %v: %v", snapshotDriverName, err)
+		data := updateDataExportDetail{
+			status: kdmpapi.DataExportStatusFailed,
+			reason: msg,
+		}
+		return false, c.updateStatus(dataExport, data)
+	}
+
+	restoreInfo, err := snapshotDriver.RestoreStatus(dataExport.Status.RestorePVC.Name, dataExport.Namespace)
+	if err != nil {
+		msg := fmt.Sprintf("failed to get a snapshot restore status: %s", err)
+		data := updateDataExportDetail{
+			status: kdmpapi.DataExportStatusFailed,
+			reason: msg,
+		}
+		return false, c.updateStatus(dataExport, data)
+	}
+
+	if restoreInfo.Status == snapshotter.StatusFailed {
+		data := updateDataExportDetail{
+			status: kdmpapi.DataExportStatusFailed,
+			reason: restoreInfo.Reason,
+		}
+		return false, c.updateStatus(dataExport, data)
+	}
+
+	if restoreInfo.Status != snapshotter.StatusReady {
+		data := updateDataExportDetail{
+			status: kdmpapi.DataExportStatusInProgress,
+			reason: restoreInfo.Reason,
+		}
+		return false, c.updateStatus(dataExport, data)
+	}
+
+	data := updateDataExportDetail{
+		status: kdmpapi.DataExportStatusSuccessful,
+		reason: restoreInfo.Reason,
+	}
+	return true, c.updateStatus(dataExport, data)
+
+}
+
 func (c *Controller) cleanUp(driver drivers.Interface, de *kdmpapi.DataExport) error {
 	var bl *storkapi.BackupLocation
-
 	if driver == nil {
 		return fmt.Errorf("driver is nil")
 	}
-
-	if hasSnapshotStage(de) {
+	if hasLocalRestoreStage(de) {
+		err := c.cleanupLocalRestoredSnapshotResources(de, true)
+		if err != nil {
+			msg := fmt.Sprintf("failed in cleaning up resources restored for local snapshot restore for dataexport %s/%s: %v", de.Namespace, de.Name, err)
+			return fmt.Errorf(msg)
+		}
+	} else if hasSnapshotStage(de) {
 		snapshotDriverName, err := c.getSnapshotDriverName(de)
 		if err != nil {
 			return fmt.Errorf("failed to get snapshot driver name: %v", err)
@@ -896,7 +1090,6 @@ func (c *Controller) cleanUp(driver drivers.Interface, de *kdmpapi.DataExport) e
 				return fmt.Errorf(msg)
 			}
 		}
-
 		if de.Status.SnapshotPVCName != "" && de.Status.SnapshotPVCNamespace != "" {
 			if err := core.Instance().DeletePersistentVolumeClaim(de.Status.SnapshotPVCName, de.Status.SnapshotPVCNamespace); err != nil && !k8sErrors.IsNotFound(err) {
 				return fmt.Errorf("delete %s/%s pvc: %s", de.Status.SnapshotPVCNamespace, de.Status.SnapshotPVCName, err)
@@ -915,6 +1108,46 @@ func (c *Controller) cleanUp(driver drivers.Interface, de *kdmpapi.DataExport) e
 		if err != nil && !k8sErrors.IsNotFound(err) {
 			return fmt.Errorf("delete %s job: %s", de.Status.TransferID, err)
 		}
+	}
+	return nil
+}
+
+func (c *Controller) cleanupLocalRestoredSnapshotResources(de *kdmpapi.DataExport, ignorePVC bool) error {
+
+	snapshotDriverName, err := c.getSnapshotDriverName(de)
+	if err != nil {
+		return fmt.Errorf("failed to get snapshot driver name: %v", err)
+	}
+
+	snapshotDriver, err := c.snapshotter.Driver(snapshotDriverName)
+	if err != nil {
+		return fmt.Errorf("failed to get snapshot driver for %v: %v", snapshotDriverName, err)
+	}
+
+	vb, err := kdmpopts.Instance().GetVolumeBackup(context.Background(),
+		de.Spec.Source.Name, de.Spec.Source.Namespace)
+	if err != nil {
+		msg := fmt.Sprintf("Error accessing volumebackup %s in namespace %s : %v",
+			de.Spec.Source.Name, de.Spec.Source.Namespace, err)
+		logrus.Errorf(msg)
+		return fmt.Errorf(msg)
+	}
+
+	bl, err := stork.Instance().GetBackupLocation(vb.Spec.BackupLocation.Name, vb.Spec.BackupLocation.Namespace)
+	if err != nil {
+		msg := fmt.Sprintf("Error while getting backuplocation %s/%s : %v",
+			de.Spec.Source.Namespace, de.Spec.Source.Name, err)
+		return fmt.Errorf(msg)
+	}
+	backupUID := getAnnotationValue(de, backupObjectUIDKey)
+	pvcUID := getAnnotationValue(de, pvcUIDKey)
+	pvcSpec := &corev1.PersistentVolumeClaim{}
+	if !ignorePVC {
+		pvcSpec = de.Status.RestorePVC
+	}
+	err = snapshotDriver.CleanUpRestoredResources(bl, pvcSpec, pvcUID, backupUID, getCSICRUploadDirectory(pvcUID), de.Namespace)
+	if err != nil {
+		return err
 	}
 
 	return nil
@@ -1303,6 +1536,10 @@ func toPodNames(objs []corev1.Pod) []string {
 
 func hasSnapshotStage(de *kdmpapi.DataExport) bool {
 	return de.Spec.SnapshotStorageClass != ""
+}
+
+func hasLocalRestoreStage(de *kdmpapi.DataExport) bool {
+	return de.Status.LocalSnapshotRestore
 }
 
 func getDriverType(de *kdmpapi.DataExport) (string, error) {
