@@ -35,6 +35,8 @@ type JobOpts struct {
 	CertSecretName              string
 	CertSecretNamespace         string
 	MaintenanceType             string
+	RepoPVCName                 string
+	Compression                 string
 }
 
 // WithBackupObjectName is job parameter.
@@ -180,6 +182,17 @@ func WithDestinationPVC(name string) JobOption {
 	}
 }
 
+// WithRepoPVC is job parameter.
+func WithRepoPVC(name string) JobOption {
+	return func(opts *JobOpts) error {
+		if strings.TrimSpace(name) == "" {
+			return fmt.Errorf("repo pvc name should be set")
+		}
+		opts.RepoPVCName = strings.TrimSpace(name)
+		return nil
+	}
+}
+
 // WithNamespace is job parameter.
 func WithNamespace(ns string) JobOption {
 	return func(opts *JobOpts) error {
@@ -296,6 +309,14 @@ func WithCertSecretNamespace(namespace string) JobOption {
 func WithMaintenanceType(maintenanceType string) JobOption {
 	return func(opts *JobOpts) error {
 		opts.MaintenanceType = maintenanceType
+		return nil
+	}
+}
+
+// WithCompressionType is job parameter.
+func WithCompressionType(compressionType string) JobOption {
+	return func(opts *JobOpts) error {
+		opts.Compression = compressionType
 		return nil
 	}
 }

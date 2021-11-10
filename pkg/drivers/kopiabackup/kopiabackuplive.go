@@ -50,10 +50,16 @@ func jobForLiveBackup(
 		"--backup-namespace",
 		jobOption.Namespace,
 		"--repository",
-		toRepoName(jobOption.SourcePVCName, jobOption.Namespace),
+		toRepoName(jobOption.RepoPVCName, jobOption.Namespace),
 		"--source-path-glob",
 		backupPath,
 	}, " ")
+
+	if jobOption.Compression != "" {
+		splitCmd := strings.Split(cmd, " ")
+		splitCmd = append(splitCmd, "--compression", jobOption.Compression)
+		cmd = strings.Join(splitCmd, " ")
+	}
 
 	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{

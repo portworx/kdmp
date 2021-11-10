@@ -43,6 +43,13 @@ func (d Driver) StartJob(opts ...drivers.JobOption) (id string, err error) {
 			}
 		}
 	}
+	// Sometimes the StartJob is getting called for the same dataexport CR,
+	// If the status update to the CR fails in the reconciler. In that case, if we
+	// the find job already created, we will exit from here with out doing anything.
+	present := jobratelimit.IsJobAlreadyPresent(o.DataExportName, o.Namespace)
+	if present {
+		return utils.NamespacedName(o.Namespace, o.DataExportName), nil
+	}
 	// Check whether already a job running to backup the PVC.
 	// If so return already job running on the PVC error and caller will retry.
 	running, err := jobratelimit.IsJobForPvcAlreadyRunning(
@@ -60,14 +67,6 @@ func (d Driver) StartJob(opts ...drivers.JobOption) (id string, err error) {
 		logrus.Infof("already a backup job is running for PVC [%v/%v]",
 			o.Labels[jobratelimit.PvcNameKey], o.Labels[jobratelimit.PvcUIDKey])
 		return "", utils.ErrJobAlreadyRunning
-	}
-
-	// Sometimes the StartJob is getting called for the same dataexport CR,
-	// If the status update to the CR fails in the reconciler. In that case, if we
-	// the find job already created, we will exit from here with out doing anything.
-	present := jobratelimit.IsJobAlreadyPresent(o.DataExportName, o.Namespace)
-	if present {
-		return utils.NamespacedName(o.Namespace, o.DataExportName), nil
 	}
 
 	// Check whether there is slot to schedule the job.
@@ -251,7 +250,7 @@ func jobFor(
 		"--volume-backup-name",
 		backupName,
 		"--repository",
-		toRepoName(jobOption.SourcePVCName, jobOption.Namespace),
+		toRepoName(jobOption.RepoPVCName, jobOption.Namespace),
 		"--credentials",
 		jobOption.DataExportName,
 		"--backup-location",
@@ -263,6 +262,12 @@ func jobFor(
 		"--source-path",
 		"/data",
 	}, " ")
+
+	if jobOption.Compression != "" {
+		splitCmd := strings.Split(cmd, " ")
+		splitCmd = append(splitCmd, "--compression", jobOption.Compression)
+		cmd = strings.Join(splitCmd, " ")
+	}
 
 	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
