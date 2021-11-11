@@ -8,7 +8,10 @@ import (
 )
 
 const (
-	baseCmd = "kopia"
+	baseCmd    = "kopia"
+	logDir     = "/tmp"
+	cacheDir   = "/tmp"
+	configFile = "/tmp/kopiconfig"
 )
 
 // Command defines the essential fields required to
@@ -88,6 +91,12 @@ func (c *Command) CreateCmd() *exec.Cmd {
 			c.Password,
 			"--prefix",
 			c.RepositoryName,
+			"--log-dir",
+			logDir,
+			"--cache-directory",
+			cacheDir,
+			"--config-file",
+			configFile,
 		}
 	case "s3":
 		argsSlice = []string{
@@ -100,6 +109,12 @@ func (c *Command) CreateCmd() *exec.Cmd {
 			c.Password,
 			"--prefix",
 			c.RepositoryName,
+			"--cache-directory",
+			cacheDir,
+			"--log-dir",
+			logDir,
+			"--config-file",
+			configFile,
 		}
 
 		if c.DisableSsl {
@@ -119,6 +134,12 @@ func (c *Command) CreateCmd() *exec.Cmd {
 			c.Password,
 			"--prefix",
 			c.RepositoryName,
+			"--cache-directory",
+			cacheDir,
+			"--log-dir",
+			logDir,
+			"--config-file",
+			configFile,
 		}
 	}
 
@@ -140,6 +161,10 @@ func (c *Command) BackupCmd() *exec.Cmd {
 	argsSlice := []string{
 		"snapshot",
 		c.Name, // create command
+		"--log-dir",
+		logDir,
+		"--config-file",
+		configFile,
 		"--json",
 	}
 	argsSlice = append(argsSlice, c.Flags...)
@@ -166,6 +191,12 @@ func (c *Command) ConnectCmd() *exec.Cmd {
 			c.Password,
 			"--prefix",
 			c.RepositoryName,
+			"--cache-directory",
+			cacheDir,
+			"--log-dir",
+			logDir,
+			"--config-file",
+			configFile,
 		}
 	case "s3":
 		argsSlice = []string{
@@ -178,6 +209,12 @@ func (c *Command) ConnectCmd() *exec.Cmd {
 			c.Password,
 			"--prefix",
 			c.RepositoryName,
+			"--cache-directory",
+			cacheDir,
+			"--log-dir",
+			logDir,
+			"--config-file",
+			configFile,
 		}
 		if c.DisableSsl {
 			ssl := []string{
@@ -196,6 +233,12 @@ func (c *Command) ConnectCmd() *exec.Cmd {
 			c.Password,
 			"--prefix",
 			c.RepositoryName,
+			"--cache-directory",
+			cacheDir,
+			"--log-dir",
+			logDir,
+			"--config-file",
+			configFile,
 		}
 	}
 
@@ -216,6 +259,10 @@ func (c *Command) RestoreCmd() *exec.Cmd {
 	argsSlice := []string{
 		"snapshot",
 		c.Name, // restore command
+		"--log-dir",
+		logDir,
+		"--config-file",
+		configFile,
 	}
 	argsSlice = append(argsSlice, c.Flags...)
 	// Get the cmd args
@@ -234,6 +281,10 @@ func (c *Command) SetPolicyCmd() *exec.Cmd {
 	argsSlice := []string{
 		"policy",
 		c.Name, // set command
+		"--log-dir",
+		logDir,
+		"--config-file",
+		configFile,
 		"--global",
 	}
 	argsSlice = append(argsSlice, c.Flags...)
@@ -255,6 +306,10 @@ func (c *Command) DeleteCmd() *exec.Cmd {
 		"snapshot",
 		c.Name, // delete command
 		c.SnapshotID,
+		"--log-dir",
+		logDir,
+		"--config-file",
+		configFile,
 		"--delete",
 	}
 	argsSlice = append(argsSlice, c.Flags...)
@@ -276,6 +331,10 @@ func (c *Command) QuickMaintenanceRunCmd() *exec.Cmd {
 	argsSlice := []string{
 		c.Name, // maintenance command
 		"run",
+		"--log-dir",
+		logDir,
+		"--config-file",
+		configFile,
 	}
 	argsSlice = append(argsSlice, c.Flags...)
 	// Get the cmd args
@@ -295,6 +354,10 @@ func (c *Command) MaintenanceRunCmd() *exec.Cmd {
 	argsSlice := []string{
 		c.Name, // maintenance command
 		"run",
+		"--log-dir",
+		logDir,
+		"--config-file",
+		configFile,
 		"--full",
 	}
 	argsSlice = append(argsSlice, c.Flags...)
@@ -318,6 +381,10 @@ func (c *Command) MaintenanceSetCmd() *exec.Cmd {
 		"set",
 		"--owner",
 		c.MaintenanceOwner,
+		"--log-dir",
+		logDir,
+		"--config-file",
+		configFile,
 	}
 	argsSlice = append(argsSlice, c.Flags...)
 	// Get the cmd args
@@ -340,6 +407,10 @@ func (c *Command) CompressionCmd() *exec.Cmd {
 		c.Path,
 		"--compression",
 		c.Compression,
+		"--log-dir",
+		logDir,
+		"--config-file",
+		configFile,
 	}
 	argsSlice = append(argsSlice, c.Flags...)
 	// Get the cmd args

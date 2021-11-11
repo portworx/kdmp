@@ -399,7 +399,7 @@ func (c *Controller) sync(ctx context.Context, in *kdmpapi.DataExport) (bool, er
 				return "", false, nil
 			}
 			if _, err := task.DoRetryWithTimeout(vbTask, defaultTimeout, progressCheckInterval); err != nil {
-				errMsg := fmt.Sprintf("max retries done, failed to read VolumeBackup CR %v: %v", vbName, err)
+				errMsg := fmt.Sprintf("max retries done, failed to read VolumeBackup CR %v: %v", vbName, vbErr)
 				logrus.Errorf("%v", errMsg)
 				// Exhausted all retries, fail the CR
 				data := updateDataExportDetail{
@@ -431,10 +431,10 @@ func (c *Controller) sync(ctx context.Context, in *kdmpapi.DataExport) (bool, er
 			}
 			return true, c.updateStatus(dataExport, data)
 		}
-
+		var cleanupErr error
 		cleanupTask := func() (interface{}, bool, error) {
-			err := c.cleanUp(driver, dataExport)
-			if err != nil {
+			cleanupErr := c.cleanUp(driver, dataExport)
+			if cleanupErr != nil {
 				errMsg := fmt.Sprintf("failed to remove resources: %s", err)
 				logrus.Errorf("%v", errMsg)
 				data := updateDataExportDetail{
@@ -450,7 +450,7 @@ func (c *Controller) sync(ctx context.Context, in *kdmpapi.DataExport) (bool, er
 			return "", false, nil
 		}
 		if _, err := task.DoRetryWithTimeout(cleanupTask, defaultTimeout, progressCheckInterval); err != nil {
-			errMsg := fmt.Sprintf("max retries done, dataexport: [%v/%v] cleanup failed with %v", dataExport.Namespace, dataExport.Name, err)
+			errMsg := fmt.Sprintf("max retries done, dataexport: [%v/%v] cleanup failed with %v", dataExport.Namespace, dataExport.Name, cleanupErr)
 			logrus.Errorf("%v", errMsg)
 			// Exhausted all retries, fail the CR
 			data := updateDataExportDetail{
@@ -921,13 +921,14 @@ func (c *Controller) cleanUp(driver drivers.Interface, de *kdmpapi.DataExport) e
 }
 
 func (c *Controller) updateStatus(de *kdmpapi.DataExport, data updateDataExportDetail) error {
+	var actualErr error
 	t := func() (interface{}, bool, error) {
 		namespacedName := types.NamespacedName{}
 		namespacedName.Name = de.Name
 		namespacedName.Namespace = de.Namespace
-		err := c.client.Get(context.TODO(), namespacedName, de)
-		if err != nil && !k8sErrors.IsNotFound(err) {
-			errMsg := fmt.Sprintf("failed in getting DE CR %v/%v: %v", de.Namespace, de.Name, err)
+		actualErr := c.client.Get(context.TODO(), namespacedName, de)
+		if actualErr != nil && !k8sErrors.IsNotFound(actualErr) {
+			errMsg := fmt.Sprintf("failed in getting DE CR %v/%v: %v", de.Namespace, de.Name, actualErr)
 			logrus.Infof("%v", errMsg)
 			return "", true, fmt.Errorf("%v", errMsg)
 		}
@@ -971,9 +972,9 @@ func (c *Controller) updateStatus(de *kdmpapi.DataExport, data updateDataExportD
 			de.Status.VolumeSnapshot = data.volumeSnapshot
 		}
 
-		err = c.client.Update(context.TODO(), de)
-		if err != nil {
-			errMsg := fmt.Sprintf("failed updating DE CR %s: %v", de.Name, err)
+		actualErr = c.client.Update(context.TODO(), de)
+		if actualErr != nil {
+			errMsg := fmt.Sprintf("failed updating DE CR %s: %v", de.Name, actualErr)
 			logrus.Errorf("%v", errMsg)
 			return "", true, fmt.Errorf("%v", errMsg)
 		}
@@ -981,10 +982,10 @@ func (c *Controller) updateStatus(de *kdmpapi.DataExport, data updateDataExportD
 		return "", false, nil
 	}
 	if _, err := task.DoRetryWithTimeout(t, defaultTimeout, progressCheckInterval); err != nil {
-		errMsg := fmt.Sprintf("max retries done, failed updating DE CR %s: %v", de.Name, err)
+		errMsg := fmt.Sprintf("max retries done, failed updating DE CR %s: %v", de.Name, actualErr)
 		logrus.Errorf("%v", errMsg)
 		// Exhausted all retries, fail the CR
-		return err
+		return fmt.Errorf("%v", errMsg)
 	}
 	return nil
 }
