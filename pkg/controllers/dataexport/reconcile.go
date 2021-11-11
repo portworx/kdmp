@@ -577,6 +577,10 @@ func (c *Controller) getSnapshotDriverName(dataExport *kdmpapi.DataExport) (stri
 	if len(dataExport.Spec.SnapshotStorageClass) == 0 {
 		return "", fmt.Errorf("snapshot storage class not provided")
 	}
+	if dataExport.Spec.SnapshotStorageClass == "default" ||
+		dataExport.Spec.SnapshotStorageClass == "Default" {
+		return csiProvider, nil
+	}
 	// Check if snapshot class is a CSI snapshot class
 	config, err := rest.InClusterConfig()
 	if err != nil {
