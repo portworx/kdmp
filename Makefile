@@ -78,7 +78,7 @@ vet:
 
 
 staticcheck:
-	GO111MODULE=off go get -u honnef.co/go/tools/cmd/staticcheck
+	 GO111MODULE=on go get -u honnef.co/go/tools/cmd/staticcheck@v0.2.1
 	staticcheck $(PKGS)
 	#staticcheck -tags integrationtest test/integration_test/*.go
 	staticcheck -tags unittest $(PKGS)
