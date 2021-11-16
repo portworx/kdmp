@@ -90,9 +90,6 @@ var volumeAPICallBackoff = wait.Backoff{
 	Steps:    volumeSteps,
 }
 
-var lastKnownStatusOfInProgress kdmpapi.DataExportStatus
-var lastKnownInProgressErrMsg string
-
 func (c *Controller) sync(ctx context.Context, in *kdmpapi.DataExport) (bool, error) {
 	if in == nil {
 		return false, nil
@@ -322,16 +319,12 @@ func (c *Controller) sync(ctx context.Context, in *kdmpapi.DataExport) (bool, er
 		}
 		return true, c.updateStatus(dataExport, data)
 	case kdmpapi.DataExportStageTransferInProgress:
-		// Remember the state so that we populate the same in the final stage if cleanup
-		// pass but InProgress failed. Need to propogate failure to caller
-		lastKnownStatusOfInProgress = dataExport.Status.Status
-		lastKnownInProgressErrMsg = dataExport.Status.Reason
 		if dataExport.Status.Status == kdmpapi.DataExportStatusSuccessful ||
 			dataExport.Status.Status == kdmpapi.DataExportStatusFailed {
 			// set to the next stage
 			data := updateDataExportDetail{
 				stage:  kdmpapi.DataExportStageCleanup,
-				status: kdmpapi.DataExportStatusInitial,
+				status: dataExport.Status.Status,
 				reason: "",
 			}
 			return false, c.updateStatus(dataExport, data)
@@ -426,27 +419,15 @@ func (c *Controller) sync(ctx context.Context, in *kdmpapi.DataExport) (bool, er
 		}
 		return false, c.updateStatus(dataExport, data)
 	case kdmpapi.DataExportStageCleanup:
-		if dataExport.Status.Status == kdmpapi.DataExportStatusSuccessful ||
-			dataExport.Status.Status == kdmpapi.DataExportStatusFailed {
-			// set to the next stage
-			data := updateDataExportDetail{
-				stage: kdmpapi.DataExportStageFinal,
-			}
-			return true, c.updateStatus(dataExport, data)
-		}
 		var cleanupErr error
+		data := updateDataExportDetail{
+			stage: kdmpapi.DataExportStageFinal,
+		}
 		cleanupTask := func() (interface{}, bool, error) {
 			cleanupErr := c.cleanUp(driver, dataExport)
 			if cleanupErr != nil {
 				errMsg := fmt.Sprintf("failed to remove resources: %s", err)
 				logrus.Errorf("%v", errMsg)
-				data := updateDataExportDetail{
-					status: kdmpapi.DataExportStatusInProgress,
-				}
-				err := c.updateStatus(dataExport, data)
-				if err != nil {
-					return "", false, fmt.Errorf("%v", err)
-				}
 				return "", true, fmt.Errorf("%v", errMsg)
 			}
 
@@ -456,15 +437,7 @@ func (c *Controller) sync(ctx context.Context, in *kdmpapi.DataExport) (bool, er
 			errMsg := fmt.Sprintf("max retries done, dataexport: [%v/%v] cleanup failed with %v", dataExport.Namespace, dataExport.Name, cleanupErr)
 			logrus.Errorf("%v", errMsg)
 			// Exhausted all retries, fail the CR
-			data := updateDataExportDetail{
-				status: kdmpapi.DataExportStatusFailed,
-				reason: errMsg,
-			}
-			return false, c.updateStatus(dataExport, data)
-		}
-		data := updateDataExportDetail{
-			status: lastKnownStatusOfInProgress,
-			reason: lastKnownInProgressErrMsg,
+			data.status = kdmpapi.DataExportStatusFailed
 		}
 		return true, c.updateStatus(dataExport, data)
 	case kdmpapi.DataExportStageFinal:
@@ -985,13 +958,9 @@ func (c *Controller) stageLocalSnapshotRestore(ctx context.Context, dataExport *
 
 func (c *Controller) stageLocalSnapshotRestoreInProgress(ctx context.Context, dataExport *kdmpapi.DataExport) (bool, error) {
 	if dataExport.Status.Status == kdmpapi.DataExportStatusSuccessful {
-		// update following vars before moving to the last clean up stage
-		lastKnownStatusOfInProgress = dataExport.Status.Status
-		lastKnownInProgressErrMsg = dataExport.Status.Reason
 		// set to the next stage
 		data := updateDataExportDetail{
 			stage:  kdmpapi.DataExportStageCleanup,
-			status: kdmpapi.DataExportStatusInitial,
 			reason: "",
 		}
 		return true, c.updateStatus(dataExport, data)
