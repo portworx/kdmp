@@ -812,8 +812,31 @@ func (c *Controller) stageSnapshotRestoreInProgress(ctx context.Context, dataExp
 		status: kdmpapi.DataExportStatusSuccessful,
 		reason: restoreInfo.Reason,
 	}
-	return true, c.updateStatus(dataExport, data)
+	// Add annotation for corresponding PV to be skipped backing
+	tempName := toSnapshotPVCName(srcPvc.Name, string(dataExport.UID))
+	interPvc, err := core.Instance().GetPersistentVolumeClaim(tempName, srcPvc.Namespace)
+	if err != nil {
+		msg := fmt.Sprintf("failed to get restore pvc %v: %v", src.Name, err)
+		logrus.Warnf("%v", msg)
+		data := updateDataExportDetail{
+			status: kdmpapi.DataExportStatusFailed,
+			reason: msg,
+		}
+		return false, c.updateStatus(dataExport, data)
+	}
+	pv, err := core.Instance().GetPersistentVolume(interPvc.Spec.VolumeName)
+	if err != nil {
+		errMsg := fmt.Sprintf("error fetching PV %s: %s", interPvc.Spec.VolumeName, err)
+		logrus.Errorf("%v", errMsg)
+	} else {
+		pv.Annotations[skipResourceAnnotation] = "true"
+		pv, err = core.Instance().UpdatePersistentVolume(pv)
+		if err != nil {
+			logrus.Warnf("error updating pv %v: %v", pv.Name, err)
+		}
+	}
 
+	return true, c.updateStatus(dataExport, data)
 }
 
 func getBackuplocationFromSecret(secretName, namespace string) (*storkapi.BackupLocation, error) {
