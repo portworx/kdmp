@@ -1024,9 +1024,12 @@ func (c *Controller) stageLocalSnapshotRestoreInProgress(ctx context.Context, da
 		return false, c.updateStatus(dataExport, data)
 	}
 
+	msg := fmt.Sprintf("Volume restore from local snapshot for volumebackup %s in namespace %s is successful", dataExport.Spec.Source.Name, dataExport.Spec.Source.Namespace)
+	logrus.Debugf(msg)
 	data := updateDataExportDetail{
 		status: kdmpapi.DataExportStatusSuccessful,
-		reason: restoreInfo.Reason,
+		reason: msg,
+		size:   restoreInfo.Size,
 	}
 	return true, c.updateStatus(dataExport, data)
 
