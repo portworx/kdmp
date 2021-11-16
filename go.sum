@@ -768,6 +768,8 @@ github.com/libopenstorage/external-storage v0.20.4-openstorage-rc3 h1:R/tNBifXCp
 github.com/libopenstorage/external-storage v0.20.4-openstorage-rc3/go.mod h1:nffpoeodwwp+wwngmBGbLBCd7TZ9GxHLtxKoaLRW6K4=
 github.com/libopenstorage/external-storage v0.20.4-openstorage-rc6 h1:qcXINczm1tOTnDC682SThzcv/L7IHGRSJ1zgh9nZzO0=
 github.com/libopenstorage/external-storage v0.20.4-openstorage-rc6/go.mod h1:nffpoeodwwp+wwngmBGbLBCd7TZ9GxHLtxKoaLRW6K4=
+github.com/libopenstorage/external-storage v0.20.4-openstorage-rc7 h1:mHp7bfGyHwG4P8dhHEMJ775KLmcjv3tcA2Uc+5nGpXg=
+github.com/libopenstorage/external-storage v0.20.4-openstorage-rc7/go.mod h1:nffpoeodwwp+wwngmBGbLBCd7TZ9GxHLtxKoaLRW6K4=
 github.com/libopenstorage/external-storage v5.3.0-alpha.1.0.20200130041458-d2b33d4448ea+incompatible/go.mod h1:H0Gzy0h36rbJPxu3lKdrIPw1h0k0c4YFtTGGlBEBPc8=
 github.com/libopenstorage/gossip v0.0.0-20190507031959-c26073a01952/go.mod h1:TjXt2Iz2bTkpfc4Q6xN0ttiNipTVwEEYoZSMZHlfPek=
 github.com/libopenstorage/openstorage v1.0.0/go.mod h1:Sp1sIObHjat1BeXhfMqLZ14wnOzEhNx2YQedreMcUyc=
@@ -810,6 +812,8 @@ github.com/libopenstorage/stork v1.4.1-0.20211103064004-088d8fdeaa37 h1:gj6HUP3I
 github.com/libopenstorage/stork v1.4.1-0.20211103064004-088d8fdeaa37/go.mod h1:IEptmD89NFAueQB5YN+UXN32QLhFxkYSsU6xdTdkBRM=
 github.com/libopenstorage/stork v1.4.1-0.20211113171730-e02f28e240e9 h1:vTkz9X9uepzpUC5wxCaRkatDqOVBHrwXePDhqQgGGTI=
 github.com/libopenstorage/stork v1.4.1-0.20211113171730-e02f28e240e9/go.mod h1:NTt7xK9DqWpXLEBJI4WEz/XTUG3EkW0zcqyOMO5Xp2w=
+github.com/libopenstorage/stork v1.4.1-0.20211116081454-74e9e3dff9c1 h1:B93apcrbHCfMrWxLBsCNEdWpiIVTxlf4P0UxD8ycV/Y=
+github.com/libopenstorage/stork v1.4.1-0.20211116081454-74e9e3dff9c1/go.mod h1:2Ac8AYpSu6aRkfG/P6ZPXCxDUKifRUUeC1my2TqUy4k=
 github.com/liggitt/tabwriter v0.0.0-20181228230101-89fcab3d43de h1:9TO3cAIGXtEhnIaL+V+BEER86oLrvS+kWobKpbJuye0=
 github.com/liggitt/tabwriter v0.0.0-20181228230101-89fcab3d43de/go.mod h1:zAbeS9B/r2mtpb6U+EI2rYA5OAXxsYw6wTamcNW+zcE=
 github.com/lightstep/lightstep-tracer-common/golang/gogo v0.0.0-20190605223551-bc2310a04743/go.mod h1:qklhhLq1aX+mtWk9cPHPzaBjWImj5ULL6C7HFJtXQMM=
@@ -1017,6 +1021,7 @@ github.com/portworx/kdmp v0.4.1-0.20211008122639-3554850ec03c/go.mod h1:a1NbL4OP
 github.com/portworx/kdmp v0.4.1-0.20211020042040-649a87216a48/go.mod h1:ethpTE5btKfTpuuC0T3bQHTBCLymlUaBAa2pRoCJixM=
 github.com/portworx/kdmp v0.4.1-0.20211103043446-cc5455f203d0/go.mod h1:BZ9ApnLFaMdxC4jd1inOw4ICfUI8AzyicAo+wL9ZSZY=
 github.com/portworx/kdmp v0.4.1-0.20211108115338-ba2bebf06ffb/go.mod h1:cbaFBCLFTtF0taXtGR2zGD89k0gl7fNl+n4Vi9p4gmI=
+github.com/portworx/kdmp v0.4.1-0.20211113181724-d6993a40aa4d/go.mod h1:iUItF4An5p0UmtTYoJUU0NLU4nWxdd6kMoHyTjaOReA=
 github.com/portworx/kvdb v0.0.0-20190105022415-cccaa09abfc9/go.mod h1:Q8YyrNDvPp3DVF96BDcQuaC7fAYUCuUX+l58S7OnD2M=
 github.com/portworx/kvdb v0.0.0-20191223203141-f42097b1fcd8/go.mod h1:Q8YyrNDvPp3DVF96BDcQuaC7fAYUCuUX+l58S7OnD2M=
 github.com/portworx/kvdb v0.0.0-20200311180812-b2c72382d652/go.mod h1:Q8YyrNDvPp3DVF96BDcQuaC7fAYUCuUX+l58S7OnD2M=
