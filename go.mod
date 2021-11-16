@@ -8,7 +8,7 @@ require (
 	github.com/kubernetes-incubator/external-storage v0.20.4-openstorage-rc7
 	github.com/libopenstorage/stork v1.4.1-0.20211113171730-e02f28e240e9
 	github.com/portworx/pxc v0.33.0
-	github.com/portworx/sched-ops v1.20.4-rc1.0.20211026113317-db80e47fe929
+	github.com/portworx/sched-ops v1.20.4-rc1.0.20211116074603-2b6905763b23
 	github.com/sirupsen/logrus v1.8.1
 	github.com/spf13/cobra v1.1.3
 	github.com/spf13/pflag v1.0.5
