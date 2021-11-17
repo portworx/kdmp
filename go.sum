@@ -1833,6 +1833,7 @@ k8s.io/kube-scheduler v0.20.4/go.mod h1:w1/IOIJ6q9K1TQ/9sQBvNDSvi9ylZgJaedkwWU5l
 k8s.io/kubectl v0.20.4 h1:Y1gUiigiZM+ulcrnWeqSHlTd0/7xWcQIXjuMnjtHyoo=
 k8s.io/kubectl v0.20.4/go.mod h1:yCC5lUQyXRmmtwyxfaakryh9ezzp/bT0O14LeoFLbGo=
 k8s.io/kubelet v0.20.4/go.mod h1:Jtubfqr/TlXcOMaUYWoGVkuY/iM5xmZiEukcJSJs0ns=
+k8s.io/kubernetes v1.20.4 h1:gPeOspTx01shAQuFhae+O7ZfU0WKlD7RE5L0pooU0g8=
 k8s.io/kubernetes v1.20.4/go.mod h1:5oh+vhVyWep2o+IH61i3aU4e/Q77Yt96tcKwYOpVbvk=
 k8s.io/legacy-cloud-providers v0.20.4/go.mod h1:whukzxTjXr2SclI8TObPeCFqIyWJ0IfqTb9enRi8Bs8=
 k8s.io/metrics v0.20.4/go.mod h1:DDXS+Ls+2NAxRcVhXKghRPa3csljyJRjDRjPe6EOg/g=
