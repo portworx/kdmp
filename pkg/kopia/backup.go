@@ -156,11 +156,13 @@ func (b *backupExecutor) Status() (*cmdexec.Status, error) {
 
 func getBackupSummary(outBytes []byte, errBytes []byte) (*BackupSummaryResponse, error) {
 	outLines := bytes.Split(outBytes, []byte("\n"))
+	logrus.Errorf("CmdOutput: %v", string(outBytes))
+	logrus.Errorf("CmdErr: %v", string(errBytes))
 	if len(outLines) == 0 {
 		return nil, &cmdexec.Error{
 			Reason:    "backup summary not available",
-			CmdOutput: string(outBytes),
-			CmdErr:    string(errBytes),
+			CmdOutput: "",
+			CmdErr:    "",
 		}
 	}
 
@@ -171,26 +173,34 @@ func getBackupSummary(outBytes []byte, errBytes []byte) (*BackupSummaryResponse,
 		},
 	}
 	if err := json.Unmarshal(outResponse, summaryResponse); err != nil {
+		logrus.Errorf("CmdOutput: %v", string(outResponse))
+		logrus.Errorf("CmdErr: %v", string(errBytes))
 		return nil, &cmdexec.Error{
 			Reason:    fmt.Sprintf("failed to parse backup summary: %v", err),
-			CmdOutput: string(outResponse),
-			CmdErr:    string(errBytes),
+			CmdOutput: "",
+			CmdErr:    "",
 		}
 	}
 	// If the ID is not present fail the backup
 	if summaryResponse.ID == "" {
+		logrus.Errorf("CmdOutput: %v", string(outResponse))
+		logrus.Errorf("CmdErr: %v", string(errBytes))
 		return nil, &cmdexec.Error{
 			Reason:    "failed to backup as snapshot ID is not present",
-			CmdOutput: string(outResponse),
-			CmdErr:    string(errBytes),
+			CmdOutput: "",
+			CmdErr:    "",
 		}
 	}
 	// If numFailed is non-zero, fail the backup
 	if summaryResponse.RootEntry.Summary.FatalErrorCount != 0 {
+		errMsg := "internal error, check backup pod logs for more details"
+		logrus.Errorf("CmdOutput: %v", string(outResponse))
+		logrus.Errorf("CmdErr: %v", string(errBytes))
 		return nil, &cmdexec.Error{
-			Reason:    fmt.Sprintf("failed to backup as FatalErrorCount is %v", summaryResponse.RootEntry.Summary.FatalErrorCount),
-			CmdOutput: string(outResponse),
-			CmdErr:    string(errBytes),
+			Reason: fmt.Sprintf("failed to backup as FatalErrorCount is %v for snapshot id: %v: %v",
+				summaryResponse.RootEntry.Summary.FatalErrorCount, summaryResponse.ID, errMsg),
+			CmdOutput: "",
+			CmdErr:    "",
 		}
 	}
 
