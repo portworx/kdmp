@@ -98,7 +98,6 @@ func (c *Controller) sync(ctx context.Context, in *kdmpapi.DataExport) (bool, er
 		return false, nil
 	}
 	dataExport := in.DeepCopy()
-
 	// set the initial stage
 	if dataExport.Status.Stage == "" {
 		// TODO: set defaults
@@ -343,7 +342,17 @@ func (c *Controller) sync(ctx context.Context, in *kdmpapi.DataExport) (bool, er
 			}
 			return false, c.updateStatus(dataExport, data)
 		}
-
+		// When job reaches the last retry limit, pod is removed and reconciler
+		// can be coming later during which is pod might be deleted. GetPods() doesn't give
+		// error when pods are not present hence we are not sure if pods are still coming up
+		// or deleted.
+		if progress.RestartCount < (utils.JobPodBackOffLimit - 1) {
+			logrus.Tracef("pod restart cnt: %v", progress.RestartCount)
+			data := updateDataExportDetail{
+				status: kdmpapi.DataExportStatusInProgress,
+			}
+			return true, c.updateStatus(dataExport, data)
+		}
 		switch progress.State {
 		case drivers.JobStateFailed:
 			errMsg := fmt.Sprintf("%s transfer job failed: %s", dataExport.Status.TransferID, progress.Reason)

@@ -530,24 +530,51 @@ func isRepositoryExists(repository *executor.Repository) (bool, error) {
 		logrus.Errorf("%v", err)
 		return false, err
 	}
-	bucket, err := objectstore.GetBucket(bl)
-	if err != nil {
-		logrus.Errorf("err: %v", err)
-		return false, err
+	exists := false
+	t := func() (interface{}, bool, error) {
+		bucket, err := objectstore.GetBucket(bl)
+		if err != nil {
+			status := &executor.Status{
+				LastKnownError: err,
+			}
+			if err = executor.WriteVolumeBackupStatus(status, volumeBackupName, bkpNamespace); err != nil {
+				errMsg := fmt.Sprintf("failed to write a VolumeBackup status: %v", err)
+				logrus.Errorf("%v", errMsg)
+				return "", true, fmt.Errorf(errMsg)
+			}
+			return "", true, fmt.Errorf("repo check status not available")
+		}
+
+		bucket = blob.PrefixedBucket(bucket, repository.Name)
+		exists, err = bucket.Exists(context.TODO(), kopiaRepositoryFile)
+		if err != nil {
+			status := &executor.Status{
+				LastKnownError: err,
+			}
+			if err = executor.WriteVolumeBackupStatus(status, volumeBackupName, bkpNamespace); err != nil {
+				errMsg := fmt.Sprintf("failed to write a VolumeBackup status: %v", err)
+				logrus.Errorf("%v", errMsg)
+				return "", true, fmt.Errorf(errMsg)
+			}
+			return "", true, fmt.Errorf("repo check status not available")
+		}
+		if exists {
+			logrus.Infof("%s exists", kopiaRepositoryFile)
+		} else {
+			logrus.Infof("%s doesn't exists", kopiaRepositoryFile)
+		}
+
+		return "", false, nil
 	}
-	bucket = blob.PrefixedBucket(bucket, repository.Name)
-	exists, err := bucket.Exists(context.TODO(), kopiaRepositoryFile)
-	if err != nil {
-		logrus.Errorf("%v", err)
-		return false, err
+
+	if _, err := task.DoRetryWithTimeout(t, executor.DefaultTimeout, progressCheckInterval); err != nil {
+		logrus.Errorf("repository %s exists check failed: %v", repository.Name, err)
+		return exists, err
 	}
-	if exists {
-		logrus.Infof("%s exists", kopiaRepositoryFile)
-	} else {
-		logrus.Infof("%s doesn't exists", kopiaRepositoryFile)
-	}
+
 	return exists, nil
 }
+
 func addPolicySetting(policyCmd *kopia.Command) *kopia.Command {
 	policyCmd.AddArg("--keep-latest")
 	policyCmd.AddArg(latestSnapshots)
