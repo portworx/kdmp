@@ -409,9 +409,14 @@ func buildJob(jobName string, jobOptions drivers.JobOpts) (*batchv1.Job, error) 
 		logrus.Errorf("%s: %v", fn, errMsg)
 		return nil, fmt.Errorf(errMsg)
 	}
-
 	// run a "live" backup if a pvc is mounted (mount a kubelet directory with pod volumes)
 	if len(pods) > 0 {
+		logrus.Debugf("buildJob: pod %v phase %v pvc: %v/%v", pods[0].Name, pods[0].Status.Phase, jobOptions.Namespace, jobOptions.SourcePVCName)
+		if pods[0].Status.Phase == corev1.PodPending {
+			errMsg := fmt.Sprintf("pods %v is using pvc %v/%v but it is in pending state, backup is not possible", pods[0].Name, jobOptions.Namespace, jobOptions.SourcePVCName)
+			logrus.Errorf("%s: %v", fn, errMsg)
+			return nil, fmt.Errorf(errMsg)
+		}
 		return jobForLiveBackup(
 			jobOptions,
 			jobName,
