@@ -242,9 +242,9 @@ func runKopiaCreateRepo(repository *executor.Repository) error {
 				); err != nil {
 					errMsg := fmt.Sprintf("failed to write a VolumeBackup status: %v", err)
 					logrus.Errorf("%v", errMsg)
-					return "", false, fmt.Errorf(errMsg)
+					return "", true, fmt.Errorf(errMsg)
 				}
-				return "", false, status.LastKnownError
+				return "", true, status.LastKnownError
 			}
 			status.LastKnownError = nil
 		}
@@ -256,7 +256,7 @@ func runKopiaCreateRepo(repository *executor.Repository) error {
 		); err != nil {
 			errMsg := fmt.Sprintf("failed to write a VolumeBackup status: %v", err)
 			logrus.Errorf("%v", errMsg)
-			return "", false, fmt.Errorf(errMsg)
+			return "", true, fmt.Errorf(errMsg)
 		}
 		if status.Done {
 			return "", false, nil
@@ -367,7 +367,7 @@ func runKopiaRepositoryConnect(repository *executor.Repository) error {
 			return "", true, err
 		}
 		if status.LastKnownError != nil {
-			return "", false, status.LastKnownError
+			return "", true, status.LastKnownError
 		}
 		if status.Done {
 			return "", false, nil
@@ -413,9 +413,9 @@ func setGlobalPolicy() error {
 			); err != nil {
 				errMsg := fmt.Sprintf("failed to write a VolumeBackup status: %v", err)
 				logrus.Errorf("%v", errMsg)
-				return "", false, fmt.Errorf(errMsg)
+				return "", true, fmt.Errorf(errMsg)
 			}
-			return "", false, status.LastKnownError
+			return "", true, status.LastKnownError
 		}
 
 		if status.Done {
@@ -461,9 +461,9 @@ func runKopiaCompression(repository *executor.Repository, sourcePath string) err
 			); err != nil {
 				errMsg := fmt.Sprintf("failed to write a VolumeBackup status: %v", err)
 				logrus.Errorf("%v", errMsg)
-				return "", false, fmt.Errorf(errMsg)
+				return "", true, fmt.Errorf(errMsg)
 			}
-			return "", false, status.LastKnownError
+			return "", true, status.LastKnownError
 		}
 		if status.Done {
 			return "", false, nil
