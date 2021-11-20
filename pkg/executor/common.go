@@ -41,7 +41,7 @@ const (
 	storageAccountKeyPath  = "/etc/cred-secret/storageaccountkey"
 
 	// DefaultTimeout Max time a command will be retired before failing
-	DefaultTimeout = 2 * time.Minute
+	DefaultTimeout = 1 * time.Minute
 )
 
 // BackupTool backup tool
