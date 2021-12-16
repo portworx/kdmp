@@ -269,23 +269,27 @@ func ToImagePullSecret(name string) []corev1.LocalObjectReference {
 }
 
 // KopiaResourceRequirements returns ResourceRequirements for the kopiaexecutor container.
-func KopiaResourceRequirements() (corev1.ResourceRequirements, error) {
-	requestCPU := drivers.DefaultKopiaExecutorRequestCPU
-	if customRequestCPU := os.Getenv(drivers.KopiaExecutorRequestCPU); customRequestCPU != "" {
-		requestCPU = customRequestCPU
+func KopiaResourceRequirements(configMap, ns string) (corev1.ResourceRequirements, error) {
+	requestCPU := strings.TrimSpace(GetConfigValue(configMap, ns, drivers.KopiaExecutorRequestCPU))
+	if requestCPU == "" {
+		requestCPU = drivers.DefaultKopiaExecutorRequestCPU
 	}
-	requestMem := drivers.DefaultKopiaExecutorRequestMemory
-	if customRequestMemory := os.Getenv(drivers.KopiaExecutorRequestMemory); customRequestMemory != "" {
-		requestMem = customRequestMemory
+
+	requestMem := strings.TrimSpace(GetConfigValue(configMap, ns, drivers.KopiaExecutorRequestMemory))
+	if requestMem == "" {
+		requestMem = drivers.DefaultKopiaExecutorRequestMemory
 	}
-	limitCPU := drivers.DefaultKopiaExecutorLimitCPU
-	if customLimitCPU := os.Getenv(drivers.KopiaExecutorLimitCPU); customLimitCPU != "" {
-		limitCPU = customLimitCPU
+
+	limitCPU := strings.TrimSpace(GetConfigValue(configMap, ns, drivers.KopiaExecutorLimitCPU))
+	if limitCPU == "" {
+		limitCPU = drivers.DefaultKopiaExecutorLimitCPU
 	}
-	limitMem := drivers.DefaultKopiaExecutorLimitMemory
-	if customLimitMemory := os.Getenv(drivers.KopiaExecutorLimitMemory); customLimitMemory != "" {
-		limitMem = customLimitMemory
+
+	limitMem := strings.TrimSpace(GetConfigValue(configMap, ns, drivers.KopiaExecutorLimitMemory))
+	if limitMem == "" {
+		limitMem = drivers.DefaultKopiaExecutorLimitMemory
 	}
+
 	return toResourceRequirements(requestCPU, requestMem, limitCPU, limitMem)
 }
 
