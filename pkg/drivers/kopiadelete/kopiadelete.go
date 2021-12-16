@@ -202,11 +202,11 @@ func jobFor(
 				Spec: corev1.PodSpec{
 					RestartPolicy:      corev1.RestartPolicyOnFailure,
 					ServiceAccountName: jobOption.ServiceAccountName,
-					ImagePullSecrets:   utils.ToImagePullSecret(utils.KopiaExecutorImageSecret()),
+					ImagePullSecrets:   utils.ToImagePullSecret(utils.KopiaExecutorImageSecret(jobOption.JobConfigMap, jobOption.JobConfigMapNs)),
 					Containers: []corev1.Container{
 						{
-							Name:            "kopiaexecutor",
-							Image:           utils.KopiaExecutorImage(),
+							Name:  "kopiaexecutor",
+							Image: utils.KopiaExecutorImage(jobOption.JobConfigMap, jobOption.JobConfigMapNs),
 							ImagePullPolicy: corev1.PullIfNotPresent,
 							Command: []string{
 								"/bin/sh",
