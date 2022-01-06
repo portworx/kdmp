@@ -16,13 +16,18 @@ import (
 	"github.com/libopenstorage/stork/pkg/crypto"
 	"github.com/libopenstorage/stork/pkg/objectstore"
 	"github.com/portworx/sched-ops/k8s/core"
+	"github.com/portworx/sched-ops/k8s/storage"
+	"github.com/portworx/sched-ops/task"
 	"github.com/sirupsen/logrus"
 	"gocloud.dev/blob"
 	"gocloud.dev/gcerrors"
 	v1 "k8s.io/api/core/v1"
+	storagev1 "k8s.io/api/storage/v1"
 	k8s_errors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/rest"
+	k8shelper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 )
 
 const (
@@ -99,13 +104,31 @@ func (c *csiDriver) CreateSnapshot(opts ...Option) (string, string, string, erro
 		return "", "", "", fmt.Errorf("error getting pv %v: %v", pvName, err)
 	}
 
-	if o.SnapshotClassName == "" {
-		o.SnapshotClassName = c.getDefaultSnapshotClassName(pv.Spec.CSI.Driver)
+	// In case the PV does not contain CSI secion itself, we will error out.
+	if pv.Spec.CSI == nil {
+		return "", "", "", fmt.Errorf("pv [%v] does not contain CSI section", pv.Name)
 	}
 
-	if err := c.ensureVolumeSnapshotClassCreated(pv.Spec.CSI.Driver, o.SnapshotClassName); err != nil {
-		return "", "", "", err
+	if o.SnapshotClassName == "" {
+		return "", "", "", fmt.Errorf("snapshot class cannot be empty, use 'default' to choose the default snapshot class")
 	}
+
+	if o.SnapshotClassName == "default" || o.SnapshotClassName == "Default" {
+		// Let kubernetes choose the default snapshot class to use
+		// for this snapshot. If none is set then the volume snapshot will fail
+		o.SnapshotClassName = ""
+	} else {
+		// For other snapshot class names ensure the volume snapshot class has
+		// been created
+		if err := c.ensureVolumeSnapshotClassCreated(pv.Spec.CSI.Driver, o.SnapshotClassName); err != nil {
+			return "", "", "", err
+		}
+	}
+	snapClassPtr := stringPtr(o.SnapshotClassName)
+	if o.SnapshotClassName == "" {
+		snapClassPtr = nil
+	}
+
 	vs := &kSnapshotv1beta1.VolumeSnapshot{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        o.Name,
@@ -114,7 +137,7 @@ func (c *csiDriver) CreateSnapshot(opts ...Option) (string, string, string, erro
 			Labels:      o.Labels,
 		},
 		Spec: kSnapshotv1beta1.VolumeSnapshotSpec{
-			VolumeSnapshotClassName: stringPtr(o.SnapshotClassName),
+			VolumeSnapshotClassName: snapClassPtr,
 			Source: kSnapshotv1beta1.VolumeSnapshotSource{
 				PersistentVolumeClaimName: stringPtr(o.PVCName),
 			},
@@ -192,14 +215,17 @@ func (c *csiDriver) SnapshotStatus(name, namespace string) (SnapshotInfo, error)
 	}
 	snapshotInfo.SnapshotRequest = snapshot
 	var snapshotClassName string
+	var snapshotClass *kSnapshotv1beta1.VolumeSnapshotClass
 	if snapshot.Spec.VolumeSnapshotClassName != nil {
 		snapshotClassName = *snapshot.Spec.VolumeSnapshotClassName
 	}
-	snapshotClass, err := c.snapshotClient.SnapshotV1beta1().VolumeSnapshotClasses().Get(context.TODO(), snapshotClassName, metav1.GetOptions{})
-	if err != nil {
-		snapshotInfo.Status = StatusFailed
-		snapshotInfo.Reason = fmt.Sprintf("snapshot class %s lost during backup: %v", snapshotClassName, err)
-		return snapshotInfo, err
+	if len(snapshotClassName) > 0 {
+		snapshotClass, err = c.snapshotClient.SnapshotV1beta1().VolumeSnapshotClasses().Get(context.TODO(), snapshotClassName, metav1.GetOptions{})
+		if err != nil {
+			snapshotInfo.Status = StatusFailed
+			snapshotInfo.Reason = fmt.Sprintf("snapshot class %s lost during backup: %v", snapshotClassName, err)
+			return snapshotInfo, err
+		}
 	}
 
 	volumeSnapshotReady := c.snapshotReady(snapshot)
@@ -255,8 +281,15 @@ func (c *csiDriver) SnapshotStatus(name, namespace string) (SnapshotInfo, error)
 		snapshotInfo.Reason = formatReasonErrorMessage(fmt.Sprintf("snapshot timeout out after %s", snapshotTimeout.String()), vsError, vscError)
 
 	default:
-		snapshotInfo.Status = StatusInProgress
-		snapshotInfo.Reason = formatReasonErrorMessage(fmt.Sprintf("volume snapshot in progress for PVC %s", pvcName), vsError, vscError)
+		if len(vsError) > 0 {
+			snapshotInfo.Status = StatusFailed
+			snapshotInfo.Reason = formatReasonErrorMessage(
+				fmt.Sprintf("volume snapshot failed for PVC %s", pvcName), vsError, vscError)
+		} else {
+			snapshotInfo.Status = StatusInProgress
+			snapshotInfo.Reason = formatReasonErrorMessage(
+				fmt.Sprintf("volume snapshot in progress for PVC %s", pvcName), vsError, vscError)
+		}
 		snapshotInfo.Size = uint64(size)
 	}
 	return snapshotInfo, nil
@@ -277,6 +310,22 @@ func (c *csiDriver) RestoreVolumeClaim(opts ...Option) (*v1.PersistentVolumeClai
 	pvc.Namespace = o.RestoreNamespace
 	pvc.ResourceVersion = ""
 	pvc.Spec.VolumeName = ""
+
+	snapshot, err := c.snapshotClient.SnapshotV1beta1().VolumeSnapshots(o.RestoreNamespace).Get(context.TODO(), o.RestoreSnapshotName, metav1.GetOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get volumesnapshot %s/%s", o.RestoreNamespace, o.RestoreSnapshotName)
+	}
+
+	// Make the pvc size  same as the restore size from the volumesnapshot
+	if snapshot.Status.RestoreSize != nil && !snapshot.Status.RestoreSize.IsZero() {
+		quantity, err := resource.ParseQuantity(snapshot.Status.RestoreSize.String())
+		if err != nil {
+			return nil, err
+		}
+		logrus.Debugf("setting size of pvc %s/%s same as snapshot size %s", pvc.Namespace, pvc.Name, quantity.String())
+		pvc.Spec.Resources.Requests[v1.ResourceStorage] = quantity
+	}
+
 	pvc.Spec.DataSource = &v1.TypedLocalObjectReference{
 		APIGroup: stringPtr("snapshot.storage.k8s.io"),
 		Kind:     "VolumeSnapshot",
@@ -285,7 +334,7 @@ func (c *csiDriver) RestoreVolumeClaim(opts ...Option) (*v1.PersistentVolumeClai
 	pvc.Status = v1.PersistentVolumeClaimStatus{
 		Phase: v1.ClaimPending,
 	}
-	pvc, err := core.Instance().CreatePersistentVolumeClaim(pvc)
+	pvc, err = core.Instance().CreatePersistentVolumeClaim(pvc)
 	if err != nil {
 		if k8s_errors.IsAlreadyExists(err) {
 			return pvc, nil
@@ -334,6 +383,10 @@ func (c *csiDriver) RestoreStatus(pvcName, namespace string) (RestoreInfo, error
 	}
 
 	switch {
+	case c.pvcWaitingForFirstConsumer(pvc):
+		restoreInfo.VolumeName = pvc.Spec.VolumeName
+		restoreInfo.Size = size
+		restoreInfo.Status = StatusReady
 	case c.pvcBindFinished(pvc):
 		restoreInfo.VolumeName = pvc.Spec.VolumeName
 		restoreInfo.Size = size
@@ -374,10 +427,6 @@ func (c *csiDriver) cleanK8sPVCAnnotations(pvc *v1.PersistentVolumeClaim) *v1.Pe
 	}
 
 	return pvc
-}
-
-func (c *csiDriver) getDefaultSnapshotClassName(driverName string) string {
-	return snapshotClassNamePrefix + driverName
 }
 
 func (c *csiDriver) getVolumeSnapshotClass(snapshotClassName string) (*kSnapshotv1beta1.VolumeSnapshotClass, error) {
@@ -457,13 +506,13 @@ func formatReasonErrorMessage(reason, vsError, vscError string) string {
 
 	switch {
 	case vsError != "" && vscError != "" && vsError != vscError:
-		snapshotError = fmt.Sprintf("Snapshot error: %s. SnapshotContent error: %s", vsError, vscError)
+		snapshotError = fmt.Sprintf("snapshot error: %s, snapshotContent error: %s", vsError, vscError)
 
 	case vsError != "":
-		snapshotError = fmt.Sprintf("Snapshot error: %s", vsError)
+		snapshotError = fmt.Sprintf("snapshot error: %s", vsError)
 
 	case vscError != "":
-		snapshotError = fmt.Sprintf("SnapshotContent error: %s", vscError)
+		snapshotError = fmt.Sprintf("snapshotContent error: %s", vscError)
 	}
 
 	if snapshotError != "" {
@@ -501,6 +550,21 @@ func (c *csiDriver) pvcBindFinished(pvc *v1.PersistentVolumeClaim) bool {
 	bindCompleted := pvc.Annotations[annPVBindCompleted]
 	boundByController := pvc.Annotations[annPVBoundByController]
 	return pvc.Status.Phase == v1.ClaimBound && bindCompleted == "yes" && boundByController == "yes"
+}
+
+func (c *csiDriver) pvcWaitingForFirstConsumer(pvc *v1.PersistentVolumeClaim) bool {
+	var sc *storagev1.StorageClass
+	var err error
+	storageClassName := k8shelper.GetPersistentVolumeClaimClass(pvc)
+	if storageClassName != "" {
+		sc, err = storage.Instance().GetStorageClass(storageClassName)
+		if err != nil {
+			logrus.Warnf("did not get the storageclass %s for pvc %s/%s, err: %v", storageClassName, pvc.Namespace, pvc.Name, err)
+			return false
+		}
+		return *sc.VolumeBindingMode == storagev1.VolumeBindingWaitForFirstConsumer
+	}
+	return false
 }
 
 func (c *csiDriver) getSnapshotContentError(vscName string) string {
@@ -853,18 +917,28 @@ func (c *csiDriver) RetainLocalSnapshots(
 				}
 			}
 
-			if index < len(vsCRList)-localCSIRetention {
-				retain = false
-			} else {
-				retain = true
+			// Waiting for vs to get bound with vsc as in cleanup path by the time deletesnapshot is running,
+			// vsc may not be bound to vs.
+			err = c.waitForVolumeSnapshotBound(vs, namespace)
+			if err == nil {
+				if index < len(vsCRList)-localCSIRetention {
+					retain = false
+				} else {
+					retain = true
+				}
+				err = c.DeleteSnapshot(
+					vs.Name,
+					namespace,
+					retain, // retain snapshot content
+				)
 			}
-			err = c.DeleteSnapshot(
-				vs.Name,
-				namespace,
-				retain, // retain snapshot content
-			)
+
 			if err != nil {
-				return err
+				logrus.Errorf("failed to delete the old snapshot %s: %v", vs.Name, err)
+				err = c.forceDeleteSnapshotResources(newSnapInfo, namespace)
+				if err != nil {
+					logrus.Warnf("deleting only vs and vsc failed")
+				}
 			}
 			logrus.Debugf("successfully deleted the recreated snapshot resources for snapshot %s/%s", namespace, snapName)
 			if !retain {
@@ -872,9 +946,10 @@ func (c *csiDriver) RetainLocalSnapshots(
 				err = c.DeleteSnapshotObject(backupLocation, volumeSnapshotCR)
 				if err != nil {
 					logrus.Errorf("deleting the CRs from objectstore failed for snapshot %s/%s: %v", namespace, snapName, err)
+				} else {
+					logrus.Debugf("successfully deleted snapshot resources in objectstore for snapshot %s/%s", namespace, snapName)
 				}
 			}
-			logrus.Debugf("successfully deleted snapshot resources in objectstore for snapshot %s/%s", namespace, snapName)
 		}
 	}
 
@@ -944,6 +1019,11 @@ func (c *csiDriver) RestoreFromLocalSnapshot(backupLocation *storkapi.BackupLoca
 		}
 	}
 
+	err = c.waitForVolumeSnapshotBound(vs, namespace)
+	if err != nil {
+		return status, fmt.Errorf("volumesnapshot %s failed to get bound: %v", vs.Name, err)
+	}
+
 	// create a new pvc for restore from the snapshot
 	pvc, err = c.RestoreVolumeClaim(
 		RestoreSnapshotName(vs.Name),
@@ -959,16 +1039,7 @@ func (c *csiDriver) RestoreFromLocalSnapshot(backupLocation *storkapi.BackupLoca
 	return status, nil
 }
 
-func (c *csiDriver) CleanUpRestoredResources(backupLocation *storkapi.BackupLocation, pvc *v1.PersistentVolumeClaim,
-	pvcUID, backupUID, objectPath, namespace string) error {
-
-	// Only delete pvc if pvc object has been passed
-	if len(pvc.Name) != 0 {
-		err := core.Instance().DeletePersistentVolumeClaim(pvc.Name, namespace)
-		if err != nil && !k8s_errors.IsNotFound(err) {
-			return err
-		}
-	}
+func (c *csiDriver) CleanUpRestoredResources(backupLocation *storkapi.BackupLocation, pvcUID, backupUID, objectPath, namespace string) error {
 
 	// Get local snapshot present
 	snapshotInfo, err := c.getLocalSnapshot(backupLocation, pvcUID, backupUID, objectPath)
@@ -987,5 +1058,39 @@ func (c *csiDriver) CleanUpRestoredResources(backupLocation *storkapi.BackupLoca
 		return err
 	}
 
+	return nil
+}
+
+func (c *csiDriver) forceDeleteSnapshotResources(snapshotInfo SnapshotInfo, namespace string) error {
+	vs := snapshotInfo.SnapshotRequest.(*kSnapshotv1beta1.VolumeSnapshot)
+	vsc := snapshotInfo.Content.(*kSnapshotv1beta1.VolumeSnapshotContent)
+
+	err := c.snapshotClient.SnapshotV1beta1().VolumeSnapshots(namespace).Delete(context.TODO(), vs.Name, metav1.DeleteOptions{})
+	if err != nil && !k8s_errors.IsNotFound(err) {
+		logrus.Errorf("failed to force delete volumesnapshot %s/%s", namespace, vs.Name)
+	}
+
+	err = c.snapshotClient.SnapshotV1beta1().VolumeSnapshotContents().Delete(context.TODO(), vsc.Name, metav1.DeleteOptions{})
+	if err != nil && !k8s_errors.IsNotFound(err) {
+		logrus.Errorf("failed to force delete volumesnapshotcontent %s", vsc.Name)
+	}
+
+	return nil
+}
+
+func (c *csiDriver) waitForVolumeSnapshotBound(vs *kSnapshotv1beta1.VolumeSnapshot, namespace string) error {
+	t := func() (interface{}, bool, error) {
+		curVS, err := c.snapshotClient.SnapshotV1beta1().VolumeSnapshots(namespace).Get(context.TODO(), vs.Name, metav1.GetOptions{})
+		if err != nil {
+			return nil, true, fmt.Errorf("failed to get volumesnapshot object %v/%v: %v", namespace, vs.Name, err)
+		}
+		if curVS.Status == nil || curVS.Status.BoundVolumeSnapshotContentName == nil {
+			return nil, true, fmt.Errorf("failed to find get status for snapshot: %s/%s, status: %+v", namespace, vs.Name, vs.Status)
+		}
+		return nil, false, nil
+	}
+	if _, err := task.DoRetryWithTimeout(t, 30*time.Second, 2*time.Second); err != nil {
+		return fmt.Errorf("timed out waiting for vs %s to get bound: %v", vs.Name, err)
+	}
 	return nil
 }
