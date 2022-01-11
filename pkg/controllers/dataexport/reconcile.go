@@ -51,6 +51,7 @@ const (
 	dataExportUIDAnnotation  = "portworx.io/dataexport-uid"
 	dataExportNameAnnotation = "portworx.io/dataexport-name"
 	skipResourceAnnotation   = "stork.libopenstorage.org/skip-resource"
+	baseSCAnnotation         = "volume.beta.kubernetes.io/storage-class"
 
 	pxbackupAnnotationPrefix        = "portworx.io/"
 	kdmpAnnotationPrefix            = "kdmp.portworx.com/"
@@ -1219,6 +1220,10 @@ func (c *Controller) cleanUp(driver drivers.Interface, de *kdmpapi.DataExport, i
 }
 
 func (c *Controller) cleanupLocalRestoredSnapshotResources(de *kdmpapi.DataExport, ignorePVC bool, ignoreVolumeSnapshotCleanup bool) error {
+	// ignorepvc should be set where we want to keep the pvc like in a successful restore from local snapshot
+	// else this pvc needs to be deleted so that kdmp restore can happen using another pvc without any datasource
+	// ignoreVolumeSnapshotCleanup should be set if vs/vsc crs need to be kept so that those can be used for creating pv in
+	// waitforfirstconsumer kind of case.
 
 	var cleanupErr error
 	var snapshotDriverName string
@@ -1372,11 +1377,18 @@ func (c *Controller) restoreSnapshot(ctx context.Context, snapshotDriver snapsho
 			StorageClassName: srcPvc.Spec.StorageClassName, // use the same SC as the source PVC
 		},
 	}
+
 	// We don't want other reconcilors (if any) to backup this temporary PVC
 	pvc.Annotations = make(map[string]string)
 	pvc.Annotations[skipResourceAnnotation] = "true"
 	pvc.Annotations[dataExportUIDAnnotation] = string(de.UID)
 	pvc.Annotations[dataExportNameAnnotation] = trimLabel(de.Name)
+
+	// If storage class annotation is set , then put that annotation too in the temp pvc
+	// Sometimes the spec.storageclass might be empty, in that case the temp pvc may get the sc as the default sc
+	if srcSC, ok := srcPvc.Annotations[baseSCAnnotation]; ok {
+		pvc.Annotations[dataExportNameAnnotation] = srcSC
+	}
 
 	pvc, err = snapshotDriver.RestoreVolumeClaim(
 		snapshotter.RestoreNamespace(de.Namespace),
