@@ -10,8 +10,8 @@ script:
   - |
     if [ -n "${TRAVIS_TAG}" ]; then
       export RELEASE_VER=${TRAVIS_TAG}
-    elif [ "${TRAVIS_BRANCH}" == "1.0.0" ]; then
-      export DOCKER_IMAGE_TAG="1.0.0-dev"
+    elif [ "${TRAVIS_BRANCH}" == "1.1.0" ]; then
+      export DOCKER_IMAGE_TAG="1.1.0-dev"
     else
       export RELEASE_VER=`git rev-parse --short HEAD`
     fi
@@ -23,6 +23,7 @@ script:
 branches:
   only:
   - 1.0.0
+  - 1.1.0
 notifications:
   email:
     on_success: always
