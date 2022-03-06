@@ -28,6 +28,8 @@ const (
 	TriggeredFromPxBackup                  = "px-backup"
 	kopiaExecutorImageRegistryEnvVar       = "KOPIA-EXECUTOR-IMAGE-REGISTRY"
 	kopiaExecutorImageRegistrySecretEnvVar = "KOPIA-EXECUTOR-IMAGE-REGISTRY-SECRET"
+	// AdminNamespace - kube-system namespace, where privilige pods will be deployed for live kopiabackup.
+	AdminNamespace = "kube-system"
 )
 
 var (
