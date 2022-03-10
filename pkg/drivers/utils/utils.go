@@ -249,7 +249,7 @@ func GetImageRegistryFromDeployment(name, namespace string) (string, string, err
 func GetKopiaExecutorImageRegistryAndSecret(source, sourceNs string) (string, string, error) {
 	var registry, registrySecret string
 	var err error
-	if len(os.Getenv(kopiaExecutorImageRegistryEnvVar)) == 0 || len(os.Getenv(kopiaExecutorImageRegistrySecretEnvVar)) == 0 {
+	if len(os.Getenv(kopiaExecutorImageRegistryEnvVar)) == 0 {
 		registry, registrySecret, err = GetImageRegistryFromDeployment(source, sourceNs)
 		if err != nil {
 			logrus.Errorf("GetKopiaExecutorImageRegistryAndSecret: error in getting image registory from %v:%v deployment", sourceNs, source)
