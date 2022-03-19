@@ -1,6 +1,6 @@
 FROM restic/restic:latest AS restic
 
-FROM ubuntu
+FROM ubuntu:20.04
 MAINTAINER Portworx Inc. <support@portworx.com>
 
 RUN apt-get update \
