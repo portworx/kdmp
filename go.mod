@@ -7,9 +7,10 @@ require (
 	github.com/hashicorp/go-version v1.2.1
 	github.com/kubernetes-csi/external-snapshotter/client/v4 v4.0.0
 	github.com/kubernetes-incubator/external-storage v0.20.4-openstorage-rc7
-	github.com/libopenstorage/stork v1.4.1-0.20211113171730-e02f28e240e9
+	github.com/libopenstorage/stork v1.4.1-0.20220323180113-0ea773109d05
 	github.com/portworx/pxc v0.33.0
-	github.com/portworx/sched-ops v1.20.4-rc1.0.20211116074603-2b6905763b23
+	// TODO: Vendor from pb-2169 branch. Need to change it to master.
+	github.com/portworx/sched-ops v1.20.4-rc1.0.20220327212454-cc1a88ecb579
 	github.com/sirupsen/logrus v1.8.1
 	github.com/spf13/cobra v1.1.3
 	github.com/spf13/pflag v1.0.5
@@ -17,18 +18,19 @@ require (
 	github.com/urfave/cli v1.22.2
 	gocloud.dev v0.20.0
 	k8s.io/api v0.21.4
-	k8s.io/apiextensions-apiserver v0.21.1
+	k8s.io/apiextensions-apiserver v0.21.4
 	k8s.io/apimachinery v0.21.4
 	k8s.io/cli-runtime v0.21.4
 	k8s.io/client-go v12.0.0+incompatible
 	k8s.io/code-generator v0.21.4
-	k8s.io/kubectl v0.20.4
+	k8s.io/kubectl v0.20.11
 	k8s.io/kubernetes v1.21.4
 	k8s.io/utils v0.0.0-20210527160623-6fdb442a123b
 	sigs.k8s.io/controller-runtime v0.9.0
 )
 
 replace (
+	github.com/go-logr/logr => github.com/go-logr/logr v0.4.0
 	github.com/googleapis/gnostic => github.com/googleapis/gnostic v0.4.1
 	github.com/kubernetes-csi/external-snapshotter/v2 => github.com/kubernetes-csi/external-snapshotter/v2 v2.1.1
 	github.com/kubernetes-incubator/external-storage => github.com/libopenstorage/external-storage v0.20.4-openstorage-rc6
@@ -47,6 +49,7 @@ replace (
 	k8s.io/controller-manager => k8s.io/controller-manager v0.21.4
 	k8s.io/cri-api => k8s.io/cri-api v0.21.5-rc.0
 	k8s.io/csi-translation-lib => k8s.io/csi-translation-lib v0.21.4
+	k8s.io/klog/v2 => k8s.io/klog/v2 v2.4.0
 	k8s.io/kube-aggregator => k8s.io/kube-aggregator v0.21.4
 	k8s.io/kube-controller-manager => k8s.io/kube-controller-manager v0.21.4
 	k8s.io/kube-proxy => k8s.io/kube-proxy v0.21.4
