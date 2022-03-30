@@ -17,6 +17,8 @@ require (
 	github.com/stretchr/testify v1.7.0
 	github.com/urfave/cli v1.22.2
 	gocloud.dev v0.20.0
+	golang.org/x/sys v0.0.0-20220330033206-e17cdc41300f // indirect
+	golang.org/x/tools v0.1.11-0.20220316014157-77aa08bb151a // indirect
 	k8s.io/api v0.21.4
 	k8s.io/apiextensions-apiserver v0.21.4
 	k8s.io/apimachinery v0.21.4
