@@ -122,7 +122,7 @@ build-kdmp:
 	-X github.com/portworx/kdmp/pkg/version.gitVersion=${RELEASE_VER} \
 	-X github.com/portworx/kdmp/pkg/version.gitCommit=${GIT_SHA} \
 	-X github.com/portworx/kdmp/pkg/version.buildDate=${BUILD_DATE}" \
-	$(BASE_DIR)/cmd/kdmp
+	-a $(BASE_DIR)/cmd/kdmp
 
 container-kdmp:
 	@echo "Build kdmp docker image"
@@ -147,7 +147,7 @@ build-restic-executor:
 	-X github.com/portworx/kdmp/pkg/version.gitVersion=${RELEASE_VER} \
 	-X github.com/portworx/kdmp/pkg/version.gitCommit=${GIT_SHA} \
 	-X github.com/portworx/kdmp/pkg/version.buildDate=${BUILD_DATE}" \
-	$(BASE_DIR)/cmd/executor/restic
+	-a $(BASE_DIR)/cmd/executor/restic
 
 build-kopia-executor:
 	@echo "Build kopia-executor"
@@ -155,7 +155,7 @@ build-kopia-executor:
 	-X github.com/portworx/kdmp/pkg/version.gitVersion=${RELEASE_VER} \
 	-X github.com/portworx/kdmp/pkg/version.gitCommit=${GIT_SHA} \
 	-X github.com/portworx/kdmp/pkg/version.buildDate=${BUILD_DATE}" \
-	$(BASE_DIR)/cmd/executor/kopia
+	-a $(BASE_DIR)/cmd/executor/kopia
 
 container-restic-executor:
 	@echo "Build restice-executor docker image"
@@ -180,7 +180,7 @@ build-pxc-exporter: gogenerate
 	-X github.com/portworx/kdmp/pkg/version.gitVersion=${RELEASE_VER} \
 	-X github.com/portworx/kdmp/pkg/version.gitCommit=${GIT_SHA} \
 	-X github.com/portworx/kdmp/pkg/version.buildDate=${BUILD_DATE}" \
-	 $(BASE_DIR)/cmd/exporter
+	-a $(BASE_DIR)/cmd/exporter
 
 container-pxc-exporter:
 deploy-pxc-exporter:
