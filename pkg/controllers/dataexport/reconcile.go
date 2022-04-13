@@ -23,7 +23,6 @@ import (
 	kdmpopts "github.com/portworx/kdmp/pkg/util/ops"
 	"github.com/portworx/sched-ops/k8s/batch"
 	"github.com/portworx/sched-ops/k8s/core"
-	"github.com/portworx/sched-ops/k8s/storage"
 	"github.com/portworx/sched-ops/k8s/stork"
 	"github.com/portworx/sched-ops/task"
 	"github.com/sirupsen/logrus"
@@ -36,7 +35,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/client-go/rest"
-	k8shelper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 )
 
 // Data export label names/keys.
@@ -1665,20 +1663,17 @@ func checkPVCIgnoringJobMounts(in kdmpapi.DataExportObjectReference, expectedMou
 		if checkErr != nil {
 			return "", true, checkErr
 		}
-		storageClassName := k8shelper.GetPersistentVolumeClaimClass(pvc)
-		if storageClassName != "" {
-			var sc *storagev1.StorageClass
-			sc, checkErr = storage.Instance().GetStorageClass(storageClassName)
+		var sc *storagev1.StorageClass
+		sc, checkErr = core.Instance().GetStorageClassForPVC(pvc)
+		if checkErr != nil {
+			return "", true, checkErr
+		}
+		logrus.Debugf("checkPVCIgnoringJobMounts: pvc name %v - storage class VolumeBindingMode %v", pvc.Name, *sc.VolumeBindingMode)
+		if *sc.VolumeBindingMode != storagev1.VolumeBindingWaitForFirstConsumer {
+			// wait for pvc to get bound
+			pvc, checkErr = waitForPVCBound(in, true)
 			if checkErr != nil {
-				return "", true, checkErr
-			}
-			logrus.Debugf("checkPVCIgnoringJobMounts: pvc name %v - storage class VolumeBindingMode %v", pvc.Name, *sc.VolumeBindingMode)
-			if *sc.VolumeBindingMode != storagev1.VolumeBindingWaitForFirstConsumer {
-				// wait for pvc to get bound
-				pvc, checkErr = waitForPVCBound(in, true)
-				if checkErr != nil {
-					return "", false, checkErr
-				}
+				return "", false, checkErr
 			}
 		} else {
 			// If sc is not set, we will direct check the pvc status
