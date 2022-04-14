@@ -7,10 +7,9 @@ require (
 	github.com/hashicorp/go-version v1.2.1
 	github.com/kubernetes-csi/external-snapshotter/client/v4 v4.0.0
 	github.com/kubernetes-incubator/external-storage v0.20.4-openstorage-rc7
-	github.com/libopenstorage/stork v1.4.1-0.20220323180113-0ea773109d05
+	github.com/libopenstorage/stork v1.4.1-0.20220414104250-3c18fd21ed95
 	github.com/portworx/pxc v0.33.0
-	// TODO: Vendor from pb-2169 branch. Need to change it to master.
-	github.com/portworx/sched-ops v1.20.4-rc1.0.20220327212454-cc1a88ecb579
+	github.com/portworx/sched-ops v1.20.4-rc1.0.20220401024625-dbc61a336f65
 	github.com/sirupsen/logrus v1.8.1
 	github.com/spf13/cobra v1.1.3
 	github.com/spf13/pflag v1.0.5
@@ -25,7 +24,6 @@ require (
 	k8s.io/code-generator v0.21.4
 	k8s.io/component-helpers v0.21.4
 	k8s.io/kubectl v0.21.4
-	k8s.io/kubernetes v1.21.4 // indirect
 	k8s.io/utils v0.0.0-20210527160623-6fdb442a123b
 	sigs.k8s.io/controller-runtime v0.9.0
 )
