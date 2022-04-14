@@ -1897,6 +1897,7 @@ k8s.io/code-generator v0.21.5-rc.0 h1:joJtc1KydnznMq6N5InEap7qKPIer1BHmMqiplr0ml
 k8s.io/code-generator v0.21.5-rc.0/go.mod h1:K3y0Bv9Cz2cOW2vXUrNZlFbflhuPvuadW6JdnN6gGKo=
 k8s.io/component-base v0.21.4 h1:Bc0AttSyhJFVXEIHz+VX+D11j/5z7SPPhl6whiXaRzs=
 k8s.io/component-base v0.21.4/go.mod h1:ZKG0eHVX+tUDcaoIGpU3Vtk4TIjMddN9uhEWDmW6Nyg=
+k8s.io/component-helpers v0.21.4 h1:Q6L3sQ+L5uaaUcsJkhlzU5UchcIYBZ56Y2Bq5k4qOtk=
 k8s.io/component-helpers v0.21.4/go.mod h1:/5TBNWmxaAymZweO1JWv3Pt5rcYJV1LbWWY0x1rDdVU=
 k8s.io/controller-manager v0.21.4/go.mod h1:a/iL7W19zkyirHDaupk9cyC11nejVznGwZI6I8tbyQY=
 k8s.io/cri-api v0.21.5-rc.0/go.mod h1:ukzeKnOkrG9/+ghKZA57WeZbQfRtqlGLF5GcF3RtHZ8=

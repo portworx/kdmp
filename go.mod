@@ -23,8 +23,9 @@ require (
 	k8s.io/cli-runtime v0.21.4
 	k8s.io/client-go v12.0.0+incompatible
 	k8s.io/code-generator v0.21.4
-	k8s.io/kubectl v0.20.11
-	k8s.io/kubernetes v1.21.4
+	k8s.io/component-helpers v0.21.4
+	k8s.io/kubectl v0.21.4
+	k8s.io/kubernetes v1.21.4 // indirect
 	k8s.io/utils v0.0.0-20210527160623-6fdb442a123b
 	sigs.k8s.io/controller-runtime v0.9.0
 )
