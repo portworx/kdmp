@@ -23,8 +23,9 @@ require (
 	k8s.io/cli-runtime v0.21.4
 	k8s.io/client-go v12.0.0+incompatible
 	k8s.io/code-generator v0.21.4
-	k8s.io/kubectl v0.20.11
-	k8s.io/kubernetes v1.21.4
+	k8s.io/component-helpers v0.21.4
+	k8s.io/kubectl v0.21.4
+	k8s.io/kubernetes v1.21.4 // indirect
 	k8s.io/utils v0.0.0-20210527160623-6fdb442a123b
 	sigs.k8s.io/controller-runtime v0.9.0
 )
@@ -56,7 +57,7 @@ replace (
 	k8s.io/kube-scheduler => k8s.io/kube-scheduler v0.21.4
 	k8s.io/kubectl => k8s.io/kubectl v0.21.4
 	k8s.io/kubelet => k8s.io/kubelet v0.21.4
-	k8s.io/kubernetes => k8s.io/kubernetes v1.20.4
+	k8s.io/kubernetes => k8s.io/kubernetes v1.21.4
 	k8s.io/legacy-cloud-providers => k8s.io/legacy-cloud-providers v0.21.4
 	k8s.io/metrics => k8s.io/metrics v0.21.4
 	k8s.io/mount-utils => k8s.io/mount-utils v0.21.5-rc.0
