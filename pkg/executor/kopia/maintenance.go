@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/libopenstorage/stork/pkg/objectstore"
@@ -26,6 +28,7 @@ var (
 const (
 	fullMaintenanceType = "full"
 	quickMaintenaceTye  = "quick"
+	cacheDir            = "/tmp"
 )
 
 func newMaintenanceCommand() *cobra.Command {
@@ -147,7 +150,6 @@ func runMaintenance(maintenanceType string) error {
 	}
 	for _, repoName := range repoList {
 		repo.Name = getBackupPathWithRepoName(repoName)
-
 		if err := runKopiaRepositoryConnect(repo); err != nil {
 			errMsg := fmt.Sprintf("repository [%v] connect failed: %v", repo.Name, err)
 			logrus.Errorf("%s: %v", fn, errMsg)
@@ -192,6 +194,14 @@ func runMaintenance(maintenanceType string) error {
 				continue
 			}
 		}
+
+		// Delete the kopia config files as the next connect command may fail because of this
+		// Not failing the operation if the clean up of the directory fails
+		err := cleanKopiaConfigContents()
+		if err != nil {
+			logrus.Errorf("failed to remove config contents from directory %s: %v", cacheDir, err)
+		}
+
 		statusErr := updateBackupLocationMaintenace(maintenanceType, kdmp_api.RepoMaintenanceStatusSuccess, repo.Name, "")
 		if err != nil {
 			logrus.Warnf("update of %smaintenance status for repo [%v] failed: %v", maintenanceType, repo.Name, statusErr)
@@ -200,6 +210,20 @@ func runMaintenance(maintenanceType string) error {
 		logrus.Infof("maintenance full run command completed successfully for repository [%v]", repo.Name)
 	}
 
+	return nil
+}
+
+func cleanKopiaConfigContents() error {
+	// cleaning all files starting with kopia in the config directory
+	files, err := filepath.Glob(fmt.Sprintf("%s/kopia*", cacheDir))
+	if err != nil {
+		return err
+	}
+	for _, f := range files {
+		if err := os.Remove(f); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -214,6 +238,7 @@ func runKopiaQuickMaintenanceExecute(repository *executor.Repository) error {
 		logrus.Errorf("%s %v", fn, errMsg)
 		return fmt.Errorf(errMsg)
 	}
+
 	initExecutor := kopia.NewMaintenanceRunExecutor(maintenanceRunCmd)
 	if err := initExecutor.Run(); err != nil {
 		errMsg := fmt.Sprintf("running maintenance run command for [%v] failed: %v", repository.Name, err)
