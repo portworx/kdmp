@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"os/user"
 
 	cmdexec "github.com/portworx/kdmp/pkg/executor"
 	"github.com/sirupsen/logrus"
@@ -31,7 +32,15 @@ func GetMaintenanceSetCommand() (*Command, error) {
 		logrus.Infof("%v", errMsg)
 		return nil, fmt.Errorf(errMsg)
 	}
-	owner := rootUser + hostname
+	curUser := rootUser
+	// Use the current user for maintenance as container may not run with root user always
+	user, err := user.Current()
+	if err != nil {
+		logrus.Errorf("failed to get current user: %v", err)
+	} else {
+		curUser = fmt.Sprintf("%s@", user.Username)
+	}
+	owner := curUser + hostname
 	logrus.Debugf("GetMaintenanceSetCommand: owner %v", owner)
 	return &Command{
 		Name:             "maintenance",
