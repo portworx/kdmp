@@ -11,7 +11,7 @@ const (
 	baseCmd    = "kopia"
 	logDir     = "/tmp"
 	cacheDir   = "/tmp"
-	configFile = "/tmp/kopiconfig"
+	configFile = "/tmp/kopiaconfig"
 )
 
 // Command defines the essential fields required to
