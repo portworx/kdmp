@@ -1,23 +1,16 @@
-FROM ubuntu
+FROM registry.access.redhat.com/ubi8-minimal:latest
 
 MAINTAINER Portworx Inc. <support@portworx.com>
 
-RUN apt-get update && apt-get install bash curl vim make git wget gpg -y
-RUN curl -s https://kopia.io/signing-key | apt-key add -
+RUN microdnf install bash curl vim make git wget gpg ca-certificates yum && \
+        microdnf update && \
+        microdnf clean all
 
-RUN echo "deb http://packages.kopia.io/apt/ stable main" |  tee /etc/apt/sources.list.d/kopia.list
-RUN apt-get update \
-    && apt-get dist-upgrade -y \
-    && apt-get install -y --no-install-recommends \
-        ca-certificates \
-    && apt-get clean -y \
-    && apt-get autoremove -y \
-    && rm -rf /tmp/* /var/tmp/* \
-    && rm -rf /var/lib/apt/lists/*
+RUN rpm --import https://kopia.io/signing-key
 
-RUN apt update
+COPY kopia.repo /etc/yum.repos.d/kopia.repo
 
-RUN apt install kopia=0.9.4
+RUN yum install -y kopia-0.9.4
 WORKDIR /
 
 COPY ./bin/kopiaexecutor /
