@@ -1,4 +1,4 @@
-FROM ubuntu:16.04
+FROM ubuntu:jammy-20220404
 
 MAINTAINER Portworx Inc. <support@portworx.com>
 
