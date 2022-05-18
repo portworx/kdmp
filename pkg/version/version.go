@@ -10,7 +10,8 @@ import (
 )
 
 const (
-	k8sMinVersionCronJobV1 = "1.21"
+	k8sMinVersionCronJobV1        = "1.21"
+	k8sMinVersionVolumeSnapshotV1 = "1.20"
 )
 
 // Base version information.
@@ -48,6 +49,23 @@ func Get() Info {
 		Compiler:   runtime.Compiler,
 		Platform:   fmt.Sprintf("%s/%s", runtime.GOOS, runtime.GOARCH),
 	}
+}
+
+// RequiresV1VolumeSnapshot returns true if V1 version of VolumeSnapshot APIs need to be called
+func RequiresV1VolumeSnapshot() (bool, error) {
+	clusterK8sVersion, _, err := GetFullVersion()
+	if err != nil {
+		return false, err
+	}
+	requiredK8sVer, err := version.NewVersion(k8sMinVersionVolumeSnapshotV1)
+	if err != nil {
+		return false, err
+
+	}
+	if clusterK8sVersion.GreaterThanOrEqual(requiredK8sVer) {
+		return true, nil
+	}
+	return false, nil
 }
 
 // RequiresV1Registration returns true if crd nees to be registered as apiVersion V1
