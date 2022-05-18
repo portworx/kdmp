@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	kSnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
 	kSnapshotv1beta1 "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1beta1"
 	kSnapshotClient "github.com/kubernetes-csi/external-snapshotter/client/v4/clientset/versioned"
 	storkapi "github.com/libopenstorage/stork/pkg/apis/stork/v1alpha1"
@@ -21,6 +22,7 @@ import (
 	"github.com/portworx/kdmp/pkg/drivers/driversinstance"
 	"github.com/portworx/kdmp/pkg/drivers/utils"
 	kdmpopts "github.com/portworx/kdmp/pkg/util/ops"
+	"github.com/portworx/kdmp/pkg/version"
 	"github.com/portworx/sched-ops/k8s/batch"
 	"github.com/portworx/sched-ops/k8s/core"
 	"github.com/portworx/sched-ops/k8s/storage"
@@ -769,12 +771,29 @@ func (c *Controller) stageSnapshotInProgress(ctx context.Context, dataExport *kd
 		return false, c.updateStatus(dataExport, data)
 	}
 
-	vs := snapInfo.SnapshotRequest.(*kSnapshotv1beta1.VolumeSnapshot)
-	timestampEpoch := strconv.FormatInt(vs.GetObjectMeta().GetCreationTimestamp().Unix(), 10)
-	snapInfoList := []snapshotter.SnapshotInfo{snapInfo}
-	err = snapshotDriver.UploadSnapshotObjects(bl, snapInfoList, getCSICRUploadDirectory(pvcUID), getVSFileName(backupUID, timestampEpoch))
+	v1SnapshotRequired, err := version.RequiresV1VolumeSnapshot()
 	if err != nil {
-		msg := fmt.Sprintf("uploading snapshot objects for pvc %s/%s failed with error : %v", vs.Namespace, vs.Name, err)
+		return false, err
+	}
+
+	var vsName, vsNamespace string
+	if v1SnapshotRequired {
+		vs := snapInfo.SnapshotRequest.(*kSnapshotv1.VolumeSnapshot)
+		timestampEpoch := strconv.FormatInt(vs.GetObjectMeta().GetCreationTimestamp().Unix(), 10)
+		snapInfoList := []snapshotter.SnapshotInfo{snapInfo}
+		err = snapshotDriver.UploadSnapshotObjects(bl, snapInfoList, getCSICRUploadDirectory(pvcUID), getVSFileName(backupUID, timestampEpoch))
+		vsName = vs.Name
+		vsNamespace = vs.Namespace
+	} else {
+		vs := snapInfo.SnapshotRequest.(*kSnapshotv1beta1.VolumeSnapshot)
+		timestampEpoch := strconv.FormatInt(vs.GetObjectMeta().GetCreationTimestamp().Unix(), 10)
+		snapInfoList := []snapshotter.SnapshotInfo{snapInfo}
+		err = snapshotDriver.UploadSnapshotObjects(bl, snapInfoList, getCSICRUploadDirectory(pvcUID), getVSFileName(backupUID, timestampEpoch))
+		vsName = vs.Name
+		vsNamespace = vs.Namespace
+	}
+	if err != nil {
+		msg := fmt.Sprintf("uploading snapshot objects for pvc %s/%s failed with error : %v", vsNamespace, vsName, err)
 		logrus.Errorf(msg)
 		data := updateDataExportDetail{
 			status: kdmpapi.DataExportStatusFailed,
