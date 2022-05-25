@@ -2,8 +2,7 @@ FROM registry.access.redhat.com/ubi8-minimal:latest
 
 MAINTAINER Portworx Inc. <support@portworx.com>
 
-RUN microdnf install bash curl vim make git wget gpg ca-certificates yum && \
-        microdnf update && \
+RUN microdnf install bash curl vim make wget gpg ca-certificates yum && \
         microdnf clean all
 
 RUN rpm --import https://kopia.io/signing-key
