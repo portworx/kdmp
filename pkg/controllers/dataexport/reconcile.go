@@ -490,7 +490,7 @@ func (c *Controller) createJobCredCertSecrets(
 
 	// Check if the above env is present and read the certs file contents and
 	// secret for the job pod for kopia to access the same
-	err := createCertificateSecret(dataExport.Name, namespace, dataExport.Labels)
+	err := createCertificateSecret(utils.GetCertSecretName(dataExport.Name), namespace, dataExport.Labels)
 	if err != nil {
 		msg := fmt.Sprintf("error in creating certificate secret[%v/%v]: %v", namespace, dataExport.Name, err)
 		logrus.Errorf(msg)
@@ -504,7 +504,7 @@ func (c *Controller) createJobCredCertSecrets(
 	// Create secret in source ns because in case of multi ns backup
 	// BL CR is created in kube-system ns
 	err = CreateCredentialsSecret(
-		dataExport.Name,
+		utils.GetCredSecretName(dataExport.Name),
 		blName,
 		blNamespace,
 		namespace,
@@ -1235,7 +1235,7 @@ func (c *Controller) cleanUp(driver drivers.Interface, de *kdmpapi.DataExport) e
 		namespace = de.Namespace
 	}
 	// Delete the tls certificate secret created
-	err = core.Instance().DeleteSecret(de.Name, namespace)
+	err = core.Instance().DeleteSecret(utils.GetCertSecretName(de.Name), namespace)
 	if err != nil && !k8sErrors.IsNotFound(err) {
 		errMsg := fmt.Sprintf("failed to delete [%s/%s] secret", namespace, de.Name)
 		logrus.Errorf("%v", errMsg)
@@ -1248,8 +1248,15 @@ func (c *Controller) cleanUp(driver drivers.Interface, de *kdmpapi.DataExport) e
 		}
 	}
 
-	if err := core.Instance().DeleteSecret(de.Name, namespace); err != nil && !k8sErrors.IsNotFound(err) {
+	if err := core.Instance().DeleteSecret(utils.GetCredSecretName(de.Name), namespace); err != nil && !k8sErrors.IsNotFound(err) {
 		errMsg := fmt.Sprintf("deletion of backup credential secret %s failed: %v", de.Name, err)
+		logrus.Errorf(errMsg)
+		return fmt.Errorf(errMsg)
+	}
+	// Deleting image secret, if present
+	// Not checking for presence of the secret, instead try delete and ignore if the error is NotFound
+	if err := core.Instance().DeleteSecret(utils.GetImageSecretName(de.Name), namespace); err != nil && !k8sErrors.IsNotFound(err) {
+		errMsg := fmt.Sprintf("deletion of image secret %s failed: %v", de.Name, err)
 		logrus.Errorf(errMsg)
 		return fmt.Errorf(errMsg)
 	}
