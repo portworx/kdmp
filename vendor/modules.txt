@@ -27,7 +27,7 @@ github.com/PuerkitoBio/urlesc
 github.com/aquilax/truncate
 # github.com/asaskevich/govalidator v0.0.0-20210307081110-f21760c49a8d
 github.com/asaskevich/govalidator
-# github.com/aws/aws-sdk-go v1.35.37
+# github.com/aws/aws-sdk-go v1.40.39
 github.com/aws/aws-sdk-go/aws
 github.com/aws/aws-sdk-go/aws/arn
 github.com/aws/aws-sdk-go/aws/awserr
@@ -39,6 +39,7 @@ github.com/aws/aws-sdk-go/aws/credentials
 github.com/aws/aws-sdk-go/aws/credentials/ec2rolecreds
 github.com/aws/aws-sdk-go/aws/credentials/endpointcreds
 github.com/aws/aws-sdk-go/aws/credentials/processcreds
+github.com/aws/aws-sdk-go/aws/credentials/ssocreds
 github.com/aws/aws-sdk-go/aws/credentials/stscreds
 github.com/aws/aws-sdk-go/aws/csm
 github.com/aws/aws-sdk-go/aws/defaults
@@ -64,14 +65,18 @@ github.com/aws/aws-sdk-go/private/protocol
 github.com/aws/aws-sdk-go/private/protocol/eventstream
 github.com/aws/aws-sdk-go/private/protocol/eventstream/eventstreamapi
 github.com/aws/aws-sdk-go/private/protocol/json/jsonutil
+github.com/aws/aws-sdk-go/private/protocol/jsonrpc
 github.com/aws/aws-sdk-go/private/protocol/query
 github.com/aws/aws-sdk-go/private/protocol/query/queryutil
 github.com/aws/aws-sdk-go/private/protocol/rest
+github.com/aws/aws-sdk-go/private/protocol/restjson
 github.com/aws/aws-sdk-go/private/protocol/restxml
 github.com/aws/aws-sdk-go/private/protocol/xml/xmlutil
 github.com/aws/aws-sdk-go/service/s3
 github.com/aws/aws-sdk-go/service/s3/s3iface
 github.com/aws/aws-sdk-go/service/s3/s3manager
+github.com/aws/aws-sdk-go/service/sso
+github.com/aws/aws-sdk-go/service/sso/ssoiface
 github.com/aws/aws-sdk-go/service/sts
 github.com/aws/aws-sdk-go/service/sts/stsiface
 # github.com/beorn7/perks v1.0.1
@@ -187,8 +192,11 @@ github.com/kubernetes-incubator/external-storage/snapshot/pkg/apis/crd/v1
 github.com/kubernetes-incubator/external-storage/snapshot/pkg/client
 # github.com/libopenstorage/openstorage-sdk-clients v0.109.0
 github.com/libopenstorage/openstorage-sdk-clients/sdk/golang
-# github.com/libopenstorage/stork v1.4.1-0.20220414104250-3c18fd21ed95
+# github.com/libopenstorage/secrets v0.0.0-20220413195519-57d1c446c5e9
+github.com/libopenstorage/secrets/aws/credentials
+# github.com/libopenstorage/stork v1.4.1-0.20220730165523-00b074f6d0da
 ## explicit
+github.com/libopenstorage/stork/drivers
 github.com/libopenstorage/stork/pkg/apis/stork
 github.com/libopenstorage/stork/pkg/apis/stork/v1alpha1
 github.com/libopenstorage/stork/pkg/client/clientset/versioned
@@ -201,8 +209,10 @@ github.com/libopenstorage/stork/pkg/objectstore
 github.com/libopenstorage/stork/pkg/objectstore/azure
 github.com/libopenstorage/stork/pkg/objectstore/common
 github.com/libopenstorage/stork/pkg/objectstore/google
+github.com/libopenstorage/stork/pkg/objectstore/nfs
 github.com/libopenstorage/stork/pkg/objectstore/s3
 github.com/libopenstorage/stork/pkg/snapshotter
+github.com/libopenstorage/stork/pkg/version
 # github.com/liggitt/tabwriter v0.0.0-20181228230101-89fcab3d43de
 github.com/liggitt/tabwriter
 # github.com/mailru/easyjson v0.7.0
@@ -342,7 +352,7 @@ golang.org/x/lint/golint
 # golang.org/x/mod v0.4.1
 golang.org/x/mod/module
 golang.org/x/mod/semver
-# golang.org/x/net v0.0.0-20210428140749-89ef3d95e781
+# golang.org/x/net v0.0.0-20210614182718-04defd469f4e
 golang.org/x/net/context
 golang.org/x/net/context/ctxhttp
 golang.org/x/net/http/httpguts
