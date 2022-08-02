@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/portworx/kdmp/pkg/drivers"
 	"github.com/portworx/kdmp/pkg/drivers/utils"
@@ -221,6 +222,22 @@ func (d Driver) JobStatus(id string) (*drivers.JobStatus, error) {
 			if utils.IsJobPending(job) {
 				logrus.Warnf("backup job %s is in pending state", job.Name)
 				return utils.ToJobStatus(0, "", jobStatus), nil
+			} else {
+				maxRetry := 12
+				retrySleep := 5 * time.Second
+				for i := 0; i < maxRetry; i++ {
+					logrus.Warnf("job is not in pending state but volumebackup %s/%s is not created - retry %v", namespace, name, i)
+					vb, err1 := kdmpops.Instance().GetVolumeBackup(context.Background(), name, namespace)
+					if err1 != nil && apierrors.IsNotFound(err1) {
+						time.Sleep(retrySleep)
+						continue
+					} else if err1 != nil {
+						logrus.Errorf("error while fetching volumebackup %s/%s status: %v", namespace, name, err1)
+						break
+					} else {
+						return utils.ToJobStatus(vb.Status.ProgressPercentage, vb.Status.LastKnownError, jobStatus), nil
+					}
+				}
 			}
 		}
 		errMsg := fmt.Sprintf("failed to fetch volumebackup %s/%s status: %v", namespace, name, err)
