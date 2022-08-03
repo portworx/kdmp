@@ -1253,6 +1253,8 @@ func (c *Controller) cleanUp(driver drivers.Interface, de *kdmpapi.DataExport) e
 	} else {
 		namespace = de.Namespace
 	}
+	logrus.Infof("Adding a sleep of 60secs in clean up of dataexport [%s/%s]", namespace, de.Name)
+	time.Sleep(60*time.Second)
 	// Delete the tls certificate secret created
 	err = core.Instance().DeleteSecret(utils.GetCertSecretName(de.Name), namespace)
 	if err != nil && !k8sErrors.IsNotFound(err) {
