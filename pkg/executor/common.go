@@ -44,6 +44,9 @@ const (
 
 	// DefaultTimeout Max time a command will be retired before failing
 	DefaultTimeout = 1 * time.Minute
+	// k8s client connection configs
+	QPS   = 100
+	Burst = 100
 )
 
 // BackupTool backup tool
