@@ -50,7 +50,7 @@ test-container:
 	@echo "Building container: docker build --tag $(KDMP_UNITTEST_IMG) -f Dockerfile.unittest ."
 	docker build --tag $(KDMP_UNITTEST_IMG) -f Dockerfile.unittest .
 
-pretest: check-fmt lint vet errcheck staticcheck
+pretest: check-fmt vet 
 build: update-deployment build-kdmp build-restic-executor kopia-executor build-pxc-exporter
 container: container-kdmp container-restic-executor container-kopia-executor container-pxc-exporter
 deploy: deploy-kdmp deploy-restic-executor deploy-kopia-executor deploy-pxc-exporter

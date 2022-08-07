@@ -295,6 +295,7 @@ func jobFor(
 	} else {
 		kopiaExecutorImage = utils.GetKopiaExecutorImageName()
 	}
+	logrus.Infof("XYZ: NON_LIVE kopia; The cred secret file name is %v", utils.GetCredSecretName(jobOption.DataExportName))
 
 	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
@@ -362,7 +363,27 @@ func jobFor(
 			},
 		},
 	}
+	if len(jobOption.NfsServer) != 0 {
+		volumeMount := corev1.VolumeMount{
+			Name:      utils.NfsMountPoint,
+			MountPath: drivers.NfsMount,
+		}
+		job.Spec.Template.Spec.Containers[0].VolumeMounts = append(
+			job.Spec.Template.Spec.Containers[0].VolumeMounts,
+			volumeMount,
+		)
+		volume := corev1.Volume{
+			Name: utils.NfsMountPoint,
+			VolumeSource: corev1.VolumeSource{
+				NFS: &corev1.NFSVolumeSource{
+					Server: jobOption.NfsServer,
+					Path:   jobOption.NfsExportDir,
+				},
+			},
+		}
 
+		job.Spec.Template.Spec.Volumes = append(job.Spec.Template.Spec.Volumes, volume)
+	}
 	if drivers.CertFilePath != "" {
 		volumeMount := corev1.VolumeMount{
 			Name:      utils.TLSCertMountVol,

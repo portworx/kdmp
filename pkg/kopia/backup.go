@@ -81,12 +81,13 @@ func GetBackupCommand(path, repoName, password, provider, sourcePath string) (*C
 	}
 
 	return &Command{
-		Name:     "create",
-		Password: password,
-		Path:     path,
-		Dir:      sourcePath,
-		Provider: provider,
-		Args:     []string{"."},
+		Name:           "create",
+		Password:       password,
+		RepositoryName: repoName,
+		Path:           path,
+		Dir:            sourcePath,
+		Provider:       provider,
+		Args:           []string{"."},
 	}, nil
 }
 
