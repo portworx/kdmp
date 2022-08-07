@@ -35,7 +35,8 @@ type BackupLocation struct {
 type BackupLocationItem struct {
 	Type BackupLocationType `json:"type"`
 	// Path is either the bucket or any other path for the backup location
-	Path               string        `json:"path"`
+	Path string `json:"path"`
+	// EncryptionKey is deprecated. Instead use EncryptionV2Key field to pass the encryption key.
 	EncryptionKey      string        `json:"encryptionKey"`
 	S3Config           *S3Config     `json:"s3Config,omitempty"`
 	AzureConfig        *AzureConfig  `json:"azureConfig,omitempty"`
@@ -43,6 +44,8 @@ type BackupLocationItem struct {
 	SecretConfig       string        `json:"secretConfig"`
 	Sync               bool          `json:"sync"`
 	RepositoryPassword string        `json:"repositoryPassword"`
+	// EncryptionV2Key will be used to pass encryption key.
+	EncryptionV2Key string `json:"encryptionV2Key"`
 }
 
 // ClusterItem is the spec used to store a the credentials associated with the cluster
@@ -99,6 +102,9 @@ type S3Config struct {
 	// The S3 Storage Class to use when uploading objects. Glacier storage
 	// classes are not supported
 	StorageClass string `json:"storageClass"`
+	// UseIam when set stork will use the instance IAM role associated with the nodes
+	// on which stork pods run
+	UseIam bool `json:"useIam"`
 }
 
 // AzureConfig specifies the config required to connect to Azure Blob Storage
@@ -135,7 +141,7 @@ func (bl *BackupLocation) UpdateFromSecret(client kubernetes.Interface) error {
 			return fmt.Errorf("error getting secretConfig for backupLocation: %v", err)
 		}
 		if val, ok := secretConfig.Data["encryptionKey"]; ok && val != nil {
-			bl.Location.EncryptionKey = strings.TrimSuffix(string(val), "\n")
+			bl.Location.EncryptionV2Key = strings.TrimSuffix(string(val), "\n")
 		}
 		if val, ok := secretConfig.Data["path"]; ok && val != nil {
 			bl.Location.Path = strings.TrimSuffix(string(val), "\n")
