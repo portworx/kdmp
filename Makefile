@@ -20,6 +20,10 @@ RESTICEXECUTOR_DOCKER_IMAGE=$(DOCKER_IMAGE_REPO)/$(RESTICEXECUTOR_DOCKER_IMAGE_N
 KOPIAEXECUTOR_DOCKER_IMAGE_NAME=kopiaexecutor
 KOPIAEXECUTOR_DOCKER_IMAGE=$(DOCKER_IMAGE_REPO)/$(KOPIAEXECUTOR_DOCKER_IMAGE_NAME):$(DOCKER_IMAGE_TAG)
 
+NFSEXECUTOR_DOCKER_IMAGE_NAME=nfsexecutor
+NFSEXECUTOR_DOCKER_IMAGE=$(DOCKER_IMAGE_REPO)/$(NFSEXECUTOR_DOCKER_IMAGE_NAME):$(DOCKER_IMAGE_TAG)
+
+
 export GO111MODULE=on
 export GOFLAGS = -mod=vendor
 
@@ -142,10 +146,13 @@ deploy-kdmp:
 kdmp: build-kdmp container-kdmp deploy-kdmp
 kopia: kopia-executor deploy-kopia-executor
 restic: restic-executor deploy-restic-executor
+nfs: nfs-executor deploy-nfs-executor
 
 restic-executor: build-restic-executor container-restic-executor
 
 kopia-executor: build-kopia-executor container-kopia-executor
+
+nfs-executor: build-nfs-executor container-nfs-executor
 
 ### restic-executor targets ###
 build-restic-executor:
@@ -164,6 +171,14 @@ build-kopia-executor:
 	-X github.com/portworx/kdmp/pkg/version.buildDate=${BUILD_DATE}" \
 	-a $(BASE_DIR)/cmd/executor/kopia
 
+build-nfs-executor:
+	@echo "Build nfs-executor"
+	go build -o $(BIN)/nfsexecutor -ldflags="-s -w \
+	-X github.com/portworx/kdmp/pkg/version.gitVersion=${RELEASE_VER} \
+	-X github.com/portworx/kdmp/pkg/version.gitCommit=${GIT_SHA} \
+	-X github.com/portworx/kdmp/pkg/version.buildDate=${BUILD_DATE}" \
+	-a $(BASE_DIR)/cmd/executor/nfs
+
 container-restic-executor:
 	@echo "Build restice-executor docker image"
 	docker build --tag $(RESTICEXECUTOR_DOCKER_IMAGE) -f Dockerfile.resticexecutor .
@@ -171,6 +186,10 @@ container-restic-executor:
 container-kopia-executor:
 	@echo "Build kopia-executor docker image"
 	docker build --tag $(KOPIAEXECUTOR_DOCKER_IMAGE) -f Dockerfile.kopia .
+
+container-nfs-executor:
+	@echo "Build nfs-executor docker image"
+	docker build --tag $(NFSEXECUTOR_DOCKER_IMAGE) -f Dockerfile.nfs .
 
 deploy-restic-executor:
 	@echo "Deploy kdmp docker image"
@@ -180,6 +199,10 @@ deploy-kopia-executor:
 	@echo "Deploy kopia docker image"
 	docker push $(KOPIAEXECUTOR_DOCKER_IMAGE)
 
+deploy-nfs-executor:
+	@echo "Deploy nfs docker image"
+	docker push $(NFSEXECUTOR_DOCKER_IMAGE)
+
 ### pxc-exporter targets ###
 build-pxc-exporter: gogenerate
 	@echo "Build kdmp"
@@ -188,6 +211,7 @@ build-pxc-exporter: gogenerate
 	-X github.com/portworx/kdmp/pkg/version.gitCommit=${GIT_SHA} \
 	-X github.com/portworx/kdmp/pkg/version.buildDate=${BUILD_DATE}" \
 	-a $(BASE_DIR)/cmd/exporter
+
 
 container-pxc-exporter:
 deploy-pxc-exporter:
