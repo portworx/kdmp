@@ -4,6 +4,7 @@ go 1.15
 
 require (
 	github.com/aquilax/truncate v1.0.0
+	github.com/go-openapi/inflect v0.19.0
 	github.com/hashicorp/go-version v1.2.1
 	github.com/kubernetes-csi/external-snapshotter/client/v4 v4.0.0
 	github.com/kubernetes-incubator/external-storage v0.20.4-openstorage-rc7
