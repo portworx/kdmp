@@ -1190,6 +1190,13 @@ func (c *Controller) stageLocalSnapshotRestoreInProgress(ctx context.Context, da
 
 func (c *Controller) cleanUp(driver drivers.Interface, de *kdmpapi.DataExport) error {
 	var bl *storkapi.BackupLocation
+	doCleanup, err := utils.DoCleanupResource()
+	if err != nil {
+		return err
+	}
+	if (de.Status.Status == kdmpapi.DataExportStatusFailed) && !doCleanup {
+		return nil
+	}
 	if driver == nil {
 		return fmt.Errorf("driver is nil")
 	}
