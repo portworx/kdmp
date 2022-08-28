@@ -42,9 +42,11 @@ const (
 
 	// DefaultTimeout Max time a command will be retired before failing
 	DefaultTimeout = 1 * time.Minute
-	// k8s client connection configs
-	QPS       = 100
-	Burst     = 100
+	// QPS value for k8s client
+	QPS = 100
+	// Burst value for k8s client
+	Burst = 100
+	// BackupUID backup UID
 	BackupUID = "portworx.io/backup-uid"
 )
 

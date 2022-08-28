@@ -6,7 +6,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
 
 	"github.com/go-openapi/inflect"
 	stork_api "github.com/libopenstorage/stork/pkg/apis/stork/v1alpha1"
@@ -81,19 +80,19 @@ func uploadBkpResource(
 
 	err = uploadNamespaces(bkpNamespace, backup, bkpDir)
 	if err != nil {
-		logrus.Errorf("%s: error uploading namespace resource %v", err)
+		logrus.Errorf("%s: error uploading namespace resource %v", funct, err)
 		return err
 	}
 
 	err = uploadCRDResources(resKinds, bkpDir)
 	if err != nil {
-		logrus.Errorf("%s: error uploading CRD resource %v", err)
+		logrus.Errorf("%s: error uploading CRD resource %v", funct, err)
 		return err
 	}
 
 	err = uploadMetadatResources(bkpNamespace, backup, bkpDir)
 	if err != nil {
-		logrus.Errorf("%s: error uploading metadata resource %v", err)
+		logrus.Errorf("%s: error uploading metadata resource %v", funct, err)
 		return err
 	}
 	return nil
@@ -141,7 +140,7 @@ func uploadResource(
 		gvk := obj.GetObjectKind().GroupVersionKind()
 		resKinds[gvk.Kind] = gvk.Version
 		if err != nil {
-			logrus.Infof("%s: %v", err)
+			logrus.Infof("%s: %v", funct, err)
 			return err
 		}
 	}
