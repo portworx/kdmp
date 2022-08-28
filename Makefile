@@ -45,7 +45,7 @@ GO_FILES := $(shell find . -name '*.go' | grep -v 'vendor' | \
 .DEFAULT_GOAL: all
 .PHONY: test deploy build container
 
-all: pretest test-container test build container
+all: do-fmt pretest test-container test build container
 
 test:
 	docker run --rm -it -v ${GOPATH}:/go: $(KDMP_UNITTEST_IMG) make unittest
