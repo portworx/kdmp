@@ -26,6 +26,10 @@ func (c *FakeKdmpV1alpha1) DataExports(namespace string) v1alpha1.DataExportInte
 	return &FakeDataExports{c, namespace}
 }
 
+func (c *FakeKdmpV1alpha1) ResourceExports(namespace string) v1alpha1.ResourceExportInterface {
+	return &FakeResourceExports{c, namespace}
+}
+
 func (c *FakeKdmpV1alpha1) VolumeBackups(namespace string) v1alpha1.VolumeBackupInterface {
 	return &FakeVolumeBackups{c, namespace}
 }
