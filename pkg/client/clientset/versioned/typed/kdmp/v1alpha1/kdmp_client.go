@@ -18,6 +18,7 @@ type KdmpV1alpha1Interface interface {
 	RESTClient() rest.Interface
 	BackupLocationMaintenancesGetter
 	DataExportsGetter
+	ResourceExportsGetter
 	VolumeBackupsGetter
 	VolumeBackupDeletesGetter
 }
@@ -33,6 +34,10 @@ func (c *KdmpV1alpha1Client) BackupLocationMaintenances(namespace string) Backup
 
 func (c *KdmpV1alpha1Client) DataExports(namespace string) DataExportInterface {
 	return newDataExports(c, namespace)
+}
+
+func (c *KdmpV1alpha1Client) ResourceExports(namespace string) ResourceExportInterface {
+	return newResourceExports(c, namespace)
 }
 
 func (c *KdmpV1alpha1Client) VolumeBackups(namespace string) VolumeBackupInterface {
