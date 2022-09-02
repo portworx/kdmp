@@ -273,6 +273,18 @@ func (c *Controller) sync(ctx context.Context, in *kdmpapi.DataExport) (bool, er
 			compressionType = kdmpData.Data[compressionKey]
 			podDataPath = kdmpData.Data[backupPath]
 		}
+		blName := dataExport.Spec.Destination.Name
+		blNamespace := dataExport.Spec.Destination.Namespace
+		backupLocation, err := readBackupLocation(blName, blNamespace, "")
+		if err != nil {
+			msg := fmt.Sprintf("reading of backuplocation [%v/%v] failed: %v", blNamespace, blName, err)
+			logrus.Errorf(msg)
+			data := updateDataExportDetail{
+				status: kdmpapi.DataExportStatusFailed,
+				reason: msg,
+			}
+			return false, c.updateStatus(dataExport, data)
+		}
 
 		// start data transfer
 		id, err := startTransferJob(
@@ -283,6 +295,8 @@ func (c *Controller) sync(ctx context.Context, in *kdmpapi.DataExport) (bool, er
 			podDataPath,
 			utils.KdmpConfigmapName,
 			utils.KdmpConfigmapNamespace,
+			backupLocation.Location.NfsConfig.NfsServerAddr,
+			backupLocation.Location.Path,
 		)
 		if err != nil && err != utils.ErrJobAlreadyRunning && err != utils.ErrOutOfJobResources {
 			msg := fmt.Sprintf("failed to start a data transfer job, dataexport [%v]: %v", dataExport.Name, err)
@@ -1603,7 +1617,10 @@ func startTransferJob(
 	dataExport *kdmpapi.DataExport,
 	podDataPath string,
 	jobConfigMap string,
-	jobConfigMapNs string) (string, error) {
+	jobConfigMapNs string,
+	nfsServerAddr string,
+	nfsExportPath string,
+) (string, error) {
 	if drv == nil {
 		return "", fmt.Errorf("data transfer driver is not set")
 	}
@@ -1651,6 +1668,8 @@ func startTransferJob(
 			drivers.WithPodDatapathType(podDataPath),
 			drivers.WithJobConfigMap(jobConfigMap),
 			drivers.WithJobConfigMapNs(jobConfigMapNs),
+			drivers.WithNfsServer(nfsServerAddr),
+			drivers.WithNfsExportDir(nfsExportPath),
 		)
 	case drivers.KopiaRestore:
 		return drv.StartJob(
@@ -1945,6 +1964,8 @@ func CreateCredentialsSecret(secretName, blName, blNamespace, namespace string, 
 		return createGoogleSecret(secretName, backupLocation, namespace, labels)
 	case storkapi.BackupLocationAzure:
 		return createAzureSecret(secretName, backupLocation, namespace, labels)
+	case storkapi.BackupLocationNFS:
+		return createNfsSecret(secretName, backupLocation, namespace, labels)
 	}
 
 	return fmt.Errorf("unsupported backup location: %v", backupLocation.Location.Type)
@@ -2006,6 +2027,17 @@ func createAzureSecret(secretName string, backupLocation *storkapi.BackupLocatio
 	credentialData["path"] = []byte(backupLocation.Location.Path)
 	credentialData["storageaccountname"] = []byte(backupLocation.Location.AzureConfig.StorageAccountName)
 	credentialData["storageaccountkey"] = []byte(backupLocation.Location.AzureConfig.StorageAccountKey)
+	err := createJobSecret(secretName, namespace, credentialData, labels)
+
+	return err
+}
+
+func createNfsSecret(secretName string, backupLocation *storkapi.BackupLocation, namespace string, labels map[string]string) error {
+	credentialData := make(map[string][]byte)
+	credentialData["type"] = []byte(backupLocation.Location.Type)
+	credentialData["serverAddr"] = []byte(backupLocation.Location.NfsConfig.NfsServerAddr)
+	credentialData["password"] = []byte(backupLocation.Location.RepositoryPassword)
+	credentialData["path"] = []byte(backupLocation.Location.Path)
 	err := createJobSecret(secretName, namespace, credentialData, labels)
 
 	return err

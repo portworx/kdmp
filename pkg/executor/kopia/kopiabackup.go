@@ -3,10 +3,12 @@ package kopia
 import (
 	"context"
 	"fmt"
+	"io/ioutil"
 	"time"
 
 	storkv1 "github.com/libopenstorage/stork/pkg/apis/stork/v1alpha1"
 	"github.com/libopenstorage/stork/pkg/objectstore"
+	"github.com/portworx/kdmp/pkg/drivers"
 	"github.com/portworx/kdmp/pkg/executor"
 	"github.com/portworx/kdmp/pkg/kopia"
 	"github.com/portworx/sched-ops/task"
@@ -35,10 +37,11 @@ var (
 )
 
 var (
-	kopiaProvderType = map[storkv1.BackupLocationType]string{
+	kopiaProviderType = map[storkv1.BackupLocationType]string{
 		storkv1.BackupLocationS3:     "s3",
 		storkv1.BackupLocationGoogle: "gcs",
 		storkv1.BackupLocationAzure:  "azure",
+		storkv1.BackupLocationNFS:    "filesystem",
 	}
 )
 
@@ -106,11 +109,24 @@ func runBackup(sourcePath string) error {
 	// kopia doesn't have a way to know if repository is already initialized.
 	// Repository create needs to run only first time.
 	// Check if kopia.repository exists
-	exists, err := isRepositoryExists(repo)
+	// TODO : We need to check for kopia.repository file. For now we are
+	// skipping the check and assuming the repo doesn't exist specifically for NFS.
+	// Read the BL type
+	fPath := drivers.KopiaCredSecretMount + "/" + "type"
+	blType, err := ioutil.ReadFile(fPath)
 	if err != nil {
-		errMsg := fmt.Sprintf("repository exists check for repo %s failed: %v", repo.Name, err)
-		logrus.Errorf("%s: %v", fn, errMsg)
-		return fmt.Errorf("%s: %v", errMsg, err)
+		errMsg := fmt.Sprintf("failed reading data from file %s : %s", fPath, err)
+		logrus.Errorf("%v", errMsg)
+		return fmt.Errorf(errMsg)
+	}
+	var exists = false
+	if storkv1.BackupLocationType(blType) != storkv1.BackupLocationNFS {
+		exists, err = isRepositoryExists(repo)
+		if err != nil {
+			errMsg := fmt.Sprintf("repository exists check for repo %s failed: %v", repo.Name, err)
+			logrus.Errorf("%s: %v", fn, errMsg)
+			return fmt.Errorf("%s: %v", errMsg, err)
+		}
 	}
 	if !exists {
 		if err = runKopiaCreateRepo(repo); err != nil {
@@ -198,7 +214,7 @@ func runKopiaCreateRepo(repository *executor.Repository) error {
 			repository.Path,
 			repository.Name,
 			repository.Password,
-			kopiaProvderType[repository.Type],
+			kopiaProviderType[repository.Type],
 			repository.S3Config.DisableSSL,
 		)
 	default:
@@ -206,13 +222,15 @@ func runKopiaCreateRepo(repository *executor.Repository) error {
 			repository.Path,
 			repository.Name,
 			repository.Password,
-			kopiaProvderType[repository.Type],
+			kopiaProviderType[repository.Type],
 			false,
 		)
 	}
 	if err != nil {
 		return err
 	}
+	// NFS doesn't need any special treatment for repo create command
+	// hence no case exist for it.
 	switch repository.Type {
 	case storkv1.BackupLocationS3:
 		repoCreateCmd = populateS3AccessDetails(repoCreateCmd, repository)
@@ -331,7 +349,7 @@ func runKopiaRepositoryConnect(repository *executor.Repository) error {
 			repository.Path,
 			repository.Name,
 			repository.Password,
-			kopiaProvderType[repository.Type],
+			kopiaProviderType[repository.Type],
 			repository.S3Config.DisableSSL,
 		)
 	default:
@@ -339,7 +357,7 @@ func runKopiaRepositoryConnect(repository *executor.Repository) error {
 			repository.Path,
 			repository.Name,
 			repository.Password,
-			kopiaProvderType[repository.Type],
+			kopiaProviderType[repository.Type],
 			false,
 		)
 	}
