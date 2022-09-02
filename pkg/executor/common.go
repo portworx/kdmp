@@ -39,6 +39,8 @@ const (
 	projectIDKeypath       = "/etc/cred-secret/projectid"
 	storageAccountNamePath = "/etc/cred-secret/storageaccountname"
 	storageAccountKeyPath  = "/etc/cred-secret/storageaccountkey"
+	// ServerAddr needed for NFS based backuplocation
+	serverAddr = "/etc/cred-secret/serverAddr"
 
 	// DefaultTimeout Max time a command will be retired before failing
 	DefaultTimeout = 1 * time.Minute
@@ -77,6 +79,11 @@ type GoogleConfig struct {
 	AccountKey string
 }
 
+//NfsConfig specifies the config required to connect to NFS Baqckuplocation
+type NfsConfig struct {
+	ServerAddr string
+}
+
 // Repository contains information used to connect the repository.
 type Repository struct {
 	// Name is a repository name without an url address.
@@ -91,6 +98,8 @@ type Repository struct {
 	AzureConfig *AzureConfig
 	// GoogleConfig goole config details
 	GoogleConfig *GoogleConfig
+	// NfsConfig NFS config details
+	NfsConfig *NfsConfig
 	// Password repository password
 	Password string
 	// Type objectstore type
@@ -253,25 +262,32 @@ func ParseCloudCred() (*Repository, error) {
 		repository, rErr = parseGoogleCreds()
 	case storkapi.BackupLocationAzure:
 		repository, rErr = parseAzureCreds()
+	case storkapi.BackupLocationNFS:
+		repository, rErr = parseNfsCreds()
 	}
 	if rErr != nil {
 		return nil, rErr
 	}
-
 	password, err := ioutil.ReadFile(passwordPath)
 	if err != nil {
 		errMsg := fmt.Sprintf("failed reading data from file %s : %s", passwordPath, err)
 		logrus.Errorf("%v", errMsg)
 		return nil, fmt.Errorf(errMsg)
 	}
+	repository.Password = string(password)
+
 	bucket, err := ioutil.ReadFile(bucketPath)
 	if err != nil {
 		errMsg := fmt.Sprintf("failed reading data from file %s : %s", bucketPath, err)
 		logrus.Errorf("%v", errMsg)
 		return nil, fmt.Errorf(errMsg)
 	}
-	repository.Path = string(bucket)
-	repository.Password = string(password)
+	if storkapi.BackupLocationType(blType) == storkapi.BackupLocationNFS {
+		// For NFS this path need to be absolute path not just a bucket name anymore.
+		repository.Path = drivers.NfsMount
+	} else {
+		repository.Path = string(bucket)
+	}
 
 	return repository, rErr
 }
@@ -327,6 +343,21 @@ func parseS3Creds() (*Repository, error) {
 	}
 	repository.S3Config.Region = string(region)
 
+	return repository, nil
+}
+
+func parseNfsCreds() (*Repository, error) {
+	repository := &Repository{
+		NfsConfig: &NfsConfig{},
+	}
+	repository.Type = storkapi.BackupLocationNFS
+	sa, err := ioutil.ReadFile(serverAddr)
+	if err != nil {
+		errMsg := fmt.Sprintf("failed reading data from file %s : %s", serverAddr, err)
+		logrus.Errorf("%v", errMsg)
+		return nil, fmt.Errorf(errMsg)
+	}
+	repository.NfsConfig.ServerAddr = string(sa)
 	return repository, nil
 }
 

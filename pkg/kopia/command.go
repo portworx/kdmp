@@ -5,6 +5,7 @@ import (
 	"os/exec"
 
 	cmdexec "github.com/portworx/kdmp/pkg/executor"
+	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -35,7 +36,7 @@ type Command struct {
 	Env []string
 	// Password is the env for storing password
 	Password string
-	// Provider storage provider (aws, Google, Azure)
+	// Provider storage provider (aws, Google, Azure, filesystem)
 	Provider string
 	// SnapshotID snapshot ID
 	SnapshotID string
@@ -141,6 +142,22 @@ func (c *Command) CreateCmd() *exec.Cmd {
 			"--config-file",
 			configFile,
 		}
+	case "filesystem":
+		argsSlice = []string{
+			"repository",
+			c.Name, // create command
+			c.Provider,
+			"--path",
+			c.Path + c.RepositoryName,
+			"--password",
+			c.Password,
+			"--cache-directory",
+			cacheDir,
+			"--log-dir",
+			logDir,
+			"--config-file",
+			configFile,
+		}
 	}
 
 	argsSlice = append(argsSlice, c.Flags...)
@@ -175,6 +192,7 @@ func (c *Command) BackupCmd() *exec.Cmd {
 		cmd.Env = append(os.Environ(), c.Env...)
 	}
 	cmd.Dir = c.Dir
+	logrus.Infof("the backup command is %+v", cmd)
 	return cmd
 }
 
@@ -233,6 +251,22 @@ func (c *Command) ConnectCmd() *exec.Cmd {
 			c.Password,
 			"--prefix",
 			c.RepositoryName,
+			"--cache-directory",
+			cacheDir,
+			"--log-dir",
+			logDir,
+			"--config-file",
+			configFile,
+		}
+	case "filesystem":
+		argsSlice = []string{
+			"repository",
+			c.Name, // connect command
+			c.Provider,
+			"--path",
+			c.Path + c.RepositoryName,
+			"--password",
+			c.Password,
 			"--cache-directory",
 			cacheDir,
 			"--log-dir",
