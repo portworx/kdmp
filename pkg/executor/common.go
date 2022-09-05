@@ -44,6 +44,12 @@ const (
 
 	// DefaultTimeout Max time a command will be retired before failing
 	DefaultTimeout = 1 * time.Minute
+	// QPS Queries per second
+	QPS = 100
+	// Burst value
+	Burst = 100
+	// BackupUID backup UID annotation
+	BackupUID = "portworx.io/backup-uid"
 )
 
 // BackupTool backup tool
@@ -528,4 +534,17 @@ func HandleErr(err error) {
 	if err != nil {
 		util.CheckErr(err)
 	}
+}
+
+// GetCrNameWithUID - returns Cr name by appending the object name with UID
+func GetCrNameWithUID(name, uid string) string {
+	return name + "-" + getShortUID(uid)
+}
+
+// getShortUID returns the first part of the UID. If an empty UID is provided, this function will return an empty string.
+func getShortUID(uid string) string {
+	if len(uid) < 8 {
+		return ""
+	}
+	return uid[0:7]
 }
