@@ -24,6 +24,14 @@ type DataExportListerExpansion interface{}
 // DataExportNamespaceLister.
 type DataExportNamespaceListerExpansion interface{}
 
+// ResourceExportListerExpansion allows custom methods to be added to
+// ResourceExportLister.
+type ResourceExportListerExpansion interface{}
+
+// ResourceExportNamespaceListerExpansion allows custom methods to be added to
+// ResourceExportNamespaceLister.
+type ResourceExportNamespaceListerExpansion interface{}
+
 // VolumeBackupListerExpansion allows custom methods to be added to
 // VolumeBackupLister.
 type VolumeBackupListerExpansion interface{}
