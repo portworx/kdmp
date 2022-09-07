@@ -4,10 +4,12 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"time"
 
+	storkapi "github.com/libopenstorage/stork/pkg/apis/stork/v1alpha1"
 	"github.com/libopenstorage/stork/pkg/objectstore"
 	kdmp_api "github.com/portworx/kdmp/pkg/apis/kdmp/v1alpha1"
 	"github.com/portworx/kdmp/pkg/executor"
@@ -129,25 +131,48 @@ func runMaintenance(maintenanceType string) error {
 		logrus.Errorf("%s %v", fn, errMsg)
 		return fmt.Errorf(errMsg)
 	}
-	bl, err := buildStorkBackupLocation(repo)
-	if err != nil {
-		logrus.Errorf("%v", err)
-		return err
+	var repoList []string
+	if repo.Type == storkapi.BackupLocationNFS {
+		repoBaseDir := repo.Path + genericBackupDir + "/"
+		listOfSubDirs, err := returnDirList(repoBaseDir)
+		if err != nil {
+			logrus.Errorf("Failed to list sub directories in dir %v", repoBaseDir)
+			return err
+		}
+		var kopiaFile string
+		for _, subDir := range listOfSubDirs {
+			kopiaFile = repoBaseDir + subDir + "/" + kopiaRepositoryFile
+			_, err := os.Stat(kopiaFile)
+			if os.IsNotExist(err) {
+				continue
+			} else if err != nil {
+				logrus.Errorf("Failed to stat kopia repository file in %v", kopiaFile)
+			} else {
+				repoList = append(repoList, subDir)
+			}
+		}
+	} else {
+		bl, err := buildStorkBackupLocation(repo)
+		if err != nil {
+			logrus.Errorf("%v", err)
+			return err
+		}
+		bucket, err := objectstore.GetBucket(bl)
+		if err != nil {
+			logrus.Errorf("getting bucket details for [%v] failed: %v", repo.Path, err)
+			return err
+		}
+		// The generic backup will be created under generic-backups/ directory in a bucket.
+		// So, to get the list of repo in the bucket, get list of enteries under genric-backup dir.
+		repo.Name = genericBackupDir + "/"
+		bucket = blob.PrefixedBucket(bucket, repo.Name)
+		repoList, err = getRepoList(bucket)
+		if err != nil {
+			logrus.Errorf("getting repo list failed for bucket [%v]: %v", repo.Path, err)
+			return err
+		}
 	}
-	bucket, err := objectstore.GetBucket(bl)
-	if err != nil {
-		logrus.Errorf("getting bucket details for [%v] failed: %v", repo.Path, err)
-		return err
-	}
-	// The generic backup will be created under generic-backups/ directory in a bucket.
-	// So, to get the list of repo in the bucket, get list of enteries under genric-backup dir.
-	repo.Name = genericBackupDir + "/"
-	bucket = blob.PrefixedBucket(bucket, repo.Name)
-	repoList, err := getRepoList(bucket)
-	if err != nil {
-		logrus.Errorf("getting repo list failed for bucket [%v]: %v", repo.Path, err)
-		return err
-	}
+
 	for _, repoName := range repoList {
 		repo.Name = getBackupPathWithRepoName(repoName)
 		if err := runKopiaRepositoryConnect(repo); err != nil {
@@ -211,6 +236,19 @@ func runMaintenance(maintenanceType string) error {
 	}
 
 	return nil
+}
+
+func returnDirList(parentDir string) ([]string, error) {
+	var files []string
+	fileInfo, err := ioutil.ReadDir(parentDir)
+	if err != nil {
+		return files, err
+	}
+
+	for _, file := range fileInfo {
+		files = append(files, file.Name())
+	}
+	return files, nil
 }
 
 func cleanKopiaConfigContents() error {
