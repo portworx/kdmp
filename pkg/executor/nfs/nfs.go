@@ -8,7 +8,8 @@ import (
 )
 
 var (
-	uploadBkpResources string
+	uploadBkpResources  string
+	restoreBkpResources string
 )
 
 // NewCommand returns a kopia command wrapper
@@ -20,9 +21,11 @@ func NewCommand() *cobra.Command {
 
 	// TODO: More flags to be added in later changes
 	cmds.PersistentFlags().StringVar(&uploadBkpResources, "upload-backup-resource", "", "Option to upload backup resources")
+	cmds.PersistentFlags().StringVar(&restoreBkpResources, "download-apply-resources", "", "Option to download the resources and apply the specs")
 
 	cmds.AddCommand(
 		newUploadBkpResourceCommand(),
+		newRestoreResourcesCommand(),
 	)
 
 	cmds.PersistentFlags().AddGoFlagSet(flag.CommandLine)
