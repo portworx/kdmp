@@ -363,6 +363,31 @@ func KopiaResourceRequirements(configMap, ns string) (corev1.ResourceRequirement
 	return toResourceRequirements(requestCPU, requestMem, limitCPU, limitMem)
 }
 
+// NFSResourceRequirements returns ResourceRequirements for the kopiaexecutor container.
+func NFSResourceRequirements(configMap, ns string) (corev1.ResourceRequirements, error) {
+	requestCPU := strings.TrimSpace(GetConfigValue(configMap, ns, drivers.NFSExecutorRequestCPU))
+	if requestCPU == "" {
+		requestCPU = drivers.DefaultNFSExecutorRequestCPU
+	}
+
+	requestMem := strings.TrimSpace(GetConfigValue(configMap, ns, drivers.NFSExecutorRequestMemory))
+	if requestMem == "" {
+		requestMem = drivers.DefaultNFSExecutorRequestMemory
+	}
+
+	limitCPU := strings.TrimSpace(GetConfigValue(configMap, ns, drivers.NFSExecutorLimitCPU))
+	if limitCPU == "" {
+		limitCPU = drivers.DefaultNFSExecutorLimitCPU
+	}
+
+	limitMem := strings.TrimSpace(GetConfigValue(configMap, ns, drivers.NFSExecutorLimitMemory))
+	if limitMem == "" {
+		limitMem = drivers.DefaultNFSExecutorLimitMemory
+	}
+
+	return toResourceRequirements(requestCPU, requestMem, limitCPU, limitMem)
+}
+
 // ResticResourceRequirements returns JobResourceRequirements for the executor container.
 func ResticResourceRequirements() (corev1.ResourceRequirements, error) {
 	requestCPU := drivers.DefaultResticExecutorRequestCPU

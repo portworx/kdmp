@@ -17,6 +17,7 @@ const (
 	KopiaMaintenance = "kopiamaintenance"
 	NFSBackup        = "nfsbackup"
 	NFSRestore       = "nfsrestore"
+	NFSDelete        = "nfsdelete"
 )
 
 // Docker images.
@@ -74,6 +75,10 @@ const (
 	KopiaExecutorRequestMemory   = "KDMP_KOPIAEXECUTOR_REQUEST_MEMORY"
 	KopiaExecutorLimitCPU        = "KDMP_KOPIAEXECUTOR_LIMIT_CPU"
 	KopiaExecutorLimitMemory     = "KDMP_KOPIAEXECUTOR_LIMIT_MEMORY"
+	NFSExecutorRequestCPU        = "KDMP_NFSEXECUTOR_REQUEST_CPU"
+	NFSExecutorRequestMemory     = "KDMP_NFSEXECUTOR_REQUEST_MEMORY"
+	NFSExecutorLimitCPU          = "KDMP_NFSEXECUTOR_LIMIT_CPU"
+	NFSExecutorLimitMemory       = "KDMP_NFSEXECUTOR_LIMIT_MEMORNFS"
 )
 
 // Default parameters for job options.
@@ -90,6 +95,10 @@ const (
 	DefaultKopiaExecutorRequestMemory  = "700Mi"
 	DefaultKopiaExecutorLimitCPU       = "0.2"
 	DefaultKopiaExecutorLimitMemory    = "1Gi"
+	DefaultNFSExecutorRequestCPU       = "0.1"
+	DefaultNFSExecutorRequestMemory    = "700Mi"
+	DefaultNFSExecutorLimitCPU         = "0.2"
+	DefaultNFSExecutorLimitMemory      = "1Gi"
 )
 
 var (
