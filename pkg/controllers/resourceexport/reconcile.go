@@ -49,7 +49,11 @@ func (c *Controller) process(ctx context.Context, in *kdmpapi.ResourceExport) (b
 		}
 		return false, c.updateStatus(resourceExport, updateData)
 	}
+<<<<<<< HEAD
 
+=======
+	
+>>>>>>> 6ca5af5f (pb-3093: Fixing issue in reconciler and job framework, missed with previous commit)
 	driver, err := driversinstance.Get(opType)
 	if err != nil {
 		updateData := updateResourceExportFields{
@@ -137,7 +141,7 @@ func getDriverType(re *kdmpapi.ResourceExport) (string, error) {
 	} else {
 		return "", fmt.Errorf("invalid kind for nfs backup destination: expected BackupLocation")
 	}
-
+	
 	switch re.Spec.Type {
 	case kdmpapi.ResourceExportNFS:
 		if doBackup {

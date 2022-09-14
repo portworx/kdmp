@@ -76,12 +76,11 @@ type ResourceExportSpec struct {
 	Destination ResourceExportObjectReference `json:"destination,omitempty"`
 }
 
-// ResourceStatus overall resource backup/restore progress
 type ResourceStatus struct {
 	// Status status of resource export
-	Status ResourceExportStatus `json:"status,omitempty"`
+	Status         ResourceExportStatus   `json:"status,omitempty"`
 	// Reason status reason
-	Reason string `json:"reason,omitempty"`
+	Reason         string                 `json:"reason,omitempty"`
 }
 
 // ResourceExportObjectReference contains enough information to let you inspect the referred object.
