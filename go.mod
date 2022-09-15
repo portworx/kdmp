@@ -10,7 +10,7 @@ require (
 	github.com/kubernetes-incubator/external-storage v0.20.4-openstorage-rc7
 	github.com/libopenstorage/stork v1.4.1-0.20221103082056-65abc8cc4e80
 	github.com/portworx/pxc v0.33.0
-	github.com/portworx/sched-ops v1.20.4-rc1.0.20220401024625-dbc61a336f65
+	github.com/portworx/sched-ops v1.20.4-rc1.0.20220915143205-3fe6e54a2a4d
 	github.com/sirupsen/logrus v1.8.1
 	github.com/spf13/cobra v1.1.3
 	github.com/spf13/pflag v1.0.5
@@ -35,6 +35,8 @@ replace (
 	github.com/kubernetes-csi/external-snapshotter/v2 => github.com/kubernetes-csi/external-snapshotter/v2 v2.1.1
 	github.com/kubernetes-incubator/external-storage => github.com/libopenstorage/external-storage v0.20.4-openstorage-rc6
 	github.com/kubernetes-incubator/external-storage v0.0.0-00010101000000-000000000000 => github.com/libopenstorage/external-storage v5.3.0-alpha.1.0.20200130041458-d2b33d4448ea+incompatible
+	github.com/libopenstorage/openstorage => github.com/libopenstorage/openstorage v1.0.1-0.20220804223926-812cb10d08c4
+	github.com/portworx/sched-ops => github.com/portworx/sched-ops v1.20.4-rc1.0.20220915143205-3fe6e54a2a4d
 	k8s.io/api => k8s.io/api v0.21.4
 	k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.21.4
 	k8s.io/apimachinery => k8s.io/apimachinery v0.21.5-rc.0

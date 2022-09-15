@@ -469,6 +469,29 @@ func WriteVolumeBackupStatus(
 	return nil
 }
 
+// UpdateResourceBackupStatus  -- Updating resourceBackup status
+func UpdateResourceBackupStatus(
+	status kdmpapi.ResourceBackupProgressStatus,
+	rbName string,
+	rbNamespace string,
+
+) error {
+	rb, err := kdmpschedops.Instance().GetResourceBackup(rbName, rbNamespace)
+	if err != nil {
+		errMsg := fmt.Sprintf("error reading ResourceBackup CR[%v/%v]: %v", rbNamespace, rbName, err)
+		return fmt.Errorf(errMsg)
+	}
+	rb.Status.Status = status.Status
+	rb.Status.Reason = status.Reason
+	_, err = kdmpschedops.Instance().UpdateResourceBackup(rb)
+	if err != nil {
+		errMsg := fmt.Sprintf("error updating ResourceBackup CR[%v/%v]: %v", rbNamespace, rbName, err)
+		return fmt.Errorf(errMsg)
+	}
+
+	return nil
+}
+
 // CreateVolumeBackup creates volumebackup CRD
 func CreateVolumeBackup(name, namespace, repository, blName, blNamespace string) error {
 	new := &kdmpapi.VolumeBackup{
