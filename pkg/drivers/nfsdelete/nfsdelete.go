@@ -122,7 +122,7 @@ func jobForDeleteResource(
 		"delete",
 		"--app-cr-name",
 		jobOption.AppCRName,
-		"--backup-namespace",
+		"--namespace",
 		jobOption.AppCRNamespace,
 	}, " ")
 
