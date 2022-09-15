@@ -2,6 +2,7 @@ package nfs
 
 import (
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -10,6 +11,7 @@ import (
 	"github.com/go-openapi/inflect"
 	stork_api "github.com/libopenstorage/stork/pkg/apis/stork/v1alpha1"
 	"github.com/libopenstorage/stork/pkg/resourcecollector"
+	kdmpapi "github.com/portworx/kdmp/pkg/apis/kdmp/v1alpha1"
 	"github.com/portworx/kdmp/pkg/executor"
 	"github.com/portworx/sched-ops/k8s/apiextensions"
 	"github.com/portworx/sched-ops/k8s/core"
@@ -27,6 +29,8 @@ import (
 var (
 	bkpNamespace      string
 	applicationCRName string
+	rbCrName          string
+	rbCrNamespace     string
 	resKinds          map[string]string
 )
 
@@ -43,13 +47,49 @@ func newUploadBkpResourceCommand() *cobra.Command {
 		Use:   "backup",
 		Short: "Start a resource backup to nfs target",
 		Run: func(c *cobra.Command, args []string) {
-			executor.HandleErr(uploadBkpResource(bkpNamespace, applicationCRName))
+			executor.HandleErr(uploadResources(bkpNamespace, applicationCRName, rbCrName, rbCrNamespace))
 		},
 	}
 	bkpUploadCommand.Flags().StringVarP(&bkpNamespace, "backup-namespace", "", "", "Namespace for backup command")
 	bkpUploadCommand.Flags().StringVarP(&applicationCRName, "app-cr-name", "", "", "Namespace for applicationbackup CR whose resource to be backed up")
+	bkpUploadCommand.Flags().StringVarP(&rbCrName, "rb-cr-name", "", "", "Name for resourcebackup CR to update job status")
+	bkpUploadCommand.Flags().StringVarP(&rbCrNamespace, "rb-cr-namespace", "", "", "Namespace for resourcebackup CR to update job status")
 
 	return bkpUploadCommand
+}
+
+func uploadResources(
+	bkpNamespace string,
+	applicationCRName string,
+	rbCrName string,
+	rbCrNamespace string,
+) error {
+	err := uploadBkpResource(bkpNamespace, applicationCRName)
+	if err != nil {
+		//update resourcebackup CR with status and reason
+		st := kdmpapi.ResourceBackupProgressStatus{
+			Status: kdmpapi.ResourceBackupStatusFailed,
+			Reason: err.Error(),
+		}
+
+		err = executor.UpdateResourceBackupStatus(st, rbCrName, rbCrNamespace)
+		if err != nil {
+			logrus.Errorf("failed to update resorucebackup[%v/%v] status: %v", rbCrNamespace, rbCrName, err)
+		}
+		return err
+	}
+	//update resourcebackup CR with status and reason
+	st := kdmpapi.ResourceBackupProgressStatus{
+		Status: kdmpapi.ResourceBackupStatusSuccessful,
+		Reason: "upload resource Successfully",
+	}
+	err = executor.UpdateResourceBackupStatus(st, rbCrName, rbCrNamespace)
+	if err != nil {
+		logrus.Errorf("failed to update resorucebackup[%v/%v] status: %v", rbCrNamespace, rbCrName, err)
+		return err
+	}
+
+	return nil
 }
 
 func uploadBkpResource(
@@ -59,41 +99,49 @@ func uploadBkpResource(
 	funct := "uploadBkpResource"
 	repo, rErr := executor.ParseCloudCred()
 	if rErr != nil {
-		logrus.Errorf("%s: error parsing cloud cred: %v", funct, rErr)
-		return rErr
+		errMsg := fmt.Sprintf("%s: error parsing cloud cred: %v", funct, rErr)
+		logrus.Errorf(errMsg)
+		return fmt.Errorf(errMsg)
 	}
 	backup, err := storkops.Instance().GetApplicationBackup(applicationCRName, bkpNamespace)
 	if err != nil {
-		logrus.Infof("%s:error fetching applicationbackup %s: %v", funct, applicationCRName, err)
-		return err
+		errMsg := fmt.Sprintf("%s: error fetching applicationbackup %s: %v", funct, applicationCRName, err)
+		logrus.Errorf(errMsg)
+		return fmt.Errorf(errMsg)
 	}
 	bkpDir := filepath.Join(repo.Path, bkpNamespace, backup.ObjectMeta.Name, string(backup.ObjectMeta.UID))
 	if err := os.MkdirAll(bkpDir, 0777); err != nil {
-		return err
+		errMsg := fmt.Sprintf("%s: error creating backup dir: %v", funct, err)
+		logrus.Errorf(errMsg)
+		return fmt.Errorf(errMsg)
 	}
 	// First create the required directory
 	err = uploadResource(bkpNamespace, backup, bkpDir)
 	if err != nil {
-		logrus.Errorf("%s: error uploading resources: %v", funct, err)
-		return err
+		errMsg := fmt.Sprintf("%s: error uploading resources: %v", funct, err)
+		logrus.Errorf(errMsg)
+		return fmt.Errorf(errMsg)
 	}
 
 	err = uploadNamespaces(bkpNamespace, backup, bkpDir)
 	if err != nil {
-		logrus.Errorf("%s: error uploading namespace resource %v", funct, err)
-		return err
+		errMsg := fmt.Sprintf("%s: error uploading namespace resource %v", funct, err)
+		logrus.Errorf(errMsg)
+		return fmt.Errorf(errMsg)
 	}
 
 	err = uploadCRDResources(resKinds, bkpDir)
 	if err != nil {
-		logrus.Errorf("%s: error uploading CRD resource %v", funct, err)
-		return err
+		errMsg := fmt.Sprintf("%s: error uploading CRD resource %v", funct, err)
+		logrus.Errorf(errMsg)
+		return fmt.Errorf(errMsg)
 	}
 
 	err = uploadMetadatResources(bkpNamespace, backup, bkpDir)
 	if err != nil {
-		logrus.Errorf("%s: error uploading metadata resource %v", funct, err)
-		return err
+		errMsg := fmt.Sprintf("%s: error uploading metadata resource %v", funct, err)
+		logrus.Errorf(errMsg)
+		return fmt.Errorf(errMsg)
 	}
 	return nil
 }
