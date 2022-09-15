@@ -10,7 +10,6 @@ import (
 	"github.com/go-openapi/inflect"
 	stork_api "github.com/libopenstorage/stork/pkg/apis/stork/v1alpha1"
 	"github.com/libopenstorage/stork/pkg/resourcecollector"
-	"github.com/portworx/kdmp/pkg/drivers"
 	"github.com/portworx/kdmp/pkg/executor"
 	"github.com/portworx/sched-ops/k8s/apiextensions"
 	"github.com/portworx/sched-ops/k8s/core"
@@ -68,7 +67,7 @@ func uploadBkpResource(
 		logrus.Infof("%s:error fetching applicationbackup %s: %v", funct, applicationCRName, err)
 		return err
 	}
-	bkpDir := filepath.Join(drivers.NfsMount, repo.Path, bkpNamespace, backup.ObjectMeta.Name, string(backup.ObjectMeta.UID))
+	bkpDir := filepath.Join(repo.Path, bkpNamespace, backup.ObjectMeta.Name, string(backup.ObjectMeta.UID))
 	if err := os.MkdirAll(bkpDir, 0777); err != nil {
 		return err
 	}
