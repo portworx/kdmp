@@ -219,6 +219,29 @@ func ToJobStatus(progress float64, errMsg string, jobStatus batchv1.JobCondition
 	}
 }
 
+// ToNFSJobStatus returns a job status for provided parameters.
+func ToNFSJobStatus(errMsg string, jobStatus batchv1.JobConditionType) *drivers.JobStatus {
+	if errMsg == "upload resource Successfully" {
+		return &drivers.JobStatus{
+			State:  drivers.JobStateCompleted,
+			Reason: errMsg,
+			Status: jobStatus,
+		}
+	}
+	if len(errMsg) > 0 {
+		return &drivers.JobStatus{
+			State:  drivers.JobStateFailed,
+			Reason: errMsg,
+			Status: jobStatus,
+		}
+	}
+
+	return &drivers.JobStatus{
+		State:  drivers.JobStateInProgress,
+		Status: jobStatus,
+	}
+}
+
 // GetConfigValue read configmap and return the value of the requested parameter
 // If error in reading from configmap, we try reading from env variable
 func GetConfigValue(cm, ns, key string) string {
