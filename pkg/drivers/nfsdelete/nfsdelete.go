@@ -12,6 +12,7 @@ import (
 	"github.com/sirupsen/logrus"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -92,6 +93,13 @@ func (d Driver) JobStatus(id string) (*drivers.JobStatus, error) {
 func buildJob(
 	jobOptions drivers.JobOpts,
 ) (*batchv1.Job, error) {
+	funct := "buildJob"
+	if err := utils.SetupServiceAccount(jobOptions.JobName, jobOptions.AppCRNamespace, roleFor()); err != nil {
+		errMsg := fmt.Sprintf("error creating service account %s/%s: %v", jobOptions.AppCRNamespace, jobOptions.JobName, err)
+		logrus.Errorf("%s: %v", funct, errMsg)
+		return nil, fmt.Errorf(errMsg)
+	}
+
 	resources, err := utils.NFSResourceRequirements(jobOptions.JobConfigMap, jobOptions.JobConfigMapNs)
 	if err != nil {
 		return nil, err
@@ -99,6 +107,18 @@ func buildJob(
 	labels := addJobLabels(jobOptions.Labels, jobOptions)
 	return jobForDeleteResource(jobOptions, resources, labels)
 
+}
+
+func roleFor() *rbacv1.Role {
+	return &rbacv1.Role{
+		Rules: []rbacv1.PolicyRule{
+			{
+				APIGroups: []string{"batch"},
+				Resources: []string{"jobs"},
+				Verbs:     []string{rbacv1.VerbAll},
+			},
+		},
+	}
 }
 
 func addJobLabels(labels map[string]string, jobOpts drivers.JobOpts) map[string]string {
@@ -129,7 +149,7 @@ func jobForDeleteResource(
 	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      jobOption.JobName,
-			Namespace: jobOption.JobNamespace,
+			Namespace: jobOption.AppCRNamespace,
 			Annotations: map[string]string{
 				utils.SkipResourceAnnotation: "true",
 			},
@@ -144,7 +164,7 @@ func jobForDeleteResource(
 				Spec: corev1.PodSpec{
 					RestartPolicy:      corev1.RestartPolicyOnFailure,
 					ImagePullSecrets:   nil,
-					ServiceAccountName: jobOption.ServiceAccountName,
+					ServiceAccountName: jobOption.JobName,
 					Containers: []corev1.Container{
 						{
 							Name:            "nfsexecutor",
