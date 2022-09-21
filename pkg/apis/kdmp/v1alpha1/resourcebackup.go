@@ -44,6 +44,8 @@ type ResourceBackupProgressStatus struct {
 	Status ResourceBackupStatus `json:"status,omitempty"`
 	// Reason status reason
 	Reason string `json:"reason,omitempty"`
+	// Resources status of each resource being restore
+	Resources []*ResourceInfo `json:"resources"`
 }
 
 // +genclient
@@ -62,8 +64,6 @@ type ResourceBackup struct {
 
 // ResourceBackupSpec configuration parameters for ResourceBackup
 type ResourceBackupSpec struct {
-	// Resources status of each resource being restore
-	Resources []*ResourceInfo `json:"resources"`
 	// ObjRef here is backuplocation CR
 	ObjRef ResourceBackupObjectReference `json:"source,omitempty"`
 }
