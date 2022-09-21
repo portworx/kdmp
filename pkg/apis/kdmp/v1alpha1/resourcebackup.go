@@ -17,13 +17,6 @@ type ResourceBackupType string
 // ResourceBackupStatus defines a status of ResourceBackup.
 type ResourceBackupStatus string
 
-// ResourceInfo is the info for the restore of a resource
-type ResourceInfo struct {
-	ObjectInfo `json:",inline"`
-	Status     ResourceBackupStatus `json:"status"`
-	Reason     string               `json:"reason"`
-}
-
 const (
 	// ResourceBackupStatusInitial is the initial status of ResourceBackup. It indicates
 	// that a volume Backup request has been received.
@@ -45,7 +38,7 @@ type ResourceBackupProgressStatus struct {
 	// Reason status reason
 	Reason string `json:"reason,omitempty"`
 	// Resources status of each resource being restore
-	Resources []*ResourceInfo `json:"resources"`
+	Resources []*ResourceRestoreResourceInfo `json:"resources"`
 }
 
 // +genclient
