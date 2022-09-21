@@ -25,12 +25,11 @@ import (
 // updateResourceExportFields when and update needs to be done to ResourceExport
 // user can choose which filed to be updated and pass the same to updateStatus()
 type updateResourceExportFields struct {
-	stage  kdmpapi.ResourceExportStage
-	status kdmpapi.ResourceExportStatus
-	reason string
-	id     string
-	// TODO: Enable for restore
-	//resources []*kdmpapi.ResourceInfo
+	stage     kdmpapi.ResourceExportStage
+	status    kdmpapi.ResourceExportStatus
+	reason    string
+	id        string
+	resources []*kdmpapi.ResourceRestoreResourceInfo
 }
 
 func (c *Controller) process(ctx context.Context, in *kdmpapi.ResourceExport) (bool, error) {
@@ -173,32 +172,41 @@ func (c *Controller) process(ctx context.Context, in *kdmpapi.ResourceExport) (b
 			}
 			return true, c.updateStatus(resourceExport, updateData)
 		}
-
+		var rb *kdmpapi.ResourceBackup
+		// Get the resourcebackup
+		rb, err = kdmp.Instance().GetResourceBackup(resourceExport.Name, resourceExport.Namespace)
+		if err != nil {
+			errMsg := fmt.Sprintf("failed to get resourcebackup CR [%s/%s]: %s", resourceExport.Namespace, resourceExport.Name, err)
+			updateData := updateResourceExportFields{
+				status: kdmpapi.ResourceExportStatusFailed,
+				reason: errMsg,
+			}
+			return false, c.updateStatus(resourceExport, updateData)
+		}
 		switch progress.State {
 		case drivers.JobStateFailed:
 			errMsg := fmt.Sprintf("%s transfer job failed: %s", resourceExport.Status.TransferID, progress.Reason)
 			// If a job has failed it means it has tried all possible retires and given up.
 			// In such a scenario we need to fail DE CR and move to clean up stage
 			updateData := updateResourceExportFields{
-				stage:  kdmpapi.ResourceExportStageFinal,
-				status: kdmpapi.ResourceExportStatusFailed,
-				reason: errMsg,
+				stage:     kdmpapi.ResourceExportStageFinal,
+				status:    kdmpapi.ResourceExportStatusFailed,
+				reason:    errMsg,
+				resources: rb.Status.Resources,
 			}
 			return true, c.updateStatus(resourceExport, updateData)
 		case drivers.JobStateCompleted:
 			// Go for clean up with success state
 			updateData := updateResourceExportFields{
-				stage:  kdmpapi.ResourceExportStageFinal,
-				status: kdmpapi.ResourceExportStatusSuccessful,
-				reason: "Job successful",
+				stage:     kdmpapi.ResourceExportStageFinal,
+				status:    kdmpapi.ResourceExportStatusSuccessful,
+				reason:    "Job successful",
+				resources: rb.Status.Resources,
 			}
 			return true, c.updateStatus(resourceExport, updateData)
 		}
 	case kdmpapi.ResourceExportStageFinal:
-		// TODO: We need to discuss if we need both final and failed state as we don't
-		// want to do anything in these states
-		// Do nothing, keep all resources for debugging
-		//
+		// Do nothing
 	}
 
 	return true, nil
@@ -238,12 +246,12 @@ func (c *Controller) updateStatus(re *kdmpapi.ResourceExport, data updateResourc
 			logrus.Infof("%v", errMsg)
 			return "", true, fmt.Errorf("%v", errMsg)
 		}
-		// TODO: In the restore path iterate over ResourceInfo{} list and only update the
-		// resource whose status as changed
+
 		if data.status != "" {
 			re.Status.Status = data.status
 			re.Status.Reason = data.reason
 		}
+
 		if data.id != "" {
 			re.Status.TransferID = data.id
 		}
@@ -251,6 +259,11 @@ func (c *Controller) updateStatus(re *kdmpapi.ResourceExport, data updateResourc
 		if data.stage != "" {
 			re.Status.Stage = data.stage
 		}
+
+		if len(data.resources) != 0 {
+			re.Status.Resources = data.resources
+		}
+
 		updErr = c.client.Update(context.TODO(), re)
 		if updErr != nil {
 			errMsg := fmt.Sprintf("failed updating resourceExport CR %s: %v", re.Name, updErr)
@@ -312,6 +325,20 @@ func startNfsResourceJob(
 		return drv.StartJob(
 			// TODO: below two calls need to be generalized and chnaged in all the startJob Calls
 			// For NFS it need to be populated in ResourceExport CR and passed to Job via its reconciler.
+			drivers.WithKopiaImageExecutorSource("stork"),
+			drivers.WithKopiaImageExecutorSourceNs("kube-system"),
+			drivers.WithRestoreExport(re.Name),
+			drivers.WithJobNamespace(re.Namespace),
+			drivers.WithNfsServer(bl.Location.NfsConfig.NfsServerAddr),
+			drivers.WithNfsExportDir(bl.Location.Path),
+			drivers.WithAppCRName(re.Spec.Source.Name),
+			drivers.WithAppCRNamespace(re.Spec.Source.Namespace),
+			drivers.WithNamespace(re.Namespace),
+			drivers.WithResoureBackupName(re.Name),
+			drivers.WithResoureBackupNamespace(re.Namespace),
+		)
+	case drivers.NFSRestore:
+		return drv.StartJob(
 			drivers.WithKopiaImageExecutorSource("stork"),
 			drivers.WithKopiaImageExecutorSourceNs("kube-system"),
 			drivers.WithRestoreExport(re.Name),
