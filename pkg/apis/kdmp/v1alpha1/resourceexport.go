@@ -84,8 +84,6 @@ type ResourceExport struct {
 type ResourceExportSpec struct {
 	// Type - Backup or Restore
 	Type ResourceExportType `json:"type,omitempty"`
-	// Resources status of each resource being restore
-	Resources []*ResourceRestoreResourceInfo `json:"resources"`
 	// Source here is applicationBackup CR for backup
 	Source ResourceExportObjectReference `json:"source,omitempty"`
 	// Destination is the ref to BL CR
@@ -102,6 +100,8 @@ type ResourceStatus struct {
 	TransferID string `json:"transferID,omitempty"`
 	// Stage resource export stage
 	Stage ResourceExportStage `json:"stage,omitempty"`
+	// Resources status of each resource being restore
+	Resources []*ResourceRestoreResourceInfo `json:"resources"`
 }
 
 // ResourceExportObjectReference contains enough information to let you inspect the referred object.
