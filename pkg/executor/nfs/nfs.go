@@ -26,6 +26,7 @@ func NewCommand() *cobra.Command {
 	cmds.AddCommand(
 		newUploadBkpResourceCommand(),
 		newRestoreResourcesCommand(),
+		newDeleteResourcesCommand(),
 	)
 
 	cmds.PersistentFlags().AddGoFlagSet(flag.CommandLine)
