@@ -13,7 +13,9 @@ import (
 	"github.com/libopenstorage/stork/pkg/crypto"
 	"github.com/libopenstorage/stork/pkg/k8sutils"
 	"github.com/libopenstorage/stork/pkg/log"
+	kdmpapi "github.com/portworx/kdmp/pkg/apis/kdmp/v1alpha1"
 	"github.com/portworx/kdmp/pkg/executor"
+	kdmpschedops "github.com/portworx/sched-ops/k8s/kdmp"
 	storkops "github.com/portworx/sched-ops/k8s/stork"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -31,7 +33,7 @@ import (
 )
 
 var (
-	namespace            string
+	restoreNamespace     string
 	applicationrestoreCR string
 )
 
@@ -40,22 +42,68 @@ func newRestoreResourcesCommand() *cobra.Command {
 		Use:   "backup",
 		Short: "Start a resource backup to nfs target",
 		Run: func(c *cobra.Command, args []string) {
-			executor.HandleErr(restoreResources(namespace, applicationrestoreCR))
+			executor.HandleErr(restoreAndApplyResources(applicationrestoreCR, restoreNamespace, rbCrName, rbCrNamespace))
 		},
 	}
-	restoreCommand.Flags().StringVarP(&bkpNamespace, "namespace", "", "", "Namespace for restore command")
+	restoreCommand.Flags().StringVarP(&restoreNamespace, "restore-namespace", "", "", "Namespace for restore CR")
 	restoreCommand.Flags().StringVarP(&applicationCRName, "app-cr-name", "", "", "application restore CR name")
+	restoreCommand.Flags().StringVarP(&rbCrName, "rb-cr-name", "", "", "Name for resourcebackup CR to update job status")
+	restoreCommand.Flags().StringVarP(&rbCrNamespace, "rb-cr-namespace", "", "", "Namespace for resourcebackup CR to update job status")
 
 	return restoreCommand
 }
 
-func restoreResources(
-	namespace, applicationCRName string,
+func restoreAndApplyResources(
+	applicationCRName string,
+	restoreNamespace string,
+	rbCrName string,
+	rbCrNamespace string,
 ) error {
-	restore, err := storkops.Instance().GetApplicationRestore(applicationCRName, namespace)
+	err := restoreResources(applicationCRName, restoreNamespace, rbCrName, rbCrNamespace)
+	if err != nil {
+		//update resourcebackup CR with status and reason
+		logrus.Errorf("restore resources for [%v/%v] failed with error: %v", rbCrNamespace, rbCrName, err.Error())
+		st := kdmpapi.ResourceBackupProgressStatus{
+			Status: kdmpapi.ResourceBackupStatusFailed,
+			Reason: err.Error(),
+		}
+
+		err = executor.UpdateResourceBackupStatus(st, rbCrName, rbCrNamespace, nil)
+		if err != nil {
+			logrus.Errorf("failed to update resorucebackup[%v/%v] status after hitting error in restoring resources: %v", rbCrNamespace, rbCrName, err)
+		}
+		return err
+	}
+
+	//update resourcebackup CR with status and reason
+	st := kdmpapi.ResourceBackupProgressStatus{
+		Status: kdmpapi.ResourceBackupStatusSuccessful,
+		Reason: "upload resource Successfully",
+	}
+	err = executor.UpdateResourceBackupStatus(st, rbCrName, rbCrNamespace, nil)
+	if err != nil {
+		logrus.Errorf("failed to update resorucebackup[%v/%v] after successfully restoring resources : %v", rbCrNamespace, rbCrName, err)
+		return err
+	}
+	return nil
+}
+
+func restoreResources(
+	applicationCRName string,
+	restoreNamespace string,
+	rbCrName string,
+	rbCrNamespace string,
+) error {
+	restore, err := storkops.Instance().GetApplicationRestore(applicationCRName, restoreNamespace)
 	if err != nil {
 		logrus.Errorf("Error getting restore cr: %v", err)
 		return err
+	}
+
+	rb, err := kdmpschedops.Instance().GetResourceBackup(rbCrName, rbCrNamespace)
+	if err != nil {
+		errMsg := fmt.Sprintf("error reading ResourceBackup CR[%v/%v]: %v", rbCrNamespace, rbCrName, err)
+		return fmt.Errorf(errMsg)
 	}
 
 	backup, err := storkops.Instance().GetApplicationBackup(restore.Spec.BackupName, restore.Namespace)
@@ -69,7 +117,7 @@ func restoreResources(
 		return err
 	}
 
-	if err := applyResources(restore, objects); err != nil {
+	if err := applyResources(restore, rb, objects); err != nil {
 		return err
 	}
 	return nil
@@ -400,19 +448,19 @@ func removeCSIVolumesBeforeApply(
 }
 
 func updateResourceStatus(
-	restore *storkapi.ApplicationRestore,
+	resourceBackup *kdmpapi.ResourceBackup,
 	object runtime.Unstructured,
-	status storkapi.ApplicationRestoreStatusType,
+	status kdmpapi.ResourceRestoreStatus,
 	reason string,
 ) error {
-	var updatedResource *storkapi.ApplicationRestoreResourceInfo
+	var updatedResource *kdmpapi.ResourceRestoreResourceInfo
 	gkv := object.GetObjectKind().GroupVersionKind()
 	metadata, err := meta.Accessor(object)
 	if err != nil {
-		log.ApplicationRestoreLog(restore).Errorf("Error getting metadata for object %v %v", object, err)
+		logrus.Errorf("updateResourceStatus: error getting metadata for object %v %v", object, err)
 		return err
 	}
-	for _, resource := range restore.Status.Resources {
+	for _, resource := range resourceBackup.Status.Resources {
 		if resource.Name == metadata.GetName() &&
 			resource.Namespace == metadata.GetNamespace() &&
 			(resource.Group == gkv.Group || (resource.Group == "core" && gkv.Group == "")) &&
@@ -423,8 +471,8 @@ func updateResourceStatus(
 		}
 	}
 	if updatedResource == nil {
-		updatedResource = &storkapi.ApplicationRestoreResourceInfo{
-			ObjectInfo: storkapi.ObjectInfo{
+		updatedResource = &kdmpapi.ResourceRestoreResourceInfo{
+			ObjectInfo: kdmpapi.ObjectInfo{
 				Name:      metadata.GetName(),
 				Namespace: metadata.GetNamespace(),
 				GroupVersionKind: metav1.GroupVersionKind{
@@ -434,7 +482,7 @@ func updateResourceStatus(
 				},
 			},
 		}
-		restore.Status.Resources = append(restore.Status.Resources, updatedResource)
+		resourceBackup.Status.Resources = append(resourceBackup.Status.Resources, updatedResource)
 	}
 
 	updatedResource.Status = status
@@ -444,6 +492,7 @@ func updateResourceStatus(
 
 func applyResources(
 	restore *storkapi.ApplicationRestore,
+	rb *kdmpapi.ResourceBackup,
 	objects []runtime.Unstructured,
 ) error {
 	resourceCollector := initResourceCollector()
@@ -522,25 +571,25 @@ func applyResources(
 
 		if err != nil {
 			if err := updateResourceStatus(
-				restore,
+				rb,
 				o,
-				storkapi.ApplicationRestoreStatusFailed,
+				kdmpapi.ResourceRestoreStatusFailed,
 				fmt.Sprintf("Error applying resource: %v", err)); err != nil {
 				return err
 			}
 		} else if retained {
 			if err := updateResourceStatus(
-				restore,
+				rb,
 				o,
-				storkapi.ApplicationRestoreStatusRetained,
+				kdmpapi.ResourceRestoreStatusRetained,
 				"Resource restore skipped as it was already present and ReplacePolicy is set to Retain"); err != nil {
 				return err
 			}
 		} else {
 			if err := updateResourceStatus(
-				restore,
+				rb,
 				o,
-				storkapi.ApplicationRestoreStatusSuccessful,
+				kdmpapi.ResourceRestoreStatusSuccessful,
 				"Resource restored successfully"); err != nil {
 				return err
 			}
