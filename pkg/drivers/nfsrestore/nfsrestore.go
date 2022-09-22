@@ -1,4 +1,4 @@
-package nfsbackup
+package nfsrestore
 
 import (
 	"fmt"
@@ -22,7 +22,7 @@ type Driver struct{}
 
 // Name returns a name of the driver.
 func (d Driver) Name() string {
-	return drivers.NFSBackup
+	return drivers.NFSRestore
 }
 
 // StartJob creates a job for data transfer between volumes.
@@ -68,7 +68,7 @@ func (d Driver) JobStatus(id string) (*drivers.JobStatus, error) {
 
 	job, err := batch.Instance().GetJob(name, namespace)
 	if err != nil {
-		errMsg := fmt.Sprintf("failed to fetch backup %s/%s job: %v", namespace, name, err)
+		errMsg := fmt.Sprintf("failed to fetch restore %s/%s job: %v", namespace, name, err)
 		logrus.Errorf("%s: %v", fn, errMsg)
 		return nil, fmt.Errorf(errMsg)
 	}
@@ -110,7 +110,7 @@ func (d Driver) JobStatus(id string) (*drivers.JobStatus, error) {
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			if utils.IsJobPending(job) {
-				logrus.Warnf("backup job %s is in pending state", job.Name)
+				logrus.Warnf("restore job %s is in pending state", job.Name)
 				return utils.ToNFSJobStatus(err.Error(), jobStatus), nil
 			}
 		}
@@ -137,7 +137,7 @@ func buildJob(
 		return nil, err
 	}
 
-	job, err := jobForBackupResource(jobOptions, resources)
+	job, err := jobForRestoreResource(jobOptions, resources)
 	if err != nil {
 		errMsg := fmt.Sprintf("building resource backup job %s failed: %v", jobOptions.RestoreExportName, err)
 		logrus.Errorf("%s: %v", funct, errMsg)
@@ -176,16 +176,16 @@ func addJobLabels(labels map[string]string) map[string]string {
 	return labels
 }
 
-func jobForBackupResource(
+func jobForRestoreResource(
 	jobOption drivers.JobOpts,
 	resources corev1.ResourceRequirements,
 ) (*batchv1.Job, error) {
 	cmd := strings.Join([]string{
 		"/nfsexecutor",
-		"backup",
+		"restore",
 		"--app-cr-name",
 		jobOption.AppCRName,
-		"--backup-namespace",
+		"--restore-namespace",
 		jobOption.AppCRNamespace,
 		// resourcebackup CR name
 		"--rb-cr-name",
