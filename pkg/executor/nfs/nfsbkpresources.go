@@ -72,7 +72,7 @@ func uploadResources(
 			Reason: err.Error(),
 		}
 
-		err = executor.UpdateResourceBackupStatus(st, rbCrName, rbCrNamespace)
+		err = executor.UpdateResourceBackupStatus(st, rbCrName, rbCrNamespace, nil)
 		if err != nil {
 			logrus.Errorf("failed to update resorucebackup[%v/%v] status: %v", rbCrNamespace, rbCrName, err)
 		}
@@ -83,7 +83,7 @@ func uploadResources(
 		Status: kdmpapi.ResourceBackupStatusSuccessful,
 		Reason: "upload resource Successfully",
 	}
-	err = executor.UpdateResourceBackupStatus(st, rbCrName, rbCrNamespace)
+	err = executor.UpdateResourceBackupStatus(st, rbCrName, rbCrNamespace, nil)
 	if err != nil {
 		logrus.Errorf("failed to update resorucebackup[%v/%v] status: %v", rbCrNamespace, rbCrName, err)
 		return err
