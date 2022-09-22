@@ -22,6 +22,9 @@ type ResourceExportStatus string
 // ResourceExportStage is the stage of the ResourceExport
 type ResourceExportStage string
 
+// ResourceRestoreStatus defines the status of Resource after applying the spec during restore.
+type ResourceRestoreStatus string
+
 // ObjectInfo contains info about an object being backed up or restored
 type ObjectInfo struct {
 	Name                    string `json:"name"`
@@ -32,9 +35,18 @@ type ObjectInfo struct {
 // ResourceRestoreResourceInfo is the info for the restore of a resource
 type ResourceRestoreResourceInfo struct {
 	ObjectInfo `json:",inline"`
-	Status     ResourceExportStatus `json:"status"`
-	Reason     string               `json:"reason"`
+	Status     ResourceRestoreStatus `json:"status"`
+	Reason     string                `json:"reason"`
 }
+
+const (
+	// ResourceRestoreStatusFailed Restore Failed
+	ResourceRestoreStatusFailed ResourceRestoreStatus = "Failed"
+	// ResourceRestoreStatusRetained Restore Retained
+	ResourceRestoreStatusRetained ResourceRestoreStatus = "Retained"
+	// ResourceRestoreStatusSuccessful Restore Successful
+	ResourceRestoreStatusSuccessful ResourceRestoreStatus = "Successful"
+)
 
 const (
 	// ResourceExportStatusInitial is the initial status of ResourceExport. It indicates
