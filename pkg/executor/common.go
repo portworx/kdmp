@@ -9,6 +9,7 @@ import (
 	"reflect"
 	"strconv"
 	"time"
+	"syscall"
 
 	storkapi "github.com/libopenstorage/stork/pkg/apis/stork/v1alpha1"
 	kdmpapi "github.com/portworx/kdmp/pkg/apis/kdmp/v1alpha1"
@@ -290,6 +291,18 @@ func ParseCloudCred() (*Repository, error) {
 	}
 	if storkapi.BackupLocationType(blType) == storkapi.BackupLocationNFS {
 		// For NFS this path need to be absolute path not just a bucket name anymore.
+		// DBG
+		// mount the nfs server using mount command
+		logrus.Infof("line 296 nfs mount")
+		nfsPath := "/root/prashanth/nfsshare"
+		if err := os.MkdirAll(drivers.NfsMount, 0777); err != nil {
+			logrus.Errorf("%v", err)
+		}
+		nerr := syscall.Mount(":"+nfsPath, drivers.NfsMount, "nfs", 0, "nolock,addr=10.13.179.152")
+		if nerr != nil {
+			fmt.Println("line 300: %v",nerr)
+		}
+		logrus.Infof("line 303 nfs mount")
 		repository.Path = drivers.NfsMount
 	} else {
 		repository.Path = string(bucket)

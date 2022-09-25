@@ -573,7 +573,7 @@ func applyResources(
 			if err := updateResourceStatus(
 				rb,
 				o,
-				kdmpapi.ResourceResourceStatusFailed,
+				kdmpapi.ResourceRestoreStatusFailed,
 				fmt.Sprintf("Error applying resource: %v", err)); err != nil {
 				return err
 			}
@@ -581,7 +581,7 @@ func applyResources(
 			if err := updateResourceStatus(
 				rb,
 				o,
-				kdmpapi.ResourceResourceStatusRetained,
+				kdmpapi.ResourceRestoreStatusRetained,
 				"Resource restore skipped as it was already present and ReplacePolicy is set to Retain"); err != nil {
 				return err
 			}
@@ -589,7 +589,7 @@ func applyResources(
 			if err := updateResourceStatus(
 				rb,
 				o,
-				kdmpapi.ResourceResourceStatusSuccessful,
+				kdmpapi.ResourceRestoreStatusSuccessful,
 				"Resource restored successfully"); err != nil {
 				return err
 			}

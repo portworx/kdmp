@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io/ioutil"
+	"syscall"
 	"time"
 
 	storkv1 "github.com/libopenstorage/stork/pkg/apis/stork/v1alpha1"
@@ -74,6 +75,7 @@ func newBackupCommand() *cobra.Command {
 func runBackup(sourcePath string) error {
 	// Parse using the mounted secrets
 	fn := "runBackup"
+	logrus.Infof("line 77")
 	repo, rErr := executor.ParseCloudCred()
 	var repoName string
 	if repo == nil {
@@ -169,7 +171,10 @@ func runBackup(sourcePath string) error {
 		logrus.Errorf("%s: %v", fn, errMsg)
 		return fmt.Errorf(errMsg)
 	}
-
+	nerr := syscall.Unmount("/tmp/nfs-target", 0)
+	if nerr != nil {
+		fmt.Println("line 177: %+v",nerr)
+	}
 	return nil
 }
 

@@ -128,14 +128,14 @@ func jobForLiveBackup(
 						},
 					},
 					Volumes: []corev1.Volume{
-						{
+						/*{
 							Name: "vol",
 							VolumeSource: corev1.VolumeSource{
 								HostPath: &corev1.HostPathVolumeSource{
 									Path: podVolumesPath,
 								},
 							},
-						},
+						},*/
 						{
 							Name: "cred-secret",
 							VolumeSource: corev1.VolumeSource{
