@@ -33,7 +33,6 @@ type updateResourceExportFields struct {
 }
 
 func (c *Controller) process(ctx context.Context, in *kdmpapi.ResourceExport) (bool, error) {
-	logrus.Infof("entering reconciler process")
 	if in == nil {
 		return false, nil
 	}
