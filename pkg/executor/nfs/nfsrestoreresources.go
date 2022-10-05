@@ -32,11 +32,6 @@ import (
 	"k8s.io/client-go/rest"
 )
 
-var (
-	restoreNamespace     string
-	applicationrestoreCR string
-)
-
 func newRestoreResourcesCommand() *cobra.Command {
 	restoreCommand := &cobra.Command{
 		Use:   "restore",
@@ -99,7 +94,6 @@ func restoreResources(
 		logrus.Errorf("Error getting restore cr: %v", err)
 		return err
 	}
-
 	rb, err := kdmpschedops.Instance().GetResourceBackup(rbCrName, rbCrNamespace)
 	if err != nil {
 		errMsg := fmt.Sprintf("error reading ResourceBackup CR[%v/%v]: %v", rbCrNamespace, rbCrName, err)
@@ -112,6 +106,7 @@ func restoreResources(
 		return err
 	}
 	objects, err := downloadResources(backup, restore.Spec.BackupLocation, restore.Namespace)
+	//objects, err := downloadResources(backup, restore)
 	if err != nil {
 		log.ApplicationRestoreLog(restore).Errorf("Error downloading resources: %v", err)
 		return err
@@ -485,7 +480,6 @@ func updateResourceStatus(
 		}
 		resourceBackup.Status.Resources = append(resourceBackup.Status.Resources, updatedResource)
 	}
-
 	updatedResource.Status = status
 	updatedResource.Reason = reason
 	return nil

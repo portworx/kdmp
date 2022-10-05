@@ -18,7 +18,7 @@ func newDeleteResourcesCommand() *cobra.Command {
 		},
 	}
 	deleteCommand.Flags().StringVarP(&bkpNamespace, "namespace", "", "", "Namespace for delete command")
-	deleteCommand.Flags().StringVarP(&applicationCRName, "app-cr-name", "", "", "Application backup CR name")
+	deleteCommand.Flags().StringVarP(&appBackupCRName, "app-cr-name", "", "", "Application backup CR name")
 
 	return deleteCommand
 }
