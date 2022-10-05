@@ -33,11 +33,6 @@ import (
 	"k8s.io/client-go/rest"
 )
 
-var (
-	restoreNamespace     string
-	applicationrestoreCR string
-)
-
 func newRestoreResourcesCommand() *cobra.Command {
 	restoreCommand := &cobra.Command{
 		Use:   "restore",
@@ -105,7 +100,6 @@ func restoreResources(
 		logrus.Errorf("Error getting restore cr: %v", err)
 		return err
 	}
-
 	rb, err := kdmpschedops.Instance().GetResourceBackup(rbCrName, rbCrNamespace)
 	if err != nil {
 		errMsg := fmt.Sprintf("error reading ResourceBackup CR[%v/%v]: %v", rbCrNamespace, rbCrName, err)
@@ -119,6 +113,7 @@ func restoreResources(
 		return err
 	}
 	objects, err := downloadResources(backup, restore.Spec.BackupLocation, restore.Namespace)
+	//objects, err := downloadResources(backup, restore)
 	if err != nil {
 		log.ApplicationRestoreLog(restore).Errorf("Error downloading resources: %v", err)
 		return err
@@ -492,7 +487,6 @@ func updateResourceStatus(
 		}
 		resourceBackup.Status.Resources = append(resourceBackup.Status.Resources, updatedResource)
 	}
-
 	updatedResource.Status = status
 	updatedResource.Reason = reason
 	return nil
@@ -629,12 +623,12 @@ func createNamespacesFromMapping(
 		log.ApplicationRestoreLog(restore).Errorf("Error getting backup: %v", err)
 		return err
 	}
-        return createNamespaces(backup, restore.Spec.BackupLocation, restore.Namespace, restore)
+	return createNamespaces(backup, restore.Spec.BackupLocation, restore.Namespace, restore)
 }
 
 func createNamespaces(backup *storkapi.ApplicationBackup,
 	backupLocation string,
-        backupLocationNamespace string,
+	backupLocationNamespace string,
 	restore *storkapi.ApplicationRestore) error {
 	var namespaces []*v1.Namespace
 	funct := "create namespaces"
