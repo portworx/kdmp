@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/go-openapi/inflect"
 	stork_api "github.com/libopenstorage/stork/pkg/apis/stork/v1alpha1"
@@ -28,11 +29,11 @@ import (
 )
 
 var (
-	bkpNamespace      string
+	// bkpNamespace      string
 	applicationCRName string
-	rbCrName          string
-	rbCrNamespace     string
-	resKinds          map[string]string
+	// bCrName          string
+	// rbCrNamespace     string
+	resKinds map[string]string
 )
 
 const (
@@ -48,13 +49,15 @@ func newUploadBkpResourceCommand() *cobra.Command {
 		Use:   "backup",
 		Short: "Start a resource backup to nfs target",
 		Run: func(c *cobra.Command, args []string) {
-			executor.HandleErr(uploadResources(bkpNamespace, applicationCRName, rbCrName, rbCrNamespace))
+			executor.HandleErr(uploadResources(bkpNamespace, appBackupCRName, rbCrName, rbCrNamespace))
 		},
 	}
 	bkpUploadCommand.Flags().StringVarP(&bkpNamespace, "backup-namespace", "", "", "Namespace for backup command")
-	bkpUploadCommand.Flags().StringVarP(&applicationCRName, "app-cr-name", "", "", "Namespace for applicationbackup CR whose resource to be backed up")
-	bkpUploadCommand.Flags().StringVarP(&rbCrName, "rb-cr-name", "", "", "Name for resourcebackup CR to update job status")
+	bkpUploadCommand.Flags().StringVarP(&appBackupCRName, "app-cr-name", "", "", "Namespace for applicationbackup CR whose resource to be backed up")
+
+	/*bkpUploadCommand.Flags().StringVarP(&rbCrName, "rb-cr-name", "", "", "Name for resourcebackup CR to update job status")
 	bkpUploadCommand.Flags().StringVarP(&rbCrNamespace, "rb-cr-namespace", "", "", "Namespace for resourcebackup CR to update job status")
+	*/
 
 	return bkpUploadCommand
 }
@@ -110,7 +113,10 @@ func uploadBkpResource(
 		logrus.Errorf(errMsg)
 		return fmt.Errorf(errMsg)
 	}
+
+	logrus.Infof("backup.ObjectMeta.Name: %v, string(backup.ObjectMeta.UID %v", backup.ObjectMeta.Name, string(backup.ObjectMeta.UID))
 	bkpDir := filepath.Join(repo.Path, bkpNamespace, backup.ObjectMeta.Name, string(backup.ObjectMeta.UID))
+	logrus.Infof("bkpDir: %v", bkpDir)
 	if err := os.MkdirAll(bkpDir, 0777); err != nil {
 		errMsg := fmt.Sprintf("%s: error creating backup dir: %v", funct, err)
 		logrus.Errorf(errMsg)
@@ -144,6 +150,7 @@ func uploadBkpResource(
 		logrus.Errorf(errMsg)
 		return fmt.Errorf(errMsg)
 	}
+	time.Sleep(1 * time.Minute)
 	return nil
 }
 
@@ -185,7 +192,7 @@ func uploadResource(
 	// For DBG remove it later
 	for _, obj := range allObjects {
 		metadata, err := meta.Accessor(obj)
-		logrus.Infof("*** line 140 metadata: %+v", metadata)
+		logrus.Infof("metadata: %+v", metadata)
 		gvk := obj.GetObjectKind().GroupVersionKind()
 		resKinds[gvk.Kind] = gvk.Version
 		if err != nil {
