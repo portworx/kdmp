@@ -10,6 +10,7 @@ import (
 
 	"github.com/go-openapi/inflect"
 	stork_api "github.com/libopenstorage/stork/pkg/apis/stork/v1alpha1"
+	"github.com/libopenstorage/stork/pkg/crypto"
 	"github.com/libopenstorage/stork/pkg/resourcecollector"
 	kdmpapi "github.com/portworx/kdmp/pkg/apis/kdmp/v1alpha1"
 	"github.com/portworx/kdmp/pkg/executor"
@@ -130,7 +131,7 @@ func uploadBkpResource(
 		return fmt.Errorf(errMsg)
 	}
 
-	err = uploadCRDResources(resKinds, bkpDir)
+	err = uploadCRDResources(resKinds, bkpDir, backup)
 	if err != nil {
 		errMsg := fmt.Sprintf("%s: error uploading CRD resource %v", funct, err)
 		logrus.Errorf(errMsg)
@@ -195,13 +196,19 @@ func uploadResource(
 
 	// TODO: Need to create directory with UID GUID needed
 	// for nfs share
-	//TODO: Add support for encryption key
 	jsonBytes, err := json.MarshalIndent(allObjects, "", " ")
 	if err != nil {
 		logrus.Infof("%s: %v", funct, err)
 		return err
 	}
-	err = uploadData(resourcePath, jsonBytes, resourcesFile)
+
+	encryptionKey, err := getEncryptionKey(bkpNamespace, backup)
+	if err != nil {
+		logrus.Errorf("%s err: %v", funct, err)
+		return err
+	}
+
+	err = uploadData(resourcePath, jsonBytes, resourcesFile, encryptionKey)
 	if err != nil {
 		logrus.Errorf("%s: %v", funct, err)
 		return err
@@ -233,7 +240,13 @@ func uploadNamespaces(
 		return err
 	}
 
-	err = uploadData(resourcePath, jsonBytes, namespacesFile)
+	encryptionKey, err := getEncryptionKey(bkpNamespace, backup)
+	if err != nil {
+		logrus.Errorf("%s err: %v", funct, err)
+		return err
+	}
+
+	err = uploadData(resourcePath, jsonBytes, namespacesFile, encryptionKey)
 	if err != nil {
 		logrus.Errorf("%s err: %v", funct, err)
 		return err
@@ -245,6 +258,7 @@ func uploadNamespaces(
 func uploadCRDResources(
 	resKinds map[string]string,
 	resourcePath string,
+	backup *stork_api.ApplicationBackup,
 ) error {
 	funct := "uploadCRDResources"
 	crdList, err := storkops.Instance().ListApplicationRegistrations()
@@ -279,7 +293,13 @@ func uploadCRDResources(
 		return err
 	}
 
-	err = uploadData(resourcePath, jsonBytes, crdFile)
+	encryptionKey, err := getEncryptionKey(bkpNamespace, backup)
+	if err != nil {
+		logrus.Errorf("%s err: %v", funct, err)
+		return err
+	}
+
+	err = uploadData(resourcePath, jsonBytes, crdFile, encryptionKey)
 	if err != nil {
 		logrus.Errorf("%s err: %v", funct, err)
 		return err
@@ -298,7 +318,13 @@ func uploadMetadatResources(
 		return err
 	}
 
-	err = uploadData(resourcePath, jsonBytes, metadataObjectName)
+	encryptionKey, err := getEncryptionKey(bkpNamespace, backup)
+	if err != nil {
+		logrus.Errorf("%s err: %v", funct, err)
+		return err
+	}
+
+	err = uploadData(resourcePath, jsonBytes, metadataObjectName, encryptionKey)
 	if err != nil {
 		logrus.Errorf("%s err: %v", funct, err)
 		return err
@@ -310,11 +336,23 @@ func uploadData(
 	resourcePath string,
 	data []byte,
 	resourceFileName string,
+	encryptionKey string,
 ) error {
+	var err error
+	var encryptedData []byte
 	funct := "uploadData"
-	filePath := filepath.Join(resourcePath, resourceFileName)
-	err := ioutil.WriteFile(filePath, data, 0777)
 
+	filePath := filepath.Join(resourcePath, resourceFileName)
+	// Encrypt data before writing with passed encryption key
+	if encryptionKey != "" {
+		if encryptedData, err = crypto.Encrypt(data, encryptionKey); err != nil {
+			logrus.Errorf("nfs %s: encryption failed :%v, writing unencrypted data", funct, err)
+			return err
+		}
+		data = encryptedData
+	}
+	//TODO: Writing with 777 permision .. Any security implication ???
+	err = ioutil.WriteFile(filePath, data, 0777)
 	if err != nil {
 		logrus.Errorf("%s err: %v", funct, err)
 		return err
@@ -343,4 +381,24 @@ func initResourceCollector() resourcecollector.ResourceCollector {
 	}
 
 	return resourceCollector
+}
+
+func getEncryptionKey(bkpNamespace string,
+	backup *stork_api.ApplicationBackup) (string, error) {
+	uploadLocation, err := storkops.Instance().GetBackupLocation(backup.Spec.BackupLocation, bkpNamespace)
+	if err != nil {
+		return "", err
+	}
+
+	if uploadLocation.Location.EncryptionV2Key == "" {
+		// Give it a Best effort to obtain the key, it can be inside BL CR named secret
+		logrus.Infof("Failed to get encryption detail from backuplocation CR, Attempting to obtain from k8s secret...")
+		cloudCredSecret, err := core.Instance().GetSecret(uploadLocation.Name, bkpNamespace)
+		if err != nil {
+			return "", err
+		}
+		return string(cloudCredSecret.Data["encryptionKey"]), nil
+	}
+
+	return uploadLocation.Location.EncryptionV2Key, nil
 }
