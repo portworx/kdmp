@@ -243,7 +243,7 @@ func downloadResources(
 		logrus.Errorf("%s: error parsing cloud cred: %v", funct, err)
 		return nil, err
 	}
-	bkpDir := filepath.Join("/tmp", repo.Path, bkpNamespace, backup.ObjectMeta.Name, string(backup.ObjectMeta.UID))
+	bkpDir := filepath.Join(repo.Path, backup.Status.BackupPath)
 
 	restoreLocation, err := storkops.Instance().GetBackupLocation(backup.Spec.BackupLocation, namespace)
 	if err != nil {
