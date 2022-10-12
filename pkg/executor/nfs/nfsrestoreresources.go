@@ -39,14 +39,14 @@ var (
 
 func newRestoreResourcesCommand() *cobra.Command {
 	restoreCommand := &cobra.Command{
-		Use:   "backup",
+		Use:   "restore",
 		Short: "Start a resource backup to nfs target",
 		Run: func(c *cobra.Command, args []string) {
 			executor.HandleErr(restoreAndApplyResources(applicationrestoreCR, restoreNamespace, rbCrName, rbCrNamespace))
 		},
 	}
 	restoreCommand.Flags().StringVarP(&restoreNamespace, "restore-namespace", "", "", "Namespace for restore CR")
-	restoreCommand.Flags().StringVarP(&applicationCRName, "app-cr-name", "", "", "application restore CR name")
+	restoreCommand.Flags().StringVarP(&applicationrestoreCR, "app-cr-name", "", "", "application restore CR name")
 	restoreCommand.Flags().StringVarP(&rbCrName, "rb-cr-name", "", "", "Name for resourcebackup CR to update job status")
 	restoreCommand.Flags().StringVarP(&rbCrNamespace, "rb-cr-namespace", "", "", "Namespace for resourcebackup CR to update job status")
 
@@ -215,6 +215,7 @@ func downloadObject(
 	resourceFileName string,
 	encryptionKey string,
 ) ([]byte, error) {
+	logrus.Debugf("downloadObject resourcePath: %s, resourceFileName: %s", resourcePath, resourceFileName)
 	filePath := filepath.Join(resourcePath, resourceFileName)
 	data, err := ioutil.ReadFile(filePath)
 	if err != nil {
