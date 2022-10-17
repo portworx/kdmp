@@ -85,7 +85,7 @@ type GoogleConfig struct {
 	AccountKey string
 }
 
-//NfsConfig specifies the config required to connect to NFS Baqckuplocation
+// NfsConfig specifies the config required to connect to NFS Baqckuplocation
 type NfsConfig struct {
 	ServerAddr string
 }

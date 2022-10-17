@@ -307,12 +307,28 @@ func uploadCRDResources(
 	return nil
 }
 
+// getObjectPath construct the full base path for a given backup
+// The format is "namespace/backupName/backupUID" which will be unique for each backup
+func getObjectPath(
+	backup *stork_api.ApplicationBackup,
+) string {
+	return filepath.Join(backup.Namespace, backup.Name, string(backup.UID))
+}
+
 func uploadMetadatResources(
 	bkpNamespace string,
 	backup *stork_api.ApplicationBackup,
 	resourcePath string,
 ) error {
 	funct := "uploadMetadatResources"
+	// In the in-memory copy alone, we will update the backup status to success.
+	// Update to the actual CR will be taken in the stork applicaitonbackup CR controller.
+	backup.Status.BackupPath = getObjectPath(backup)
+	backup.Status.Stage = stork_api.ApplicationBackupStageFinal
+	backup.Status.FinishTimestamp = metav1.Now()
+	backup.Status.Status = stork_api.ApplicationBackupStatusSuccessful
+	backup.Status.Reason = "Volumes and resources were backed up successfully"
+
 	jsonBytes, err := json.MarshalIndent(backup, "", " ")
 	if err != nil {
 		return err

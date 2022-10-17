@@ -51,7 +51,8 @@ func GetRestoreCommand(
 // output of restic restore
 //
 // TODO: restic provides no progress info for a restore process now:
-//       https://github.com/restic/restic/issues/1154
+//
+//	https://github.com/restic/restic/issues/1154
 type RestoreProgressResponse struct {
 }
 
