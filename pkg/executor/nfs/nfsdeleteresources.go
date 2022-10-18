@@ -9,16 +9,12 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var (
-	namespace string
-)
-
 func newDeleteResourcesCommand() *cobra.Command {
 	deleteCommand := &cobra.Command{
 		Use:   "delete",
 		Short: "Start resource deletion on nfs target",
 		Run: func(c *cobra.Command, args []string) {
-			executor.HandleErr(deleteResources(namespace, applicationrestoreCR))
+			executor.HandleErr(deleteResources(bkpNamespace, applicationCRName))
 		},
 	}
 	deleteCommand.Flags().StringVarP(&bkpNamespace, "namespace", "", "", "Namespace for delete command")
