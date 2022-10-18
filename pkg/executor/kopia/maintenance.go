@@ -136,7 +136,11 @@ func runMaintenance(maintenanceType string) error {
 		repoBaseDir := repo.Path + genericBackupDir + "/"
 		listOfSubDirs, err := returnDirList(repoBaseDir)
 		if err != nil {
-			logrus.Errorf("Failed to list sub directories in dir %v", repoBaseDir)
+			if os.IsNotExist(err) {
+				logrus.Warnf("No directory %v exists, verify if it is a resource only backup", repoBaseDir)
+				return nil
+			}
+			logrus.Errorf("Failed to list sub directories in dir %v : [%v]", repoBaseDir, err)
 			return err
 		}
 		var kopiaFile string
