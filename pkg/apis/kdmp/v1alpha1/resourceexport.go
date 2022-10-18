@@ -100,6 +100,8 @@ type ResourceExportSpec struct {
 	Source ResourceExportObjectReference `json:"source,omitempty"`
 	// Destination is the ref to BL CR
 	Destination ResourceExportObjectReference `json:"destination,omitempty"`
+	// Admin namespace required for create namespace
+	AdminNamespace string `json:"adminnamespace"`
 }
 
 // ResourceStatus overall resource backup/restore progress
