@@ -345,6 +345,7 @@ func startNfsResourceJob(
 			drivers.WithNamespace(re.Namespace),
 			drivers.WithResoureBackupName(re.Name),
 			drivers.WithResoureBackupNamespace(re.Namespace),
+			drivers.WithAdminNamespace(re.Spec.AdminNamespace),
 		)
 	case drivers.NFSRestore:
 		return drv.StartJob(
@@ -359,6 +360,7 @@ func startNfsResourceJob(
 			drivers.WithNamespace(re.Namespace),
 			drivers.WithResoureBackupName(re.Name),
 			drivers.WithResoureBackupNamespace(re.Namespace),
+			drivers.WithAdminNamespace(re.Spec.AdminNamespace),
 		)
 	}
 	return "", fmt.Errorf("unknown data transfer driver: %s", drv.Name())

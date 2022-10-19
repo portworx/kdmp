@@ -52,6 +52,7 @@ type JobOpts struct {
 	AppCRNamespace             string
 	ResoureBackupName          string
 	ResoureBackupNamespace     string
+	AdminNamespace             string
 }
 
 // WithResoureBackupName is job parameter
@@ -66,6 +67,14 @@ func WithResoureBackupName(name string) JobOption {
 func WithResoureBackupNamespace(namespace string) JobOption {
 	return func(opts *JobOpts) error {
 		opts.ResoureBackupNamespace = strings.TrimSpace(namespace)
+		return nil
+	}
+}
+
+// WithAdminNamespace is Job parameter
+func WithAdminNamespace(namespace string) JobOption {
+	return func(opts *JobOpts) error {
+		opts.AdminNamespace = strings.TrimSpace(namespace)
 		return nil
 	}
 }

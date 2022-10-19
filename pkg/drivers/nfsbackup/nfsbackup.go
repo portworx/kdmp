@@ -207,10 +207,11 @@ func jobForBackupResource(
 		logrus.Errorf("failed to get the executor image details")
 		return nil, fmt.Errorf("failed to get the executor image details for job %s", jobOption.JobName)
 	}
+	// job is decided to be created in admin namespace.
 	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      jobOption.RestoreExportName,
-			Namespace: jobOption.Namespace,
+			Namespace: jobOption.AdminNamespace,
 			Annotations: map[string]string{
 				utils.SkipResourceAnnotation: "true",
 			},
