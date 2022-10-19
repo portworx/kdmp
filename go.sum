@@ -1078,6 +1078,8 @@ github.com/libopenstorage/stork v1.4.1-0.20220902043617-635e642468d0 h1:sbTeyWNc
 github.com/libopenstorage/stork v1.4.1-0.20220902043617-635e642468d0/go.mod h1:oQ0lteROzRCxHMvESCSyOiY/9oqgO3Qrvfs5LI/jVCA=
 github.com/libopenstorage/stork v1.4.1-0.20220902111346-9dbf76d2db2c h1:tlVWiquCQhQX+OnWRR27rkytQzaah+fNEG6YJ9NPE10=
 github.com/libopenstorage/stork v1.4.1-0.20220902111346-9dbf76d2db2c/go.mod h1:KNG/pkhMCdKXXFr0nKtYybWCx2ggLCoi+I7Onylwl64=
+github.com/libopenstorage/stork v1.4.1-0.20221018090922-5eb863af232f h1:f7Orgi3F/ZnkHAsNGDYzoHvoI8BlxmaSMv7i74Y34y4=
+github.com/libopenstorage/stork v1.4.1-0.20221018090922-5eb863af232f/go.mod h1:AkkMHtpmMolj0bTNKrhyuknICDjuLE2jrd3lhBfQt9o=
 github.com/libopenstorage/systemutils v0.0.0-20160208220149-44ac83be3ce1/go.mod h1:xwNGC7xiz/BQ/wbMkvHujL8Gjgseg+x41xMek7sKRRQ=
 github.com/liggitt/tabwriter v0.0.0-20181228230101-89fcab3d43de h1:9TO3cAIGXtEhnIaL+V+BEER86oLrvS+kWobKpbJuye0=
 github.com/liggitt/tabwriter v0.0.0-20181228230101-89fcab3d43de/go.mod h1:zAbeS9B/r2mtpb6U+EI2rYA5OAXxsYw6wTamcNW+zcE=
@@ -1349,6 +1351,7 @@ github.com/portworx/kdmp v0.4.1-0.20220414053457-962507678379/go.mod h1:EAVroITf
 github.com/portworx/kdmp v0.4.1-0.20220710173715-5d42efc7d149/go.mod h1:nb5AupP/63ByyqAYfZ+E32LDEnP0PjgH6w+yKXxWIgE=
 github.com/portworx/kdmp v0.4.1-0.20220902105026-dc14791e1508/go.mod h1:sTO9LkPkExEVE6BqowIzkrQsyBtGdaC4Vh1AcKQ4xZA=
 github.com/portworx/kdmp v0.4.1-0.20220905153748-e0bb69e59f38/go.mod h1:NI2UgLITtggRvvaRA7lE4+Np4htDp+06Jf1LWksKyGA=
+github.com/portworx/kdmp v0.4.1-0.20221018061335-677587f3339b/go.mod h1:l9qIpk6irCHxiyup3meoM9wjnn1eRKtEdZw9bIVoY+4=
 github.com/portworx/kvdb v0.0.0-20190105022415-cccaa09abfc9/go.mod h1:Q8YyrNDvPp3DVF96BDcQuaC7fAYUCuUX+l58S7OnD2M=
 github.com/portworx/kvdb v0.0.0-20191223203141-f42097b1fcd8/go.mod h1:Q8YyrNDvPp3DVF96BDcQuaC7fAYUCuUX+l58S7OnD2M=
 github.com/portworx/kvdb v0.0.0-20200311180812-b2c72382d652/go.mod h1:Q8YyrNDvPp3DVF96BDcQuaC7fAYUCuUX+l58S7OnD2M=
