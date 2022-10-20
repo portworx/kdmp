@@ -15,6 +15,7 @@ import (
 	"github.com/libopenstorage/stork/pkg/log"
 	kdmpapi "github.com/portworx/kdmp/pkg/apis/kdmp/v1alpha1"
 	"github.com/portworx/kdmp/pkg/executor"
+	"github.com/portworx/sched-ops/k8s/core"
 	kdmpschedops "github.com/portworx/sched-ops/k8s/kdmp"
 	storkops "github.com/portworx/sched-ops/k8s/stork"
 	"github.com/sirupsen/logrus"
@@ -24,6 +25,7 @@ import (
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apimachinery/pkg/api/errors"
+	k8s_errors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -59,7 +61,12 @@ func restoreAndApplyResources(
 	rbCrName string,
 	rbCrNamespace string,
 ) error {
-	err := restoreResources(applicationCRName, restoreNamespace, rbCrName, rbCrNamespace)
+
+	err := createNamespacesFromMapping(applicationCRName, restoreNamespace)
+	if err != nil {
+		return err
+	}
+	err = restoreResources(applicationCRName, restoreNamespace, rbCrName, rbCrNamespace)
 	if err != nil {
 		//update resourcebackup CR with status and reason
 		logrus.Errorf("restore resources for [%v/%v] failed with error: %v", rbCrNamespace, rbCrName, err.Error())
@@ -103,6 +110,7 @@ func restoreResources(
 	rb, err := kdmpschedops.Instance().GetResourceBackup(rbCrName, rbCrNamespace)
 	if err != nil {
 		errMsg := fmt.Sprintf("error reading ResourceBackup CR[%v/%v]: %v", rbCrNamespace, rbCrName, err)
+		log.ApplicationRestoreLog(restore).Errorf(errMsg)
 		return fmt.Errorf(errMsg)
 	}
 
@@ -606,4 +614,134 @@ func getDynamicInterface() (dynamic.Interface, error) {
 	}
 
 	return dynamic.NewForConfig(config)
+}
+
+func createNamespacesFromMapping(
+	applicationCRName string,
+	restoreNamespace string) error {
+	funct := "createNamespacesFromMapping"
+	restore, err := storkops.Instance().GetApplicationRestore(applicationCRName, restoreNamespace)
+	if err != nil {
+		logrus.Errorf("%s: Error getting restore cr: %v", funct, err)
+		return err
+	}
+	backup, err := storkops.Instance().GetApplicationBackup(restore.Spec.BackupName, restore.Namespace)
+	if err != nil {
+		log.ApplicationRestoreLog(restore).Errorf("Error getting backup: %v", err)
+		return err
+	}
+        return createNamespaces(backup, restore.Spec.BackupLocation, restore.Namespace, restore)
+}
+
+func createNamespaces(backup *storkapi.ApplicationBackup,
+	backupLocation string,
+        backupLocationNamespace string,
+	restore *storkapi.ApplicationRestore) error {
+	var namespaces []*v1.Namespace
+	funct := "create namespaces"
+
+	repo, err := executor.ParseCloudCred()
+	if err != nil {
+		logrus.Errorf("%s: error parsing cloud cred: %v", funct, err)
+		return err
+	}
+	bkpDir := filepath.Join(repo.Path, backup.Status.BackupPath)
+	restoreLocation, err := storkops.Instance().GetBackupLocation(backup.Spec.BackupLocation, backupLocationNamespace)
+	if err != nil {
+		return err
+	}
+
+	nsData, err := downloadObject(bkpDir, namespacesFile, restoreLocation.Location.EncryptionKey)
+	if err != nil {
+		return err
+	}
+	if nsData != nil {
+		if err = json.Unmarshal(nsData, &namespaces); err != nil {
+			return err
+		}
+		for _, ns := range namespaces {
+			if restoreNS, ok := restore.Spec.NamespaceMapping[ns.Name]; ok {
+				ns.Name = restoreNS
+			} else {
+				// Skip namespaces we aren't restoring
+				continue
+			}
+			// create mapped restore namespace with metadata of backed up
+			// namespace
+			_, err := core.Instance().CreateNamespace(&v1.Namespace{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        ns.Name,
+					Labels:      ns.Labels,
+					Annotations: ns.GetAnnotations(),
+				},
+			})
+			log.ApplicationRestoreLog(restore).Tracef("Creating dest namespace %v", ns.Name)
+			if err != nil {
+				if k8s_errors.IsAlreadyExists(err) {
+					oldNS, err := core.Instance().GetNamespace(ns.GetName())
+					if err != nil {
+						return err
+					}
+					annotations := make(map[string]string)
+					labels := make(map[string]string)
+					if restore.Spec.ReplacePolicy == storkapi.ApplicationRestoreReplacePolicyDelete {
+						// overwrite all annotation in case of replace policy set to delete
+						annotations = ns.GetAnnotations()
+						labels = ns.GetLabels()
+					} else if restore.Spec.ReplacePolicy == storkapi.ApplicationRestoreReplacePolicyRetain {
+						// only add new annotation,labels in case of replace policy is set to retain
+						annotations = oldNS.GetAnnotations()
+						if annotations == nil {
+							annotations = make(map[string]string)
+						}
+						for k, v := range ns.GetAnnotations() {
+							if _, ok := annotations[k]; !ok {
+								annotations[k] = v
+							}
+						}
+						labels = oldNS.GetLabels()
+						if labels == nil {
+							labels = make(map[string]string)
+						}
+						for k, v := range ns.GetLabels() {
+							if _, ok := labels[k]; !ok {
+								labels[k] = v
+							}
+						}
+					}
+					log.ApplicationRestoreLog(restore).Tracef("Namespace already exists, updating dest namespace %v", ns.Name)
+					_, err = core.Instance().UpdateNamespace(&v1.Namespace{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:        ns.Name,
+							Labels:      labels,
+							Annotations: annotations,
+						},
+					})
+					if err != nil {
+						return err
+					}
+					continue
+				}
+				return err
+			}
+		}
+		return nil
+	}
+	for _, namespace := range restore.Spec.NamespaceMapping {
+		if ns, err := core.Instance().GetNamespace(namespace); err != nil {
+			if k8s_errors.IsNotFound(err) {
+				if _, err := core.Instance().CreateNamespace(&v1.Namespace{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:        ns.Name,
+						Labels:      ns.Labels,
+						Annotations: ns.GetAnnotations(),
+					},
+				}); err != nil {
+					return err
+				}
+			}
+			return err
+		}
+	}
+	return nil
 }
