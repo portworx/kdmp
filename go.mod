@@ -9,7 +9,7 @@ require (
 	github.com/kubernetes-csi/external-snapshotter/client/v4 v4.0.0
 	github.com/kubernetes-incubator/external-storage v0.20.4-openstorage-rc7
 	github.com/libopenstorage/openstorage v9.4.20+incompatible // indirect
-	github.com/libopenstorage/stork v1.4.1-0.20220902111346-9dbf76d2db2c
+	github.com/libopenstorage/stork v1.4.1-0.20221020163443-24401306f270
 	github.com/portworx/pxc v0.33.0
 	github.com/portworx/sched-ops v1.20.4-rc1.0.20220915143205-3fe6e54a2a4d
 	github.com/sirupsen/logrus v1.8.1
