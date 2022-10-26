@@ -224,7 +224,7 @@ func jobForBackupResource(
 				},
 				Spec: corev1.PodSpec{
 					RestartPolicy:      corev1.RestartPolicyOnFailure,
-					ImagePullSecrets:   nil,
+					ImagePullSecrets:   utils.ToImagePullSecret(utils.GetImageSecretName(jobOption.RestoreExportName)),
 					ServiceAccountName: jobOption.RestoreExportName,
 					//NodeName:           mountPod.Spec.NodeName,
 					Containers: []corev1.Container{
