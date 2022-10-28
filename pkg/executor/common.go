@@ -39,8 +39,9 @@ const (
 	projectIDKeypath       = "/etc/cred-secret/projectid"
 	storageAccountNamePath = "/etc/cred-secret/storageaccountname"
 	storageAccountKeyPath  = "/etc/cred-secret/storageaccountkey"
-	// ServerAddr needed for NFS based backuplocation
+	// ServerAddr & SubPath needed for NFS based backuplocation
 	serverAddr = "/etc/cred-secret/serverAddr"
+	subPath    = "/etc/cred-secret/subPath"
 
 	// DefaultTimeout Max time a command will be retired before failing
 	DefaultTimeout = 1 * time.Minute
@@ -88,6 +89,7 @@ type GoogleConfig struct {
 // NfsConfig specifies the config required to connect to NFS Baqckuplocation
 type NfsConfig struct {
 	ServerAddr string
+	SubPath    string
 }
 
 // Repository contains information used to connect the repository.
@@ -290,7 +292,7 @@ func ParseCloudCred() (*Repository, error) {
 	}
 	if storkapi.BackupLocationType(blType) == storkapi.BackupLocationNFS {
 		// For NFS this path need to be absolute path not just a bucket name anymore.
-		repository.Path = drivers.NfsMount
+		repository.Path = drivers.NfsMount + repository.NfsConfig.SubPath
 	} else {
 		repository.Path = string(bucket)
 	}
@@ -363,7 +365,15 @@ func parseNfsCreds() (*Repository, error) {
 		logrus.Errorf("%v", errMsg)
 		return nil, fmt.Errorf(errMsg)
 	}
+	subPath, err := ioutil.ReadFile(subPath)
+	if err != nil {
+		errMsg := fmt.Sprintf("failed reading data from file %s : %s", subPath, err)
+		logrus.Errorf("%v", errMsg)
+		return nil, fmt.Errorf(errMsg)
+	}
+
 	repository.NfsConfig.ServerAddr = string(sa)
+	repository.NfsConfig.SubPath = string(subPath)
 	return repository, nil
 }
 

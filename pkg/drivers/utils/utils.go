@@ -390,6 +390,8 @@ func CreateNfsSecret(secretName string, backupLocation *storkapi.BackupLocation,
 	credentialData["serverAddr"] = []byte(backupLocation.Location.NfsConfig.ServerAddr)
 	credentialData["password"] = []byte(backupLocation.Location.RepositoryPassword)
 	credentialData["path"] = []byte(backupLocation.Location.Path)
+	credentialData["subPath"] = []byte(backupLocation.Location.NfsConfig.SubPath)
+
 	err := CreateJobSecret(secretName, namespace, credentialData, labels)
 
 	return err
