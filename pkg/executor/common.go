@@ -292,7 +292,7 @@ func ParseCloudCred() (*Repository, error) {
 	}
 	if storkapi.BackupLocationType(blType) == storkapi.BackupLocationNFS {
 		// For NFS this path need to be absolute path not just a bucket name anymore.
-		repository.Path = drivers.NfsMount + repository.NfsConfig.SubPath
+		repository.Path = drivers.NfsMount + repository.NfsConfig.SubPath + "/"
 	} else {
 		repository.Path = string(bucket)
 	}
