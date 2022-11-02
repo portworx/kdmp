@@ -282,6 +282,14 @@ func jobFor(
 		logrus.Errorf("jobFor: getting kopia image registry and image secret failed during backup: %v", err)
 		return nil, err
 	}
+
+	tolerations, err := utils.GetTolerationsFromDeployment(jobOption.KopiaImageExecutorSource,
+		jobOption.KopiaImageExecutorSourceNs)
+	if err != nil {
+		logrus.Errorf("failed to get the toleration details")
+		return nil, fmt.Errorf("failed to get the toleration details for job %s", jobOption.JobName)
+	}
+
 	if len(imageRegistrySecret) != 0 {
 		err = utils.CreateImageRegistrySecret(imageRegistrySecret, jobName, jobOption.KopiaImageExecutorSourceNs, jobOption.Namespace)
 		if err != nil {
@@ -340,6 +348,7 @@ func jobFor(
 							},
 						},
 					},
+					Tolerations: tolerations,
 					Volumes: []corev1.Volume{
 						{
 							Name: "vol",

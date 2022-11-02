@@ -85,6 +85,13 @@ func jobForLiveBackup(
 		}
 	}
 
+	tolerations, err := utils.GetTolerationsFromDeployment(jobOption.KopiaImageExecutorSource,
+		jobOption.KopiaImageExecutorSourceNs)
+	if err != nil {
+		logrus.Errorf("failed to get the toleration details")
+		return nil, fmt.Errorf("failed to get the toleration details for job %s", jobOption.JobName)
+	}
+
 	var kopiaExecutorImage string
 	if len(imageRegistry) != 0 {
 		kopiaExecutorImage = fmt.Sprintf("%s/%s", imageRegistry, utils.GetKopiaExecutorImageName())
@@ -140,6 +147,7 @@ func jobForLiveBackup(
 							},
 						},
 					},
+					Tolerations: tolerations,
 					Volumes: []corev1.Volume{
 						{
 							Name: "vol",
