@@ -201,6 +201,13 @@ func jobFor(
 		return nil, fmt.Errorf("failed to get the executor image details for job %s", jobName)
 	}
 
+	tolerations, err := utils.GetTolerationsFromDeployment(jobOption.KopiaImageExecutorSource,
+		jobOption.KopiaImageExecutorSourceNs)
+	if err != nil {
+		logrus.Errorf("failed to get the toleration details")
+		return nil, fmt.Errorf("failed to get the toleration details for job %s", jobName)
+	}
+
 	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      jobName,
@@ -245,6 +252,7 @@ func jobFor(
 							},
 						},
 					},
+					Tolerations: tolerations,
 					Volumes: []corev1.Volume{
 						{
 							Name: "vol",

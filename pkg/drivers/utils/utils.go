@@ -307,6 +307,15 @@ func GetImageRegistryFromDeployment(name, namespace string) (string, string, err
 	return registry, "", nil
 }
 
+// GetTolerationsFromDeployment - extract tolerations from deployment spec
+func GetTolerationsFromDeployment(name, namespace string) ([]corev1.Toleration, error) {
+	deploy, err := apps.Instance().GetDeployment(name, namespace)
+	if err != nil {
+		return nil, err
+	}
+	return deploy.Spec.Template.Spec.Tolerations, nil
+}
+
 // GetExecutorImageAndSecret returns the image name and secret to to use in the job pod
 func GetExecutorImageAndSecret(executorImageType, deploymentName, deploymentNs,
 	jobName string, jobOption drivers.JobOpts) (string, string, error) {
