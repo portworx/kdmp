@@ -13,6 +13,7 @@ import (
 	stork_api "github.com/libopenstorage/stork/pkg/apis/stork/v1alpha1"
 	"github.com/portworx/sched-ops/k8s/core"
 	"github.com/portworx/sched-ops/k8s/rbac"
+	"github.com/portworx/sched-ops/k8s/storage"
 	storkops "github.com/portworx/sched-ops/k8s/stork"
 	"github.com/sirupsen/logrus"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -46,6 +47,12 @@ const (
 	ProjectMappingsOption = "ProjectMappings"
 	// IncludeResources to not skip resources of specific type
 	IncludeResources = "stork.libopenstorage.org/include-resource"
+	// TransformedResourceName is the annotation used to check if resource has been updated
+	// as per transformation rules
+	TransformedResourceName = "stork.libopenstorage.org/resourcetransformation-name"
+	// CurrentStorageClassName is the annotation used to store the current storage class of the PV before
+	// taking backup as we will reset it to empty.
+	CurrentStorageClassName = "stork.libopenstorage.org/current-storage-class-name"
 
 	// ServiceKind for k8s service resources
 	ServiceKind = "Service"
@@ -65,6 +72,7 @@ type ResourceCollector struct {
 	coreOps          core.Ops
 	rbacOps          rbac.Ops
 	storkOps         storkops.Ops
+	storageOps       storage.Ops
 }
 
 // Options are the options passed to the ResourceCollector APIs that dictate how k8s
@@ -132,6 +140,11 @@ func (r *ResourceCollector) Init(config *restclient.Config) error {
 	if err != nil {
 		return err
 	}
+	r.storageOps, err = storage.NewForConfig(config)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -557,6 +570,8 @@ func (r *ResourceCollector) objectToBeCollected(
 		return r.dataVolumesToBeCollected(object)
 	case "VirtualMachineInstance":
 		return r.virtualMachineInstanceToBeCollected(object)
+	case "VirtualMachineInstanceMigration":
+		return r.virtualMachineInstanceMigrationToBeCollected(object)
 	case "Endpoints":
 		return r.endpointsToBeCollected(object)
 	case "MutatingWebhookConfiguration":
@@ -805,7 +820,7 @@ func (r *ResourceCollector) PrepareResourceForApply(
 		}
 		return true, nil
 	case "PersistentVolume":
-		return r.preparePVResourceForApply(object, pvNameMappings, vInfo)
+		return r.preparePVResourceForApply(object, pvNameMappings, vInfo, storageClassMappings, namespaceMappings)
 	case "PersistentVolumeClaim":
 		return r.preparePVCResourceForApply(object, allObjects, pvNameMappings, storageClassMappings, vInfo)
 	case "ClusterRoleBinding":
@@ -816,6 +831,8 @@ func (r *ResourceCollector) PrepareResourceForApply(
 		return false, r.prepareValidatingWebHookForApply(object, namespaceMappings)
 	case "MutatingWebhookConfiguration":
 		return false, r.prepareMutatingWebHookForApply(object, namespaceMappings)
+	case "Secret":
+		return false, r.prepareSecretForApply(object)
 	}
 	return false, nil
 }

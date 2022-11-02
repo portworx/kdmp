@@ -347,6 +347,12 @@ func (g *gcp) DeleteBackup(backup *storkapi.ApplicationBackup) (bool, error) {
 		}
 		_, err := service.Snapshots.Delete(vInfo.Options["projectID"], vInfo.BackupID).Do()
 		if err != nil {
+			if gceErr, ok := err.(*googleapi.Error); ok {
+				if gceErr.Code == http.StatusNotFound {
+					// snapshot is already deleted
+					continue
+				}
+			}
 			return true, err
 		}
 	}
@@ -356,6 +362,7 @@ func (g *gcp) DeleteBackup(backup *storkapi.ApplicationBackup) (bool, error) {
 func (g *gcp) UpdateMigratedPersistentVolumeSpec(
 	pv *v1.PersistentVolume,
 	vInfo *storkapi.ApplicationRestoreVolumeInfo,
+	namespaceMapping map[string]string,
 ) (*v1.PersistentVolume, error) {
 	if pv.Spec.CSI != nil {
 		key, err := common.VolumeIDToKey(pv.Spec.CSI.VolumeHandle)

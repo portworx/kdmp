@@ -1029,6 +1029,8 @@ github.com/libopenstorage/autopilot-api v0.6.1-0.20210128210103-5fbb67948648/go.
 github.com/libopenstorage/autopilot-api v1.3.0/go.mod h1:6JLrPbR3ZJQFbUY/+QJMl/aF00YdIrLf8/GWAplgvJs=
 github.com/libopenstorage/cloudops v0.0.0-20190815012442-6e0d676b6c3e/go.mod h1:quSDXGC3Fhc+pBwMRIi1Gk+kaSfBDZo5rRsftapTzGE=
 github.com/libopenstorage/cloudops v0.0.0-20200604165016-9cc0977d745e/go.mod h1:5Qie78eVLLXqLkLCq1+0HyJzjpdRCHyeg9LWlU0WPfU=
+github.com/libopenstorage/external-storage v0.20.4-openstorage-rc10 h1:q21CLGSi9DhNBBuJuitquA/T6FwLV3KNZxaJpxQbOLc=
+github.com/libopenstorage/external-storage v0.20.4-openstorage-rc10/go.mod h1:nffpoeodwwp+wwngmBGbLBCd7TZ9GxHLtxKoaLRW6K4=
 github.com/libopenstorage/external-storage v0.20.4-openstorage-rc6 h1:qcXINczm1tOTnDC682SThzcv/L7IHGRSJ1zgh9nZzO0=
 github.com/libopenstorage/external-storage v0.20.4-openstorage-rc6/go.mod h1:nffpoeodwwp+wwngmBGbLBCd7TZ9GxHLtxKoaLRW6K4=
 github.com/libopenstorage/external-storage v5.3.0-alpha.1.0.20200130041458-d2b33d4448ea+incompatible/go.mod h1:H0Gzy0h36rbJPxu3lKdrIPw1h0k0c4YFtTGGlBEBPc8=
@@ -1080,6 +1082,8 @@ github.com/libopenstorage/stork v1.4.1-0.20220902111346-9dbf76d2db2c h1:tlVWiquC
 github.com/libopenstorage/stork v1.4.1-0.20220902111346-9dbf76d2db2c/go.mod h1:KNG/pkhMCdKXXFr0nKtYybWCx2ggLCoi+I7Onylwl64=
 github.com/libopenstorage/stork v1.4.1-0.20221020163443-24401306f270 h1:ll1nX2lVUQFr8w57/goQy9m11lO7C1nKUMngjZ7qFUU=
 github.com/libopenstorage/stork v1.4.1-0.20221020163443-24401306f270/go.mod h1:kIZUDvhfMY3AfYntKBbr2wQOQZW0Wvu9p4VU/TKU9XE=
+github.com/libopenstorage/stork v1.4.1-0.20221102072712-38baa0be1f15 h1:Ya0UQcoFdlgmrq6AvmvIHc8dlkraE63XgkKIACdBugY=
+github.com/libopenstorage/stork v1.4.1-0.20221102072712-38baa0be1f15/go.mod h1:HG3VNip0KC5xpkjKAwCUdJw7ldC59DMuUPYFxrvr3ak=
 github.com/libopenstorage/systemutils v0.0.0-20160208220149-44ac83be3ce1/go.mod h1:xwNGC7xiz/BQ/wbMkvHujL8Gjgseg+x41xMek7sKRRQ=
 github.com/liggitt/tabwriter v0.0.0-20181228230101-89fcab3d43de h1:9TO3cAIGXtEhnIaL+V+BEER86oLrvS+kWobKpbJuye0=
 github.com/liggitt/tabwriter v0.0.0-20181228230101-89fcab3d43de/go.mod h1:zAbeS9B/r2mtpb6U+EI2rYA5OAXxsYw6wTamcNW+zcE=
@@ -1352,6 +1356,7 @@ github.com/portworx/kdmp v0.4.1-0.20220710173715-5d42efc7d149/go.mod h1:nb5AupP/
 github.com/portworx/kdmp v0.4.1-0.20220902105026-dc14791e1508/go.mod h1:sTO9LkPkExEVE6BqowIzkrQsyBtGdaC4Vh1AcKQ4xZA=
 github.com/portworx/kdmp v0.4.1-0.20220905153748-e0bb69e59f38/go.mod h1:NI2UgLITtggRvvaRA7lE4+Np4htDp+06Jf1LWksKyGA=
 github.com/portworx/kdmp v0.4.1-0.20221006022703-ed9604037765/go.mod h1:l9qIpk6irCHxiyup3meoM9wjnn1eRKtEdZw9bIVoY+4=
+github.com/portworx/kdmp v0.4.1-0.20221020172845-7898dec64114/go.mod h1:jQ1l8qVPYLAzztvxJ3scbFW9XGFkQgpsKfsABqEtnwY=
 github.com/portworx/kvdb v0.0.0-20190105022415-cccaa09abfc9/go.mod h1:Q8YyrNDvPp3DVF96BDcQuaC7fAYUCuUX+l58S7OnD2M=
 github.com/portworx/kvdb v0.0.0-20191223203141-f42097b1fcd8/go.mod h1:Q8YyrNDvPp3DVF96BDcQuaC7fAYUCuUX+l58S7OnD2M=
 github.com/portworx/kvdb v0.0.0-20200311180812-b2c72382d652/go.mod h1:Q8YyrNDvPp3DVF96BDcQuaC7fAYUCuUX+l58S7OnD2M=
@@ -2270,6 +2275,8 @@ gopkg.in/yaml.v3 v3.0.0-20200313102051-9f266ea9e77c/go.mod h1:K4uyk7z7BCEPqu6E+C
 gopkg.in/yaml.v3 v3.0.0-20200615113413-eeeca48fe776/go.mod h1:K4uyk7z7BCEPqu6E+C64Yfv1cQ7kz7rIZviUmN+EgEM=
 gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b h1:h8qDotaEPuJATrMmW04NCwg7v22aHH28wwpauUhK9Oo=
 gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b/go.mod h1:K4uyk7z7BCEPqu6E+C64Yfv1cQ7kz7rIZviUmN+EgEM=
+gopkg.in/yaml.v3 v3.0.1 h1:fxVm/GzAzEWqLHuvctI91KS9hhNmmWOoWu0XTYJS7CA=
+gopkg.in/yaml.v3 v3.0.1/go.mod h1:K4uyk7z7BCEPqu6E+C64Yfv1cQ7kz7rIZviUmN+EgEM=
 gotest.tools v2.2.0+incompatible h1:VsBPFP1AI068pPrMxtb/S8Zkgf9xEmTLJjfM+P5UIEo=
 gotest.tools v2.2.0+incompatible/go.mod h1:DsYFclhRJ6vuDpmuTbkuFWG+y2sxOXAzmJt81HFBacw=
 gotest.tools/v3 v3.0.2/go.mod h1:3SzNCllyD9/Y+b5r9JIKQ474KzkZyqLqEfYqMsX94Bk=
@@ -2306,6 +2313,8 @@ k8s.io/component-base v0.21.4 h1:Bc0AttSyhJFVXEIHz+VX+D11j/5z7SPPhl6whiXaRzs=
 k8s.io/component-base v0.21.4/go.mod h1:ZKG0eHVX+tUDcaoIGpU3Vtk4TIjMddN9uhEWDmW6Nyg=
 k8s.io/component-helpers v0.21.4 h1:Q6L3sQ+L5uaaUcsJkhlzU5UchcIYBZ56Y2Bq5k4qOtk=
 k8s.io/component-helpers v0.21.4/go.mod h1:/5TBNWmxaAymZweO1JWv3Pt5rcYJV1LbWWY0x1rDdVU=
+k8s.io/component-helpers v0.24.0 h1:hZIHGfdd55thhqd9oxjDTw68OAPauDMJ+8hC69aNw1I=
+k8s.io/component-helpers v0.24.0/go.mod h1:Q2SlLm4h6g6lPTC9GMMfzdywfLSvJT2f1hOnnjaWD8c=
 k8s.io/controller-manager v0.21.4/go.mod h1:a/iL7W19zkyirHDaupk9cyC11nejVznGwZI6I8tbyQY=
 k8s.io/cri-api v0.21.5-rc.0/go.mod h1:ukzeKnOkrG9/+ghKZA57WeZbQfRtqlGLF5GcF3RtHZ8=
 k8s.io/csi-translation-lib v0.21.4/go.mod h1:WtxJW4/3XGhllbRCO4SRkL/MyLhjaRsL6Ds+q0pDHTg=
@@ -2360,6 +2369,8 @@ k8s.io/utils v0.0.0-20201110183641-67b214c5f920/go.mod h1:jPW/WVKK9YHAvNhRxK0md/
 k8s.io/utils v0.0.0-20210111153108-fddb29f9d009/go.mod h1:jPW/WVKK9YHAvNhRxK0md/EJ228hCsBRufyofKtW8HA=
 k8s.io/utils v0.0.0-20210527160623-6fdb442a123b h1:MSqsVQ3pZvPGTqCjptfimO2WjG7A9un2zcpiHkA6M/s=
 k8s.io/utils v0.0.0-20210527160623-6fdb442a123b/go.mod h1:jPW/WVKK9YHAvNhRxK0md/EJ228hCsBRufyofKtW8HA=
+k8s.io/utils v0.0.0-20220210201930-3a6ce19ff2f9 h1:HNSDgDCrr/6Ly3WEGKZftiE7IY19Vz2GdbOCyI4qqhc=
+k8s.io/utils v0.0.0-20220210201930-3a6ce19ff2f9/go.mod h1:jPW/WVKK9YHAvNhRxK0md/EJ228hCsBRufyofKtW8HA=
 knative.dev/pkg v0.0.0-20191101194912-56c2594e4f11/go.mod h1:pgODObA1dTyhNoFxPZTTjNWfx6F0aKsKzn+vaT9XO/Q=
 layeh.com/radius v0.0.0-20190322222518-890bc1058917/go.mod h1:fywZKyu//X7iRzaxLgPWsvc0L26IUpVvE/aeIL2JtIQ=
 modernc.org/cc v1.0.0/go.mod h1:1Sk4//wdnYJiUIxnW8ddKpaOJCF37yAdqYnkxUpaYxw=

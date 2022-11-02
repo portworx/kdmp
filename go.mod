@@ -9,9 +9,9 @@ require (
 	github.com/kubernetes-csi/external-snapshotter/client/v4 v4.0.0
 	github.com/kubernetes-incubator/external-storage v0.20.4-openstorage-rc7
 	github.com/libopenstorage/openstorage v9.4.20+incompatible // indirect
-	github.com/libopenstorage/stork v1.4.1-0.20221020163443-24401306f270
+	github.com/libopenstorage/stork v1.4.1-0.20221102072712-38baa0be1f15
 	github.com/portworx/pxc v0.33.0
-	github.com/portworx/sched-ops v1.20.4-rc1.0.20220915143205-3fe6e54a2a4d
+	github.com/portworx/sched-ops v1.20.4-rc1.0.20221102055014-b3a55a3df5c8
 	github.com/sirupsen/logrus v1.8.1
 	github.com/spf13/cobra v1.1.3
 	github.com/spf13/pflag v1.0.5
@@ -19,23 +19,23 @@ require (
 	github.com/urfave/cli v1.22.2
 	gocloud.dev v0.20.0
 	k8s.io/api v0.24.0
-	k8s.io/apiextensions-apiserver v0.21.4
+	k8s.io/apiextensions-apiserver v0.21.5
 	k8s.io/apimachinery v0.24.3
-	k8s.io/cli-runtime v0.21.4
+	k8s.io/cli-runtime v0.21.5
 	k8s.io/client-go v12.0.0+incompatible
 	k8s.io/code-generator v0.22.1
-	k8s.io/component-helpers v0.21.4
-	k8s.io/kubectl v0.21.4
-	k8s.io/utils v0.0.0-20210527160623-6fdb442a123b
-	sigs.k8s.io/controller-runtime v0.9.0
+	k8s.io/component-helpers v0.24.0
+	k8s.io/kubectl v0.21.5
+	k8s.io/utils v0.0.0-20220210201930-3a6ce19ff2f9
+	sigs.k8s.io/controller-runtime v0.9.7
 )
 
 replace (
 	github.com/go-logr/logr => github.com/go-logr/logr v0.4.0
 	github.com/googleapis/gnostic => github.com/googleapis/gnostic v0.4.1
 	github.com/kubernetes-csi/external-snapshotter/v2 => github.com/kubernetes-csi/external-snapshotter/v2 v2.1.1
-	github.com/kubernetes-incubator/external-storage => github.com/libopenstorage/external-storage v0.20.4-openstorage-rc6
-	github.com/kubernetes-incubator/external-storage v0.0.0-00010101000000-000000000000 => github.com/libopenstorage/external-storage v5.3.0-alpha.1.0.20200130041458-d2b33d4448ea+incompatible
+	github.com/kubernetes-incubator/external-storage => github.com/libopenstorage/external-storage v0.20.4-openstorage-rc10
+	github.com/kubernetes-incubator/external-storage v0.20.4-openstorage-rc10 => github.com/libopenstorage/external-storage v0.20.4-openstorage-rc10
 	github.com/libopenstorage/openstorage => github.com/libopenstorage/openstorage v1.0.1-0.20220804223926-812cb10d08c4
 	github.com/portworx/sched-ops => github.com/portworx/sched-ops v1.20.4-rc1.0.20220915143205-3fe6e54a2a4d
 	k8s.io/api => k8s.io/api v0.21.4
@@ -48,7 +48,7 @@ replace (
 	k8s.io/cluster-bootstrap => k8s.io/cluster-bootstrap v0.21.4
 	k8s.io/code-generator => k8s.io/code-generator v0.21.5-rc.0
 	k8s.io/component-base => k8s.io/component-base v0.21.4
-	k8s.io/component-helpers => k8s.io/component-helpers v0.21.4
+	k8s.io/component-helpers => k8s.io/component-helpers v0.24.0
 	k8s.io/controller-manager => k8s.io/controller-manager v0.21.4
 	k8s.io/cri-api => k8s.io/cri-api v0.21.5-rc.0
 	k8s.io/csi-translation-lib => k8s.io/csi-translation-lib v0.21.4

@@ -166,17 +166,24 @@ const (
 	noToken = "notoken"
 	// templatizedNamespace is the CSI templatized parameter for namespace
 	templatizedNamespace = "${pvc.namespace}"
-	proxyEndpoint        = "proxy_endpoint"
-	proxyPath            = "proxy_nfs_exportpath"
-	pureBackendParam     = "backend"
-	pureFileParam        = "pure_file"
-	pureBlockParam       = "pure_block"
+	// templatizedName is the CSI templatized parameter for name
+	templatizedName  = "${pvc.name}"
+	proxyEndpoint    = "proxy_endpoint"
+	proxyPath        = "proxy_nfs_exportpath"
+	pureBackendParam = "backend"
+	pureFileParam    = "pure_file"
+	pureBlockParam   = "pure_block"
 
 	statfsSOName              = "px_statfs.so"
 	statfsSODirInStork        = "/"
 	statfsSODirInVirtLauncher = "/etc"
 	statfsConfigMapName       = "px-statfs"
 	statfsVolName             = "px-statfs"
+
+	nodePublishSecretName           = "csi.storage.k8s.io/node-publish-secret-name"
+	controllerExpandSecretName      = "csi.storage.k8s.io/controller-expand-secret-name"
+	nodePublishSecretNamespace      = "csi.storage.k8s.io/node-publish-secret-namespace"
+	controllerExpandSecretNamespace = "csi.storage.k8s.io/controller-expand-secret-namespace"
 )
 
 type cloudSnapStatus struct {
@@ -383,9 +390,9 @@ func (p *portworx) initPortworxClients() error {
 	return err
 }
 
-// 	tokenGenerator generates authorization token for system.admin
-//	when shared secret is not configured authz token is empty string
-//	this let Openstorage API clients be bootstrapped with no authorization (by accepting empty token)
+// tokenGenerator generates authorization token for system.admin
+// when shared secret is not configured authz token is empty string
+// this let Openstorage API clients be bootstrapped with no authorization (by accepting empty token)
 func (p *portworx) tokenGenerator() (string, error) {
 	if len(p.jwtSharedSecret) == 0 {
 		return "", nil
@@ -1986,9 +1993,31 @@ func (p *portworx) DescribeSnapshot(snapshotData *crdv1.VolumeSnapshotData) (*[]
 	return &snapConditions, true, err
 }
 
-// TODO: Implement FindSnapshot
+// FindSnapshot return snapshotdata source for created portworx snapshot
+// Note: we wait for underlying driver snapshot creation in SnapshotCreate() only,
+// This will be called by snapshotter every time new snapshot is created
 func (p *portworx) FindSnapshot(tags *map[string]string) (*crdv1.VolumeSnapshotDataSource, *[]crdv1.VolumeSnapshotCondition, error) {
-	return nil, nil, &errors.ErrNotImplemented{}
+	if tags == nil || len(*tags) == 0 {
+		return nil, nil, fmt.Errorf("empty tags received for snapshots")
+	}
+	name := (*tags)[snapshotter.CloudSnapshotCreatedForVolumeSnapshotNameTag]
+	namespace := (*tags)[snapshotter.CloudSnapshotCreatedForVolumeSnapshotNamespaceTag]
+	logrus.Infof("Find snapshotdata for snapshot: %s/%s", namespace, name)
+	if name == "" || namespace == "" {
+		return nil, nil, fmt.Errorf("empty snapshot metadata %s/%s", namespace, name)
+	}
+	snap, err := k8sextops.Instance().GetSnapshot(name, namespace)
+	if err != nil {
+		return nil, nil, fmt.Errorf("unable to retrieve snapshot %s/%s, err: %v", namespace, name, err)
+	}
+	snapData, err := k8sextops.Instance().GetSnapshotData(snap.Spec.SnapshotDataName)
+	if err != nil {
+		// this means that snapshotdata object by external snapshotter is not created
+		// lets return nil so that reconciler call findsnapshot() again
+		return nil, nil, fmt.Errorf("unable to retrieve snapshotdata object %s/%s, err: %v", namespace, name, err)
+	}
+	logrus.Debugf("Found snapshotdata for snapshot: %s/%s", namespace, name)
+	return &snapData.Spec.VolumeSnapshotDataSource, &snap.Status.Conditions, nil
 }
 
 func (p *portworx) GetSnapshotType(snap *crdv1.VolumeSnapshot) (string, error) {
@@ -2590,7 +2619,75 @@ func (p *portworx) CancelMigration(migration *storkapi.Migration) error {
 func (p *portworx) UpdateMigratedPersistentVolumeSpec(
 	pv *v1.PersistentVolume,
 	vInfo *storkapi.ApplicationRestoreVolumeInfo,
+	namespaceMapping map[string]string,
 ) (*v1.PersistentVolume, error) {
+	// Get the pv storageclass and get the provision detail and decide on csi section.
+	if len(pv.Spec.StorageClassName) != 0 {
+		sc, err := storage.Instance().GetStorageClass(pv.Spec.StorageClassName)
+		if err != nil {
+			return nil, fmt.Errorf("failed in getting the storage class [%v]: %v", pv.Spec.StorageClassName, err)
+		}
+		if isCsiProvisioner(sc.Provisioner) {
+			// add csi section in the pv spec
+			if pv.Spec.CSI == nil {
+				pv.Spec.CSI = &v1.CSIPersistentVolumeSource{}
+			}
+			// get the destinationNamespace
+			var dstNamespace string
+			var exists bool
+			if dstNamespace, exists = namespaceMapping[vInfo.SourceNamespace]; !exists {
+				dstNamespace = vInfo.SourceNamespace
+			}
+			// Update the controller expand secret
+			if val, ok := sc.Parameters[controllerExpandSecretName]; ok {
+				if pv.Spec.CSI.ControllerExpandSecretRef == nil {
+					pv.Spec.CSI.ControllerExpandSecretRef = &v1.SecretReference{}
+				}
+				if val == templatizedName {
+					pv.Spec.CSI.ControllerExpandSecretRef.Name = vInfo.PersistentVolumeClaim
+				} else {
+					pv.Spec.CSI.ControllerExpandSecretRef.Name = val
+				}
+			}
+			if val, ok := sc.Parameters[controllerExpandSecretNamespace]; ok {
+				if pv.Spec.CSI.ControllerExpandSecretRef == nil {
+					pv.Spec.CSI.ControllerExpandSecretRef = &v1.SecretReference{}
+				}
+				if val == templatizedNamespace {
+					pv.Spec.CSI.ControllerExpandSecretRef.Namespace = dstNamespace
+				} else {
+					pv.Spec.CSI.ControllerExpandSecretRef.Namespace = val
+				}
+			}
+
+			// Update the node publish secret
+			if val, ok := sc.Parameters[nodePublishSecretName]; ok {
+				if pv.Spec.CSI.NodePublishSecretRef == nil {
+					pv.Spec.CSI.NodePublishSecretRef = &v1.SecretReference{}
+				}
+				if val == templatizedName {
+					pv.Spec.CSI.NodePublishSecretRef.Name = vInfo.PersistentVolumeClaim
+				} else {
+					pv.Spec.CSI.NodePublishSecretRef.Name = val
+				}
+			}
+			if val, ok := sc.Parameters[nodePublishSecretNamespace]; ok {
+				if pv.Spec.CSI.NodePublishSecretRef == nil {
+					pv.Spec.CSI.NodePublishSecretRef = &v1.SecretReference{}
+				}
+				if val == templatizedNamespace {
+					pv.Spec.CSI.NodePublishSecretRef.Namespace = dstNamespace
+				} else {
+					pv.Spec.CSI.NodePublishSecretRef.Namespace = val
+				}
+			}
+
+			// Update driver (provisioner) name
+			pv.Spec.CSI.Driver = sc.Provisioner
+			// In the case of csi, will set pv.Spec.portworxVolume to nil as we will have csi section now.
+			pv.Spec.PortworxVolume = nil
+		}
+	}
 
 	if pv.Spec.CSI != nil {
 		pv.Spec.CSI.VolumeHandle = pv.Name
