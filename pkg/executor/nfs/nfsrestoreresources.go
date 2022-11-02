@@ -24,7 +24,6 @@ import (
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
-	"k8s.io/apimachinery/pkg/api/errors"
 	k8s_errors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -166,7 +165,7 @@ func downloadCRD(
 	for _, crd := range crds {
 		crd.ResourceVersion = ""
 		regCrd[crd.GetName()] = false
-		if _, err := client.ApiextensionsV1beta1().CustomResourceDefinitions().Create(context.TODO(), crd, metav1.CreateOptions{}); err != nil && !errors.IsAlreadyExists(err) {
+		if _, err := client.ApiextensionsV1beta1().CustomResourceDefinitions().Create(context.TODO(), crd, metav1.CreateOptions{}); err != nil && !k8s_errors.IsAlreadyExists(err) {
 			regCrd[crd.GetName()] = true
 			logrus.Warnf("error registering crds v1beta1 %v,%v", crd.GetName(), err)
 			continue
@@ -183,7 +182,7 @@ func downloadCRD(
 			var updatedVersions []apiextensionsv1.CustomResourceDefinitionVersion
 			// try to apply as v1 crd
 			var err error
-			if _, err = client.ApiextensionsV1().CustomResourceDefinitions().Create(context.TODO(), crd, metav1.CreateOptions{}); err == nil || errors.IsAlreadyExists(err) {
+			if _, err = client.ApiextensionsV1().CustomResourceDefinitions().Create(context.TODO(), crd, metav1.CreateOptions{}); err == nil || k8s_errors.IsAlreadyExists(err) {
 				logrus.Infof("registered v1 crds %v,", crd.GetName())
 				continue
 			}
@@ -203,7 +202,7 @@ func downloadCRD(
 			}
 			crd.Spec.Versions = updatedVersions
 
-			if _, err := client.ApiextensionsV1().CustomResourceDefinitions().Create(context.TODO(), crd, metav1.CreateOptions{}); err != nil && !errors.IsAlreadyExists(err) {
+			if _, err := client.ApiextensionsV1().CustomResourceDefinitions().Create(context.TODO(), crd, metav1.CreateOptions{}); err != nil && !k8s_errors.IsAlreadyExists(err) {
 				logrus.Warnf("error registering crdsv1 %v,%v", crd.GetName(), err)
 				continue
 			}
@@ -567,7 +566,7 @@ func applyResources(
 		err = resourceCollector.ApplyResource(
 			dynamicInterface,
 			o)
-		if err != nil && errors.IsAlreadyExists(err) {
+		if err != nil && k8s_errors.IsAlreadyExists(err) {
 			switch restore.Spec.ReplacePolicy {
 			case storkapi.ApplicationRestoreReplacePolicyDelete:
 				log.ApplicationRestoreLog(restore).Errorf("Error deleting %v %v during restore: %v", objectType.GetKind(), metadata.GetName(), err)
