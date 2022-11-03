@@ -7,25 +7,25 @@ require (
 	github.com/hashicorp/go-version v1.2.1
 	github.com/kubernetes-csi/external-snapshotter/client/v4 v4.0.0
 	github.com/kubernetes-incubator/external-storage v0.20.4-openstorage-rc7
-	github.com/libopenstorage/stork v1.4.1-0.20220414104250-3c18fd21ed95
+	github.com/libopenstorage/stork v1.4.1-0.20221103082056-65abc8cc4e80
 	github.com/portworx/pxc v0.33.0
 	github.com/portworx/sched-ops v1.20.4-rc1.0.20220401024625-dbc61a336f65
 	github.com/sirupsen/logrus v1.8.1
 	github.com/spf13/cobra v1.1.3
 	github.com/spf13/pflag v1.0.5
-	github.com/stretchr/testify v1.7.0
+	github.com/stretchr/testify v1.7.2-0.20220317124727-77977386932a
 	github.com/urfave/cli v1.22.2
 	gocloud.dev v0.20.0
-	k8s.io/api v0.21.4
-	k8s.io/apiextensions-apiserver v0.21.4
-	k8s.io/apimachinery v0.21.4
-	k8s.io/cli-runtime v0.21.4
+	k8s.io/api v0.24.0
+	k8s.io/apiextensions-apiserver v0.21.5
+	k8s.io/apimachinery v0.24.3
+	k8s.io/cli-runtime v0.21.5
 	k8s.io/client-go v12.0.0+incompatible
-	k8s.io/code-generator v0.21.4
-	k8s.io/component-helpers v0.21.4
-	k8s.io/kubectl v0.21.4
+	k8s.io/code-generator v0.21.5
+	k8s.io/component-helpers v0.24.0
+	k8s.io/kubectl v0.21.5
 	k8s.io/utils v0.0.0-20210527160623-6fdb442a123b
-	sigs.k8s.io/controller-runtime v0.9.0
+	sigs.k8s.io/controller-runtime v0.9.7
 )
 
 replace (
