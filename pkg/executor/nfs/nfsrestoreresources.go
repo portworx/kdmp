@@ -58,6 +58,17 @@ func restoreAndApplyResources(
 
 	err := createNamespacesFromMapping(applicationCRName, restoreNamespace)
 	if err != nil {
+		//update resourcebackup CR with status and reason
+		logrus.Errorf("restore resources for [%v/%v] failed with error: %v", rbCrNamespace, rbCrName, err.Error())
+		st := kdmpapi.ResourceBackupProgressStatus{
+			Status: kdmpapi.ResourceBackupStatusFailed,
+			Reason: err.Error(),
+		}
+
+		err = executor.UpdateResourceBackupStatus(st, rbCrName, rbCrNamespace, nil)
+		if err != nil {
+			logrus.Errorf("failed to update resorucebackup[%v/%v] status after hitting error in create namespace : %v", rbCrNamespace, rbCrName, err)
+		}
 		return err
 	}
 	err = restoreResources(applicationCRName, restoreNamespace, rbCrName, rbCrNamespace)
@@ -596,6 +607,14 @@ func applyResources(
 				return err
 			}
 		}
+	}
+	rb.Status.Reason = "upload resource Successfully"
+	rb.Status.Status = kdmpapi.ResourceBackupStatusSuccessful
+	_, err = kdmpschedops.Instance().UpdateResourceBackup(rb)
+	if err != nil {
+		errMsg := fmt.Sprintf("applyResources: error updating ResourceBackup CR[%v/%v]: %v", rb.Namespace, rb.Name, err)
+		logrus.Infof("%v", errMsg)
+		return fmt.Errorf(errMsg)
 	}
 	return nil
 }
