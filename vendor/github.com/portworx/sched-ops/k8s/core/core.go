@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/portworx/sched-ops/k8s/common"
 	"github.com/portworx/sched-ops/task"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
@@ -23,6 +24,7 @@ import (
 const (
 	masterLabelKey           = "node-role.kubernetes.io/master"
 	controlplaneLabelKey     = "node-role.kubernetes.io/controlplane"
+	controlDashPlaneLabelKey = "node-role.kubernetes.io/control-plane"
 	pvcStorageProvisionerKey = "volume.beta.kubernetes.io/storage-provisioner"
 	labelUpdateMaxRetries    = 5
 )
@@ -48,6 +50,7 @@ type Ops interface {
 	ServiceOps
 	ServiceAccountOps
 	LimitRangeOps
+	NetworkPolicyOps
 
 	// SetConfig sets the config and resets the client
 	SetConfig(config *rest.Config)
@@ -202,7 +205,10 @@ func (c *Client) loadClient() error {
 	}
 
 	var err error
-
+	err = common.SetRateLimiter(c.config)
+	if err != nil {
+		return err
+	}
 	c.kubernetes, err = kubernetes.NewForConfig(c.config)
 	if err != nil {
 		return err
