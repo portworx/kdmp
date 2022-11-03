@@ -13,6 +13,7 @@ import (
 
 var (
 	restoreNamespace string
+	appRestoreCR     string
 )
 
 func newRestoreCommand() *cobra.Command {
@@ -32,18 +33,24 @@ func newRestoreCommand() *cobra.Command {
 				util.CheckErr(fmt.Errorf("target-path argument is required for kopia restores"))
 				return
 			}
-			executor.HandleErr(runRestore(snapshotID, targetPath))
+			executor.HandleErr(runRestore(snapshotID, targetPath, appRestoreCR))
 		},
 	}
 	restoreCommand.Flags().StringVarP(&restoreNamespace, "restore-namespace", "", "", "Namespace for restore command")
 	restoreCommand.Flags().StringVar(&targetPath, "target-path", "", "Destination path for kopia restore")
 	restoreCommand.Flags().StringVar(&snapshotID, "snapshot-id", "", "Snapshot id of the restore")
+	restoreCommand.Flags().StringVar(&appRestoreCR, "app-restore-cr", "", "ApplicationRestore CR name")
+
 	return restoreCommand
 }
 
 // VolumeBackup CR are present in the same namespace as the restore PVC
 // be restored namespace. Stork would take care of creating it
-func runRestore(snapshotID, targetPath string) error {
+func runRestore(
+	snapshotID string,
+	targetPath string,
+	appRestoreCR string,
+) error {
 	logrus.Infof("Restore started from snapshotID: %s", snapshotID)
 	// Parse using the mounted secrets
 	fn := "runRestore"
