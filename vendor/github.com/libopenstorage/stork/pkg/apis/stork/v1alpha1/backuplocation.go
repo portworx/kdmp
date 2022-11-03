@@ -35,14 +35,18 @@ type BackupLocation struct {
 type BackupLocationItem struct {
 	Type BackupLocationType `json:"type"`
 	// Path is either the bucket or any other path for the backup location
-	Path               string        `json:"path"`
+	Path string `json:"path"`
+	// EncryptionKey is deprecated. Instead use EncryptionV2Key field to pass the encryption key.
 	EncryptionKey      string        `json:"encryptionKey"`
 	S3Config           *S3Config     `json:"s3Config,omitempty"`
 	AzureConfig        *AzureConfig  `json:"azureConfig,omitempty"`
 	GoogleConfig       *GoogleConfig `json:"googleConfig,omitempty"`
+	NfsConfig          *NfsConfig    `json:"nfsConfig,omitempty"`
 	SecretConfig       string        `json:"secretConfig"`
 	Sync               bool          `json:"sync"`
 	RepositoryPassword string        `json:"repositoryPassword"`
+	// EncryptionV2Key will be used to pass encryption key.
+	EncryptionV2Key string `json:"encryptionV2Key"`
 }
 
 // ClusterItem is the spec used to store a the credentials associated with the cluster
@@ -70,6 +74,8 @@ const (
 	BackupLocationAzure BackupLocationType = "azure"
 	// BackupLocationGoogle stores the backup in Google Cloud Storage
 	BackupLocationGoogle BackupLocationType = "google"
+	// BackupLocationNFS stores the backup in NFS backed Storage
+	BackupLocationNFS BackupLocationType = "nfs"
 )
 
 // ClusterType is the type of the cluster
@@ -99,6 +105,9 @@ type S3Config struct {
 	// The S3 Storage Class to use when uploading objects. Glacier storage
 	// classes are not supported
 	StorageClass string `json:"storageClass"`
+	// UseIam when set stork will use the instance IAM role associated with the nodes
+	// on which stork pods run
+	UseIam bool `json:"useIam"`
 }
 
 // AzureConfig specifies the config required to connect to Azure Blob Storage
@@ -115,6 +124,12 @@ type AzureConfig struct {
 type GoogleConfig struct {
 	ProjectID  string `json:"projectID"`
 	AccountKey string `json:"accountKey"`
+}
+
+type NfsConfig struct {
+	ServerAddr  string `json:"serverAddr"`
+	SubPath     string `json:"subPath"`
+	MountOption string `json:"mountOption"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -135,7 +150,7 @@ func (bl *BackupLocation) UpdateFromSecret(client kubernetes.Interface) error {
 			return fmt.Errorf("error getting secretConfig for backupLocation: %v", err)
 		}
 		if val, ok := secretConfig.Data["encryptionKey"]; ok && val != nil {
-			bl.Location.EncryptionKey = strings.TrimSuffix(string(val), "\n")
+			bl.Location.EncryptionV2Key = strings.TrimSuffix(string(val), "\n")
 		}
 		if val, ok := secretConfig.Data["path"]; ok && val != nil {
 			bl.Location.Path = strings.TrimSuffix(string(val), "\n")
@@ -148,6 +163,8 @@ func (bl *BackupLocation) UpdateFromSecret(client kubernetes.Interface) error {
 		return bl.getMergedAzureConfig(client)
 	case BackupLocationGoogle:
 		return bl.getMergedGoogleConfig(client)
+	case BackupLocationNFS:
+		return bl.getMergedNfsConfig(client)
 	default:
 		return fmt.Errorf("Invalid BackupLocation type %v", bl.Location.Type)
 	}
@@ -165,6 +182,28 @@ func (bl *BackupLocation) UpdateFromClusterSecret(client kubernetes.Interface) e
 		case AzureCluster:
 			return bl.getMergedAzureClusterCred(client)
 		default:
+		}
+	}
+	return nil
+}
+
+func (bl *BackupLocation) getMergedNfsConfig(client kubernetes.Interface) error {
+	if bl.Location.NfsConfig == nil {
+		bl.Location.NfsConfig = &NfsConfig{}
+	}
+	if bl.Location.SecretConfig != "" {
+		secretConfig, err := client.CoreV1().Secrets(bl.Namespace).Get(context.TODO(), bl.Location.SecretConfig, metav1.GetOptions{})
+		if err != nil {
+			return fmt.Errorf("error getting secretConfig for backupLocation: %v", err)
+		}
+		if val, ok := secretConfig.Data["serverAddr"]; ok && val != nil {
+			bl.Location.NfsConfig.ServerAddr = strings.TrimSuffix(string(val), "\n")
+		}
+		if val, ok := secretConfig.Data["subPath"]; ok && val != nil {
+			bl.Location.NfsConfig.SubPath = strings.TrimSuffix(string(val), "\n")
+		}
+		if val, ok := secretConfig.Data["mountOption"]; ok && val != nil {
+			bl.Location.NfsConfig.MountOption = strings.TrimSuffix(string(val), "\n")
 		}
 	}
 	return nil
