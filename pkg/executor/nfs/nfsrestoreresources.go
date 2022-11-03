@@ -629,12 +629,12 @@ func createNamespacesFromMapping(
 		log.ApplicationRestoreLog(restore).Errorf("Error getting backup: %v", err)
 		return err
 	}
-        return createNamespaces(backup, restore.Spec.BackupLocation, restore.Namespace, restore)
+	return createNamespaces(backup, restore.Spec.BackupLocation, restore.Namespace, restore)
 }
 
 func createNamespaces(backup *storkapi.ApplicationBackup,
 	backupLocation string,
-        backupLocationNamespace string,
+	backupLocationNamespace string,
 	restore *storkapi.ApplicationRestore) error {
 	var namespaces []*v1.Namespace
 	funct := "create namespaces"

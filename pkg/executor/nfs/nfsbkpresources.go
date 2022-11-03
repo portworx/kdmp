@@ -12,6 +12,8 @@ import (
 	stork_api "github.com/libopenstorage/stork/pkg/apis/stork/v1alpha1"
 	"github.com/libopenstorage/stork/pkg/crypto"
 	"github.com/libopenstorage/stork/pkg/resourcecollector"
+	"github.com/libopenstorage/stork/pkg/utils"
+	"github.com/libopenstorage/stork/pkg/version"
 	kdmpapi "github.com/portworx/kdmp/pkg/apis/kdmp/v1alpha1"
 	"github.com/portworx/kdmp/pkg/executor"
 	"github.com/portworx/sched-ops/k8s/apiextensions"
@@ -20,6 +22,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	v1 "k8s.io/api/core/v1"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	k8s_errors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -269,10 +272,76 @@ func uploadCRDResources(
 	ruleset.AddPlural("quota", "quotas")
 	ruleset.AddPlural("prometheus", "prometheuses")
 	ruleset.AddPlural("mongodbcommunity", "mongodbcommunity")
+	v1CrdAPIReqrd, err := version.RequiresV1Registration()
+	if err != nil {
+		return err
+	}
+	if v1CrdAPIReqrd {
+		var crds []*apiextensionsv1.CustomResourceDefinition
+		crdsGroups := make(map[string]bool)
+		// First collect the group detail for the CRDs, which has CR
+		for _, crd := range crdList.Items {
+			for _, v := range crd.Resources {
+				if _, ok := resKinds[v.Kind]; !ok {
+					continue
+				}
+				crdsGroups[utils.GetTrimmedGroupName(v.Group)] = true
+			}
+
+		}
+		// pick up all the CRDs that belongs to the group in the crdsGroups map
+		for _, crd := range crdList.Items {
+			for _, v := range crd.Resources {
+				if _, ok := crdsGroups[utils.GetTrimmedGroupName(v.Group)]; !ok {
+					continue
+				}
+				crdName := ruleset.Pluralize(strings.ToLower(v.Kind)) + "." + v.Group
+				res, err := apiextensions.Instance().GetCRD(crdName, metav1.GetOptions{})
+				if err != nil {
+					if k8s_errors.IsNotFound(err) {
+						continue
+					}
+					logrus.Errorf("Unable to get custom resource definition for %s, err: %v", v.Kind, err)
+					return err
+				}
+				crds = append(crds, res)
+			}
+
+		}
+		jsonBytes, err := json.MarshalIndent(crds, "", " ")
+		if err != nil {
+			logrus.Errorf("%s err: %v", funct, err)
+			return err
+		}
+
+		encryptionKey, err := getEncryptionKey(bkpNamespace, backup)
+		if err != nil {
+			logrus.Errorf("%s err: %v", funct, err)
+			return err
+		}
+
+		err = uploadData(resourcePath, jsonBytes, crdFile, encryptionKey)
+		if err != nil {
+			logrus.Errorf("%s err: %v", funct, err)
+			return err
+		}
+		return nil
+	}
 	var crds []*apiextensionsv1beta1.CustomResourceDefinition
+	crdsGroups := make(map[string]bool)
+	// First collect the group detail for the CRDs, which has CR
 	for _, crd := range crdList.Items {
 		for _, v := range crd.Resources {
 			if _, ok := resKinds[v.Kind]; !ok {
+				continue
+			}
+			crdsGroups[utils.GetTrimmedGroupName(v.Group)] = true
+		}
+	}
+	// pick up all the CRDs that belongs to the group in the crdsGroups map
+	for _, crd := range crdList.Items {
+		for _, v := range crd.Resources {
+			if _, ok := crdsGroups[utils.GetTrimmedGroupName(v.Group)]; !ok {
 				continue
 			}
 			crdName := ruleset.Pluralize(strings.ToLower(v.Kind)) + "." + v.Group
@@ -281,6 +350,7 @@ func uploadCRDResources(
 				if k8s_errors.IsNotFound(err) {
 					continue
 				}
+				logrus.Errorf("Unable to get customresourcedefination for %s, err: %v", v.Kind, err)
 				return err
 			}
 			crds = append(crds, res)
