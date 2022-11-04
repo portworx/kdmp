@@ -322,7 +322,7 @@ func GetImageRegistryFromDeployment(name, namespace string) (string, string, err
 	return registry, "", nil
 }
 
-// GetExecutorImageAndSecret returns the image name and secret to to use in the job pod
+// GetExecutorImageAndSecret returns the image name and secret to use in the job pod
 func GetExecutorImageAndSecret(executorImageType, deploymentName, deploymentNs,
 	jobName string, jobOption drivers.JobOpts) (string, string, error) {
 	var imageRegistry, imageRegistrySecret string
@@ -757,7 +757,7 @@ func CreateNFSPvPvcForJob(jobName string, namespace string, o drivers.JobOpts) e
 	if err := CreateNfsPvc(nfsPvcName, nfsPvName, namespace); err != nil {
 		return err
 	}
-	logrus.Debugf("Created NFS PVC successfully %s", nfsPvcName)
+	logrus.Debugf("Created NFS PVC successfully %s/%s", namespace, nfsPvcName)
 	return nil
 }
 
@@ -777,7 +777,7 @@ func WaitForPVCBound(pvcName string, namespace string) (*corev1.PersistentVolume
 		}
 
 		if pvc.Status.Phase != corev1.ClaimBound {
-			errMsg = fmt.Sprintf("nfs pvc status: expected %s, got %s", corev1.ClaimBound, pvc.Status.Phase)
+			errMsg = fmt.Sprintf("nfs pvc status: expected %s, got %s for pvc %s/%s", corev1.ClaimBound, pvc.Status.Phase, namespace, pvcName)
 			logrus.Debugf("%v", errMsg)
 			return false, nil
 		}
