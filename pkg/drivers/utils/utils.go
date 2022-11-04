@@ -56,6 +56,11 @@ const (
 	volumeinitialDelay          = 2 * time.Second
 	volumeFactor                = 1.5
 	volumeSteps                 = 15
+	nfsVolumeSize               = "10Gi"
+	// ResourceUploadSuccessMsg - resource update success message
+	ResourceUploadSuccessMsg = "upload resource Successfully"
+	// PvcBoundSuccessMsg - pvc bound success message
+	PvcBoundSuccessMsg = "pvc bounded successfully"
 )
 
 var (
@@ -235,8 +240,8 @@ func ToNFSJobStatus(errMsg string, jobStatus batchv1.JobConditionType) *drivers.
 	// is successful
 	// TODO: Need to have better logical way to notify job completion, this
 	// hard coding of msg doesn't look good
-	if errMsg == "upload resource Successfully" ||
-		errMsg == "pvc bounded successfully" {
+	if errMsg == ResourceUploadSuccessMsg ||
+		errMsg == PvcBoundSuccessMsg {
 		return &drivers.JobStatus{
 			State:  drivers.JobStateCompleted,
 			Reason: errMsg,
@@ -814,7 +819,7 @@ func WaitForPVAvailable(pvName string) (*corev1.PersistentVolume, error) {
 	})
 
 	if wErr != nil {
-		logrus.Errorf("%v", wErr)
+		logrus.Errorf("%v:%v", wErr, errMsg)
 		return nil, fmt.Errorf("%s:%s", wErr, errMsg)
 	}
 	return pv, nil

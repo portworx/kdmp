@@ -23,8 +23,8 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 )
 
-// updateResourceExportFields when and update needs to be done to ResourceExport
-// user can choose which filed to be updated and pass the same to updateStatus()
+// updateResourceExportFields when an update needs to be done to ResourceExport
+// user can choose which field to be updated and pass the same to updateStatus()
 type updateResourceExportFields struct {
 	stage               kdmpapi.ResourceExportStage
 	status              kdmpapi.ResourceExportStatus
@@ -117,7 +117,6 @@ func (c *Controller) process(ctx context.Context, in *kdmpapi.ResourceExport) (b
 			return false, c.updateStatus(resourceExport, updateData)
 		}
 		// start data transfer
-
 		id, serr := startNfsResourceJob(
 			driver,
 			utils.KdmpConfigmapName,
@@ -169,8 +168,6 @@ func (c *Controller) process(ctx context.Context, in *kdmpapi.ResourceExport) (b
 			}
 			return true, c.updateStatus(resourceExport, updateData)
 		} else if progress.Status == batchv1.JobConditionType("") {
-			// TODO: We can avoid these update but this event will eventually catch up after
-			// resync time
 			updateData := updateResourceExportFields{
 				stage:  kdmpapi.ResourceExportStageInProgress,
 				status: kdmpapi.ResourceExportStatusInProgress,
@@ -225,7 +222,6 @@ func (c *Controller) process(ctx context.Context, in *kdmpapi.ResourceExport) (b
 
 func (c *Controller) cleanupResources(resourceExport *kdmpapi.ResourceExport) error {
 	// clean up resources
-	// Delete ResourceBackup CR
 	rbNamespace, rbName, err := utils.ParseJobID(resourceExport.Status.TransferID)
 	if err != nil {
 		errMsg := fmt.Sprintf("failed to parse job ID %v from ResourceeExport CR: %v: %v",
@@ -267,12 +263,11 @@ func (c *Controller) updateStatus(re *kdmpapi.ResourceExport, data updateResourc
 	var updErr error
 	t := func() (interface{}, bool, error) {
 		logrus.Infof("updateStatus data: %+v", data)
-		//logrus.Infof("re cr: %+v", re)
 		namespacedName := types.NamespacedName{}
 		namespacedName.Name = re.Name
 		namespacedName.Namespace = re.Namespace
 		err := c.client.Get(context.TODO(), namespacedName, re)
-		if err != nil && !k8sErrors.IsNotFound(err) {
+		if err != nil {
 			errMsg := fmt.Sprintf("failed in getting RE CR %v/%v: %v", re.Namespace, re.Name, err)
 			logrus.Infof("%v", errMsg)
 			return "", true, fmt.Errorf("%v", errMsg)

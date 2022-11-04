@@ -8,6 +8,7 @@ import (
 	storkapi "github.com/libopenstorage/stork/pkg/apis/stork/v1alpha1"
 	"github.com/libopenstorage/stork/pkg/log"
 	"github.com/portworx/kdmp/pkg/apis/kdmp/v1alpha1"
+	"github.com/portworx/kdmp/pkg/drivers/utils"
 	"github.com/portworx/kdmp/pkg/executor"
 	"github.com/portworx/sched-ops/k8s/core"
 	kdmpschedops "github.com/portworx/sched-ops/k8s/kdmp"
@@ -67,7 +68,6 @@ func convertAppBkpVolInfoToResourceVolInfo(
 ) (resVolInfo []*v1alpha1.ResourceBackupVolumeInfo) {
 	restoreVolumeInfos := make([]*v1alpha1.ResourceBackupVolumeInfo, 0)
 	for _, vol := range volInfo {
-		//restoreVolInfo := &storkapi.ApplicationRestoreVolumeInfo{}
 		resInfo := &v1alpha1.ResourceBackupVolumeInfo{}
 
 		resInfo.PersistentVolumeClaim = vol.PersistentVolumeClaim
@@ -438,7 +438,7 @@ func isPVCsBounded(
 			if isBounded {
 				// update the pvc resource status to successful
 				res.Status = v1alpha1.ResourceRestoreStatusSuccessful
-				res.Reason = "pvc bounded successfully"
+				res.Reason = utils.PvcBoundSuccessMsg
 				tResources = append(tResources, res)
 			}
 		}
@@ -453,7 +453,7 @@ func isPVCsBounded(
 	} else {
 		rb.Status.Resources = tResources
 		rb.Status.Status = v1alpha1.ResourceBackupStatusSuccessful
-		rb.Status.Reason = "pvc bounded successfully"
+		rb.Status.Reason = utils.PvcBoundSuccessMsg
 	}
 
 	rb1, err := kdmpschedops.Instance().UpdateResourceBackup(rb)

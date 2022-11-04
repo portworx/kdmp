@@ -14,6 +14,7 @@ import (
 	"github.com/libopenstorage/stork/pkg/crypto"
 	"github.com/libopenstorage/stork/pkg/resourcecollector"
 	kdmpapi "github.com/portworx/kdmp/pkg/apis/kdmp/v1alpha1"
+	kdmputils "github.com/portworx/kdmp/pkg/drivers/utils"
 	"github.com/portworx/kdmp/pkg/executor"
 	"github.com/portworx/sched-ops/k8s/apiextensions"
 	"github.com/portworx/sched-ops/k8s/core"
@@ -85,7 +86,7 @@ func uploadResources(
 	//update resourcebackup CR with status and reason
 	st := kdmpapi.ResourceBackupProgressStatus{
 		Status: kdmpapi.ResourceBackupStatusSuccessful,
-		Reason: "upload resource Successfully",
+		Reason: kdmputils.ResourceUploadSuccessMsg,
 	}
 	err = executor.UpdateResourceBackupStatus(st, rbCrName, rbCrNamespace, nil)
 	if err != nil {

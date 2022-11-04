@@ -14,6 +14,7 @@ import (
 	"github.com/libopenstorage/stork/pkg/k8sutils"
 	"github.com/libopenstorage/stork/pkg/log"
 	kdmpapi "github.com/portworx/kdmp/pkg/apis/kdmp/v1alpha1"
+	"github.com/portworx/kdmp/pkg/drivers/utils"
 	"github.com/portworx/kdmp/pkg/executor"
 	"github.com/portworx/sched-ops/k8s/core"
 	kdmpschedops "github.com/portworx/sched-ops/k8s/kdmp"
@@ -90,7 +91,7 @@ func restoreAndApplyResources(
 	//update resourcebackup CR with status and reason
 	st := kdmpapi.ResourceBackupProgressStatus{
 		Status: kdmpapi.ResourceBackupStatusSuccessful,
-		Reason: "upload resource Successfully",
+		Reason: utils.ResourceUploadSuccessMsg,
 	}
 	err = executor.UpdateResourceBackupStatus(st, rbCrName, rbCrNamespace, nil)
 	if err != nil {
@@ -608,7 +609,7 @@ func applyResources(
 			}
 		}
 	}
-	rb.Status.Reason = "upload resource Successfully"
+	rb.Status.Reason = utils.ResourceUploadSuccessMsg
 	rb.Status.Status = kdmpapi.ResourceBackupStatusSuccessful
 	_, err = kdmpschedops.Instance().UpdateResourceBackup(rb)
 	if err != nil {
