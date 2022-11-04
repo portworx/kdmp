@@ -323,7 +323,7 @@ func jobFor(
 			Name: utils.NfsVolumeName,
 			VolumeSource: corev1.VolumeSource{
 				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-					ClaimName: "pvc-" + jobName,
+					ClaimName: utils.GetPvcNameForJob(jobName),
 				},
 			},
 		}

@@ -238,11 +238,11 @@ func (c *Controller) cleanupResources(resourceExport *kdmpapi.ResourceExport) er
 	if err = batch.Instance().DeleteJob(resourceExport.Name, resourceExport.Namespace); err != nil && !k8sErrors.IsNotFound(err) {
 		return err
 	}
-	pvcName := "pvc-" + rbName
+	pvcName := utils.GetPvcNameForJob(rbName)
 	if err := core.Instance().DeletePersistentVolumeClaim(pvcName, rbNamespace); err != nil && !k8sErrors.IsNotFound(err) {
 		return fmt.Errorf("delete %s/%s pvc: %s", rbNamespace, pvcName, err)
 	}
-	pvName := "pv-" + rbName
+	pvName := utils.GetPvNameForJob(rbName)
 	if err := core.Instance().DeletePersistentVolume(pvName); err != nil && !k8sErrors.IsNotFound(err) {
 		return fmt.Errorf("delete %s pv: %s", pvName, err)
 	}
