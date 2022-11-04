@@ -808,9 +808,9 @@ func WaitForPVAvailable(pvName string) (*corev1.PersistentVolume, error) {
 		if err != nil {
 			return false, err
 		}
-
-		if pv.Status.Phase != corev1.VolumeAvailable {
-			errMsg = fmt.Sprintf("nfs pv status: expected %s, got %s", corev1.VolumeAvailable, pv.Status.Phase)
+		// If the pv is not Available state or not Bound state, wait for it.
+		if !(pv.Status.Phase == corev1.VolumeAvailable || pv.Status.Phase == corev1.VolumeBound) {
+			errMsg = fmt.Sprintf("nfs pv [%v] status: expected %s, got %s", pvName, corev1.VolumeAvailable, pv.Status.Phase)
 			logrus.Debugf("%v", errMsg)
 			return false, nil
 		}
