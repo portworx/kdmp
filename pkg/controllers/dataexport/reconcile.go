@@ -1339,12 +1339,12 @@ func (c *Controller) cleanUp(driver drivers.Interface, de *kdmpapi.DataExport) e
 		if err != nil {
 			return err
 		}
-		pvcName := "pvc-" + jobName
+		pvcName := utils.GetPvcNameForJob(jobName)
 		if err := core.Instance().DeletePersistentVolumeClaim(pvcName, namespace); err != nil && !k8sErrors.IsNotFound(err) {
 			return fmt.Errorf("delete %s/%s pvc: %s", namespace, pvcName, err)
 		}
 
-		pvName := "pv-" + jobName
+		pvName := utils.GetPvNameForJob(jobName)
 		if err := core.Instance().DeletePersistentVolume(pvName); err != nil && !k8sErrors.IsNotFound(err) {
 			return fmt.Errorf("delete %s pv: %s", pvName, err)
 		}

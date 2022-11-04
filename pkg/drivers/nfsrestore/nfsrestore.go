@@ -285,7 +285,7 @@ func jobForRestoreResource(
 			Name: utils.NfsVolumeName,
 			VolumeSource: corev1.VolumeSource{
 				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-					ClaimName: "pvc-" + jobOption.RestoreExportName,
+					ClaimName: utils.GetPvcNameForJob(jobOption.RestoreExportName),
 				},
 			},
 		}

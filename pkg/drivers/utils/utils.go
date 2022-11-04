@@ -56,6 +56,7 @@ const (
 	volumeinitialDelay          = 2 * time.Second
 	volumeFactor                = 1.5
 	volumeSteps                 = 15
+	nfsVolumeSize               = "10Gi"
 )
 
 var (
@@ -678,7 +679,7 @@ func CreateNfsPv(pvName string,
 				"ReadWriteMany",
 			},
 			Capacity: corev1.ResourceList{
-				corev1.ResourceName(corev1.ResourceStorage): resource.MustParse("3Mi"),
+				corev1.ResourceName(corev1.ResourceStorage): resource.MustParse(nfsVolumeSize),
 			},
 			PersistentVolumeSource: corev1.PersistentVolumeSource{
 				NFS: &corev1.NFSVolumeSource{
@@ -721,7 +722,7 @@ func CreateNfsPvc(pvcName string, pvName string, namespace string) error {
 			AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteMany},
 			Resources: corev1.ResourceRequirements{
 				Requests: corev1.ResourceList{
-					corev1.ResourceName(corev1.ResourceStorage): resource.MustParse("3Mi"),
+					corev1.ResourceName(corev1.ResourceStorage): resource.MustParse(nfsVolumeSize),
 				},
 			},
 			VolumeName: pvName,
@@ -747,13 +748,13 @@ func CreateNfsPvc(pvcName string, pvName string, namespace string) error {
 // CreateNFSPvPvcForJob - this function creates PV and PVC for NFS job.
 func CreateNFSPvPvcForJob(jobName string, namespace string, o drivers.JobOpts) error {
 	// create PV before creating job
-	nfsPvName := "pv-" + jobName
+	nfsPvName := GetPvNameForJob(jobName)
 	if err := CreateNfsPv(nfsPvName, o.NfsServer, o.NfsExportDir, o.NfsMountOption); err != nil {
 		return err
 	}
 	logrus.Debugf("Created NFS PV successfully %s", nfsPvName)
 	// create pvc before creating job
-	nfsPvcName := "pvc-" + jobName
+	nfsPvcName := GetPvcNameForJob(jobName)
 	if err := CreateNfsPvc(nfsPvcName, nfsPvName, namespace); err != nil {
 		return err
 	}
@@ -818,4 +819,14 @@ func WaitForPVAvailable(pvName string) (*corev1.PersistentVolume, error) {
 		return nil, fmt.Errorf("%s:%s", wErr, errMsg)
 	}
 	return pv, nil
+}
+
+//GetPvcNameForJob - returns the PVC name for a job
+func GetPvcNameForJob(jobName string) string {
+	return "pvc-" + jobName
+}
+
+//GetPvNameForJob - returns pv name for a job
+func GetPvNameForJob(jobName string) string {
+	return "pv-" + jobName
 }
