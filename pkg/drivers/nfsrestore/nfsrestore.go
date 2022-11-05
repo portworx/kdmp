@@ -209,9 +209,8 @@ func jobForRestoreResource(
 	labels := addJobLabels(jobOption.Labels)
 
 	nfsExecutorImage, _, err := utils.GetExecutorImageAndSecret(drivers.NfsExecutorImage,
-		// TODO: We need to make this a generic call and pass it from RE CR accordingly. Till that time we will use this variable name.
-		jobOption.KopiaImageExecutorSource,
-		jobOption.KopiaImageExecutorSourceNs,
+		jobOption.NfsImageExecutorSource,
+		jobOption.NfsImageExecutorSourceNs,
 		jobOption.JobName,
 		jobOption)
 	if err != nil {
