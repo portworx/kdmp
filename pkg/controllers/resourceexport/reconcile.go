@@ -263,12 +263,11 @@ func (c *Controller) updateStatus(re *kdmpapi.ResourceExport, data updateResourc
 	var updErr error
 	t := func() (interface{}, bool, error) {
 		logrus.Infof("updateStatus data: %+v", data)
-		//logrus.Infof("re cr: %+v", re)
 		namespacedName := types.NamespacedName{}
 		namespacedName.Name = re.Name
 		namespacedName.Namespace = re.Namespace
 		err := c.client.Get(context.TODO(), namespacedName, re)
-		if err != nil && !k8sErrors.IsNotFound(err) {
+		if err != nil {
 			errMsg := fmt.Sprintf("failed in getting RE CR %v/%v: %v", re.Namespace, re.Name, err)
 			logrus.Infof("%v", errMsg)
 			return "", true, fmt.Errorf("%v", errMsg)

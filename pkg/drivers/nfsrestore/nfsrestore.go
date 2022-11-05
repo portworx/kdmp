@@ -163,7 +163,7 @@ func addJobLabels(labels map[string]string) map[string]string {
 		labels = make(map[string]string)
 	}
 
-	labels[drivers.DriverNameLabel] = drivers.NFSBackup
+	labels[drivers.DriverNameLabel] = drivers.NFSRestore
 	return labels
 }
 

@@ -155,13 +155,16 @@ func SetupNFSServiceAccount(name, namespace string, role *rbacv1.ClusterRole) er
 	tokenName := sa.Secrets[0].Name
 	secretToken, err := coreops.Instance().GetSecret(tokenName, namespace)
 	if err != nil {
-		logrus.Infof("Returned sa-secret token name null")
-		return fmt.Errorf("failed in getting secretToken [%v] of service account [%v/%v]: %v", tokenName, name, namespace, err)
+		errMsg := fmt.Errorf("failed in getting secretToken [%v] of service account [%v/%v]: %v", tokenName, name, namespace, err)
+		logrus.Errorf("%v", errMsg)
+		return errMsg
 	}
 	secretToken.Annotations[SkipResourceAnnotation] = "true"
 	_, err = coreops.Instance().UpdateSecret(secretToken)
 	if err != nil {
-		return fmt.Errorf("failed in updating the secretToken [%v] of service account [%v/%v]: %v", tokenName, name, namespace, err)
+		errMsg := fmt.Errorf("failed in updating the secretToken [%v] of service account [%v/%v]: %v", tokenName, name, namespace, err)
+		logrus.Errorf("%v", errMsg)
+		return errMsg
 	}
 	return nil
 }

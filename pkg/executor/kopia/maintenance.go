@@ -145,7 +145,7 @@ func runMaintenance(maintenanceType string) error {
 		}
 		var kopiaFile string
 		for _, subDir := range listOfSubDirs {
-			kopiaFile = repoBaseDir + subDir + "/" + kopiaRepositoryFile
+			kopiaFile = filepath.Join(repoBaseDir, subDir, kopiaRepositoryFile)
 			_, err := os.Stat(kopiaFile)
 			if os.IsNotExist(err) {
 				continue
