@@ -8,8 +8,6 @@ import (
 )
 
 var (
-	//uploadBkpResources  string
-	//restoreBkpResources string
 	appRestoreCRName     string
 	appBackupCRName      string
 	restoreNamespace     string
@@ -26,10 +24,6 @@ func NewCommand() *cobra.Command {
 		Short: "a command executor for nfs target as support ",
 	}
 
-	// TODO: More flags to be added in later changes
-	//cmds.PersistentFlags().StringVar(&uploadBkpResources, "upload-backup-resource", "", "Option to upload backup resources")
-	//cmds.PersistentFlags().StringVar(&restoreBkpResources, "download-apply-resources", "", "Option to download the resources and apply the specs")
-	//cmds.PersistentFlags().StringVar(&restoreBkpResources, "restore-volume", "", "Option to restore volume content")
 	cmds.PersistentFlags().StringVarP(&restoreNamespace, "restore-namespace", "", "", "Namespace for restore CR")
 	cmds.PersistentFlags().StringVarP(&appRestoreCRName, "app-cr-name", "", "", "application restore CR name")
 	cmds.PersistentFlags().StringVarP(&rbCrName, "rb-cr-name", "", "", "Name for resourcebackup CR to update job status")

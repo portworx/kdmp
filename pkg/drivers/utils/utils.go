@@ -819,7 +819,7 @@ func WaitForPVAvailable(pvName string) (*corev1.PersistentVolume, error) {
 	})
 
 	if wErr != nil {
-		logrus.Errorf("%v", wErr)
+		logrus.Errorf("%v:%v", wErr, errMsg)
 		return nil, fmt.Errorf("%s:%s", wErr, errMsg)
 	}
 	return pv, nil

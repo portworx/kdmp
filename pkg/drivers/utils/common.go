@@ -131,25 +131,26 @@ func SetupNFSServiceAccount(name, namespace string, role *rbacv1.ClusterRole) er
 	if sa, err = coreops.Instance().CreateServiceAccount(serviceAccountFor(name, namespace)); err != nil && !errors.IsAlreadyExists(err) {
 		return fmt.Errorf("create %s/%s serviceaccount: %s", namespace, name, err)
 	}
+	var errMsg error
 	t := func() (interface{}, bool, error) {
 		sa, err = coreops.Instance().GetServiceAccount(name, namespace)
 		if err != nil {
-			errMsg := fmt.Sprintf("failed fetching sa [%v/%v]: %v", name, namespace, err)
+			errMsg = fmt.Errorf("failed fetching sa [%v/%v]: %v", name, namespace, err)
 			logrus.Errorf("%v", errMsg)
 			return "", true, fmt.Errorf("%v", errMsg)
 		}
 		if sa.Secrets == nil {
 			logrus.Infof("Returned sa-secret null")
-			errMsg := fmt.Sprintf("secret token is missing in sa [%v/%v]", name, namespace)
+			errMsg = fmt.Errorf("secret token is missing in sa [%v/%v]", name, namespace)
 			return "", true, fmt.Errorf("%v", errMsg)
 		}
 		return "", false, nil
 	}
 	if _, err := task.DoRetryWithTimeout(t, DefaultTimeout, ProgressCheckInterval); err != nil {
-		errMsg := fmt.Sprintf("max retries done, failed in fetching secret token of sa [%v/%v]: %v ", name, namespace, err)
-		logrus.Errorf("%v", errMsg)
+		eMsg := fmt.Errorf("max retries done, failed in fetching secret token of sa [%v/%v]: %v ", name, namespace, errMsg)
+		logrus.Errorf("%v", eMsg)
 		// Exhausted all retries
-		return err
+		return eMsg
 	}
 
 	tokenName := sa.Secrets[0].Name
