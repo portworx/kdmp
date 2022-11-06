@@ -44,6 +44,8 @@ type JobOpts struct {
 	JobConfigMapNs             string
 	KopiaImageExecutorSource   string
 	KopiaImageExecutorSourceNs string
+	NfsImageExecutorSource     string
+	NfsImageExecutorSourceNs   string
 	NodeAffinity               map[string]string
 	NfsServer                  string
 	NfsMountOption             string
@@ -124,6 +126,28 @@ func WithNfsSubPath(server string) JobOption {
 func WithNfsExportDir(exportDir string) JobOption {
 	return func(opts *JobOpts) error {
 		opts.NfsExportDir = strings.TrimSpace(exportDir)
+		return nil
+	}
+}
+
+// WithNfsImageExecutorSource is job parameter.
+func WithNfsImageExecutorSource(source string) JobOption {
+	return func(opts *JobOpts) error {
+		if strings.TrimSpace(source) == "" {
+			return fmt.Errorf("nfs image executor source should be set")
+		}
+		opts.NfsImageExecutorSource = strings.TrimSpace(source)
+		return nil
+	}
+}
+
+// WithNfsImageExecutorSourceNs is job parameter.
+func WithNfsImageExecutorSourceNs(namespace string) JobOption {
+	return func(opts *JobOpts) error {
+		if strings.TrimSpace(namespace) == "" {
+			return fmt.Errorf("nfs image executor source namespace should be set")
+		}
+		opts.NfsImageExecutorSourceNs = strings.TrimSpace(namespace)
 		return nil
 	}
 }

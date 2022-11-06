@@ -368,8 +368,8 @@ func startNfsResourceJob(
 		return drv.StartJob(
 			// TODO: below two calls need to be generalized and changed in all the startJob Calls
 			// For NFS it need to be populated in ResourceExport CR and passed to Job via its reconciler.
-			drivers.WithKopiaImageExecutorSource("stork"),
-			drivers.WithKopiaImageExecutorSourceNs("kube-system"),
+			drivers.WithNfsImageExecutorSource(re.Spec.TriggeredFrom),
+			drivers.WithNfsImageExecutorSourceNs(re.Spec.TriggeredFromNs),
 			drivers.WithRestoreExport(re.Name),
 			drivers.WithJobNamespace(re.Namespace),
 			drivers.WithNfsServer(bl.Location.NfsConfig.ServerAddr),
@@ -383,8 +383,8 @@ func startNfsResourceJob(
 		)
 	case drivers.NFSRestore:
 		return drv.StartJob(
-			drivers.WithKopiaImageExecutorSource("stork"),
-			drivers.WithKopiaImageExecutorSourceNs("kube-system"),
+			drivers.WithNfsImageExecutorSource(re.Spec.TriggeredFrom),
+			drivers.WithNfsImageExecutorSourceNs(re.Spec.TriggeredFromNs),
 			drivers.WithRestoreExport(re.Name),
 			drivers.WithJobNamespace(re.Namespace),
 			drivers.WithNfsServer(bl.Location.NfsConfig.ServerAddr),
