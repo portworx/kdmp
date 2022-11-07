@@ -29,7 +29,7 @@ export GOFLAGS = -mod=vendor
 
 MAJOR_VERSION := 1
 MINOR_VERSION := 2
-PATCH_VERSION := 1
+PATCH_VERSION := 3
 
 ifndef PKGS
 	PKGS := $(shell GOFLAGS=-mod=vendor go list ./... 2>&1 | grep -v 'go: ' | grep -v 'github.com/portworx/kdmp/vendor' | grep -v versioned | grep -v 'pkg/apis/v1')
