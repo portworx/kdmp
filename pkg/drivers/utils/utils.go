@@ -728,7 +728,7 @@ func CreateNfsPvc(pvcName string, pvName string, namespace string) error {
 		Spec: corev1.PersistentVolumeClaimSpec{
 			// Setting it to empty stringm so that default storage class will not selected.
 			StorageClassName: &empttyStorageClass,
-			AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteMany},
+			AccessModes:      []corev1.PersistentVolumeAccessMode{corev1.ReadWriteMany},
 			Resources: corev1.ResourceRequirements{
 				Requests: corev1.ResourceList{
 					corev1.ResourceName(corev1.ResourceStorage): resource.MustParse(nfsVolumeSize),
@@ -838,4 +838,22 @@ func GetPvcNameForJob(jobName string) string {
 //GetPvNameForJob - returns pv name for a job
 func GetPvNameForJob(jobName string) string {
 	return "pv-" + jobName
+}
+
+// GetTolerationsFromDeployment - extract tolerations from deployment spec
+func GetTolerationsFromDeployment(name, namespace string) ([]corev1.Toleration, error) {
+	deploy, err := apps.Instance().GetDeployment(name, namespace)
+	if err != nil {
+		return nil, err
+	}
+	return deploy.Spec.Template.Spec.Tolerations, nil
+}
+
+// GetNodeAffinityFromDeployment - extract NodeAffinity from deployment spec
+func GetNodeAffinityFromDeployment(name, namespace string) (*corev1.NodeAffinity, error) {
+	deploy, err := apps.Instance().GetDeployment(name, namespace)
+	if err != nil {
+		return nil, err
+	}
+	return deploy.Spec.Template.Spec.Affinity.NodeAffinity, nil
 }
