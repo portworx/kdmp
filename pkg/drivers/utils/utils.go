@@ -625,6 +625,10 @@ func CreateImageRegistrySecret(sourceName, destName, sourceNamespace, destNamesp
 	// and create one in the current job's namespace
 	secret, err := core.Instance().GetSecret(sourceName, sourceNamespace)
 	if err != nil {
+		// Safely exit if image registry secret is not found.
+		if apierrors.IsNotFound(err) {
+			return nil
+		}
 		logrus.Errorf("failed in getting secret [%v/%v]: %v", sourceNamespace, sourceName, err)
 		return err
 	}
