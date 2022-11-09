@@ -631,6 +631,10 @@ func CreateImageRegistrySecret(sourceName, destName, sourceNamespace, destNamesp
 	// and create one in the current job's namespace
 	secret, err := core.Instance().GetSecret(sourceName, sourceNamespace)
 	if err != nil {
+		// Safely exit if image registry secret is not found.
+		if apierrors.IsNotFound(err) {
+			return nil
+		}
 		logrus.Errorf("failed in getting secret [%v/%v]: %v", sourceNamespace, sourceName, err)
 		return err
 	}
@@ -734,7 +738,7 @@ func CreateNfsPvc(pvcName string, pvName string, namespace string) error {
 		Spec: corev1.PersistentVolumeClaimSpec{
 			// Setting it to empty stringm so that default storage class will not selected.
 			StorageClassName: &empttyStorageClass,
-			AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteMany},
+			AccessModes:      []corev1.PersistentVolumeAccessMode{corev1.ReadWriteMany},
 			Resources: corev1.ResourceRequirements{
 				Requests: corev1.ResourceList{
 					corev1.ResourceName(corev1.ResourceStorage): resource.MustParse(nfsVolumeSize),
