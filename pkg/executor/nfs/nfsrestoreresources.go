@@ -62,8 +62,9 @@ func restoreAndApplyResources(
 		//update resourcebackup CR with status and reason
 		logrus.Errorf("restore resources for [%v/%v] failed with error: %v", rbCrNamespace, rbCrName, err.Error())
 		st := kdmpapi.ResourceBackupProgressStatus{
-			Status: kdmpapi.ResourceBackupStatusFailed,
-			Reason: err.Error(),
+			Status:             kdmpapi.ResourceBackupStatusFailed,
+			Reason:             err.Error(),
+			ProgressPercentage: 0,
 		}
 
 		err = executor.UpdateResourceBackupStatus(st, rbCrName, rbCrNamespace, nil)
@@ -77,8 +78,9 @@ func restoreAndApplyResources(
 		//update resourcebackup CR with status and reason
 		logrus.Errorf("restore resources for [%v/%v] failed with error: %v", rbCrNamespace, rbCrName, err.Error())
 		st := kdmpapi.ResourceBackupProgressStatus{
-			Status: kdmpapi.ResourceBackupStatusFailed,
-			Reason: err.Error(),
+			Status:             kdmpapi.ResourceBackupStatusFailed,
+			Reason:             err.Error(),
+			ProgressPercentage: 0,
 		}
 
 		err = executor.UpdateResourceBackupStatus(st, rbCrName, rbCrNamespace, nil)
@@ -90,8 +92,9 @@ func restoreAndApplyResources(
 
 	//update resourcebackup CR with status and reason
 	st := kdmpapi.ResourceBackupProgressStatus{
-		Status: kdmpapi.ResourceBackupStatusSuccessful,
-		Reason: utils.ResourceUploadSuccessMsg,
+		Status:             kdmpapi.ResourceBackupStatusSuccessful,
+		Reason:             utils.ResourceUploadSuccessMsg,
+		ProgressPercentage: 100,
 	}
 	err = executor.UpdateResourceBackupStatus(st, rbCrName, rbCrNamespace, nil)
 	if err != nil {
