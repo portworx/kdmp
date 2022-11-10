@@ -845,3 +845,21 @@ func GetPvcNameForJob(jobName string) string {
 func GetPvNameForJob(jobName string) string {
 	return "pv-" + jobName
 }
+
+// GetTolerationsFromDeployment - extract tolerations from deployment spec
+func GetTolerationsFromDeployment(name, namespace string) ([]corev1.Toleration, error) {
+	deploy, err := apps.Instance().GetDeployment(name, namespace)
+	if err != nil {
+		return nil, err
+	}
+	return deploy.Spec.Template.Spec.Tolerations, nil
+}
+
+// GetNodeAffinityFromDeployment - extract NodeAffinity from deployment spec
+func GetNodeAffinityFromDeployment(name, namespace string) (*corev1.NodeAffinity, error) {
+	deploy, err := apps.Instance().GetDeployment(name, namespace)
+	if err != nil {
+		return nil, err
+	}
+	return deploy.Spec.Template.Spec.Affinity.NodeAffinity, nil
+}
