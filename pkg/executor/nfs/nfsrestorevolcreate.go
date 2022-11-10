@@ -450,10 +450,13 @@ func isPVCsBounded(
 		logrus.Errorf("%v", errMsg)
 		// Exhausted all retries, fail the CR
 		rb.Status.Status = v1alpha1.ResourceBackupStatusFailed
+		rb.Status.Reason = utils.PvcBoundFailedMsg
+		rb.Status.ProgressPercentage = 0
 	} else {
 		rb.Status.Resources = tResources
 		rb.Status.Status = v1alpha1.ResourceBackupStatusSuccessful
 		rb.Status.Reason = utils.PvcBoundSuccessMsg
+		rb.Status.ProgressPercentage = 100
 	}
 
 	rb1, err := kdmpschedops.Instance().UpdateResourceBackup(rb)

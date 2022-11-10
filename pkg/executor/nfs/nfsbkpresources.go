@@ -59,10 +59,6 @@ func newUploadBkpResourceCommand() *cobra.Command {
 	bkpUploadCommand.Flags().StringVarP(&bkpNamespace, "backup-namespace", "", "", "Namespace for backup command")
 	bkpUploadCommand.Flags().StringVarP(&appBackupCRName, "app-cr-name", "", "", "Namespace for applicationbackup CR whose resource to be backed up")
 
-	/*bkpUploadCommand.Flags().StringVarP(&rbCrName, "rb-cr-name", "", "", "Name for resourcebackup CR to update job status")
-	bkpUploadCommand.Flags().StringVarP(&rbCrNamespace, "rb-cr-namespace", "", "", "Namespace for resourcebackup CR to update job status")
-	*/
-
 	return bkpUploadCommand
 }
 
@@ -76,8 +72,9 @@ func uploadResources(
 	if err != nil {
 		//update resourcebackup CR with status and reason
 		st := kdmpapi.ResourceBackupProgressStatus{
-			Status: kdmpapi.ResourceBackupStatusFailed,
-			Reason: err.Error(),
+			Status:             kdmpapi.ResourceBackupStatusFailed,
+			Reason:             err.Error(),
+			ProgressPercentage: 0,
 		}
 
 		err = executor.UpdateResourceBackupStatus(st, rbCrName, rbCrNamespace, nil)
@@ -88,8 +85,9 @@ func uploadResources(
 	}
 	//update resourcebackup CR with status and reason
 	st := kdmpapi.ResourceBackupProgressStatus{
-		Status: kdmpapi.ResourceBackupStatusSuccessful,
-		Reason: kdmputils.ResourceUploadSuccessMsg,
+		Status:             kdmpapi.ResourceBackupStatusSuccessful,
+		Reason:             kdmputils.ResourceUploadSuccessMsg,
+		ProgressPercentage: 100,
 	}
 	err = executor.UpdateResourceBackupStatus(st, rbCrName, rbCrNamespace, nil)
 	if err != nil {
