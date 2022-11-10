@@ -14,7 +14,7 @@ func newDeleteResourcesCommand() *cobra.Command {
 		Use:   "delete",
 		Short: "Start resource deletion on nfs target",
 		Run: func(c *cobra.Command, args []string) {
-			executor.HandleErr(deleteResources(bkpNamespace, applicationCRName))
+			executor.HandleErr(deleteResources(bkpNamespace, appBackupCRName))
 		},
 	}
 	deleteCommand.Flags().StringVarP(&bkpNamespace, "namespace", "", "", "Namespace for delete command")
