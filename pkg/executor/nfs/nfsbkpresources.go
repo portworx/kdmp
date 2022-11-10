@@ -33,10 +33,6 @@ import (
 )
 
 var (
-	// bkpNamespace      string
-	applicationCRName string
-	// bCrName          string
-	// rbCrNamespace     string
 	resKinds map[string]string
 )
 
@@ -58,10 +54,6 @@ func newUploadBkpResourceCommand() *cobra.Command {
 	}
 	bkpUploadCommand.Flags().StringVarP(&bkpNamespace, "backup-namespace", "", "", "Namespace for backup command")
 	bkpUploadCommand.Flags().StringVarP(&appBackupCRName, "app-cr-name", "", "", "Namespace for applicationbackup CR whose resource to be backed up")
-
-	/*bkpUploadCommand.Flags().StringVarP(&rbCrName, "rb-cr-name", "", "", "Name for resourcebackup CR to update job status")
-	bkpUploadCommand.Flags().StringVarP(&rbCrNamespace, "rb-cr-namespace", "", "", "Namespace for resourcebackup CR to update job status")
-	*/
 
 	return bkpUploadCommand
 }
