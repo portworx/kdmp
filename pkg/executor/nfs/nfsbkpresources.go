@@ -68,8 +68,9 @@ func uploadResources(
 	if err != nil {
 		//update resourcebackup CR with status and reason
 		st := kdmpapi.ResourceBackupProgressStatus{
-			Status: kdmpapi.ResourceBackupStatusFailed,
-			Reason: err.Error(),
+			Status:             kdmpapi.ResourceBackupStatusFailed,
+			Reason:             err.Error(),
+			ProgressPercentage: 0,
 		}
 
 		err = executor.UpdateResourceBackupStatus(st, rbCrName, rbCrNamespace, nil)
@@ -80,8 +81,9 @@ func uploadResources(
 	}
 	//update resourcebackup CR with status and reason
 	st := kdmpapi.ResourceBackupProgressStatus{
-		Status: kdmpapi.ResourceBackupStatusSuccessful,
-		Reason: kdmputils.ResourceUploadSuccessMsg,
+		Status:             kdmpapi.ResourceBackupStatusSuccessful,
+		Reason:             kdmputils.ResourceUploadSuccessMsg,
+		ProgressPercentage: 100,
 	}
 	err = executor.UpdateResourceBackupStatus(st, rbCrName, rbCrNamespace, nil)
 	if err != nil {

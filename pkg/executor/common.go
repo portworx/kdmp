@@ -495,6 +495,7 @@ func UpdateResourceBackupStatus(
 	rb.Status.Status = status.Status
 	rb.Status.Reason = status.Reason
 	rb.Status.Resources = status.Resources
+	rb.Status.ProgressPercentage = status.ProgressPercentage
 	_, err = kdmpschedops.Instance().UpdateResourceBackup(rb)
 	if err != nil {
 		errMsg := fmt.Sprintf("error updating ResourceBackup CR[%v/%v]: %v", rbNamespace, rbName, err)
