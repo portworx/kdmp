@@ -301,7 +301,7 @@ func restoreVolResourcesAndApply(
 			}
 			// TODO: In future we can optimize this path where we can directly get runtime.Unstructured from the preRestoreObjects
 			// for the respective pvc
-			o, err := fetchObjectFromPVC(preRestoreObjects, pvc)
+			o, err := fetchObjectFromPVC(preRestoreObjects, pvc, restore.Spec.NamespaceMapping)
 			if err != nil {
 				// Proceed to next PVC
 				continue
@@ -350,6 +350,7 @@ func restoreVolResourcesAndApply(
 func fetchObjectFromPVC(
 	preRestoreObjects []runtime.Unstructured,
 	pvc *v1.PersistentVolumeClaim,
+	namespaceMapping map[string]string,
 ) (runtime.Unstructured, error) {
 	// For the given PVC fetch the object from preRestoreObjects
 	for _, o := range preRestoreObjects {
@@ -363,7 +364,19 @@ func fetchObjectFromPVC(
 			if err != nil {
 				return nil, err
 			}
-			if tempPVC.Name == pvc.Name {
+			restoreNamespace, ok := namespaceMapping[tempPVC.Namespace]
+			if !ok {
+				return nil, fmt.Errorf("sivakumar restore namespace mapping not found: %s namespaceMapping %v ", restoreNamespace, namespaceMapping)
+			}
+			if tempPVC.Name == pvc.Name && restoreNamespace == pvc.Namespace {
+				// update the namespace based on the namespace mapping
+				tempPVC.Namespace = pvc.Namespace
+				object, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&tempPVC)
+				if err != nil {
+					logrus.Errorf("unable to convert pvc[%v/%v] to unstruct objects, err: %v", pvc.Namespace, pvc.Name, err)
+					return nil, err
+				}
+				o.SetUnstructuredContent(object)
 				return o, nil
 			}
 
