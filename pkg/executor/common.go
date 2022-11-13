@@ -2,6 +2,7 @@ package executor
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -11,13 +12,17 @@ import (
 	"time"
 
 	storkapi "github.com/libopenstorage/stork/pkg/apis/stork/v1alpha1"
+	"github.com/libopenstorage/stork/pkg/crypto"
+	"github.com/libopenstorage/stork/pkg/log"
 	kdmpapi "github.com/portworx/kdmp/pkg/apis/kdmp/v1alpha1"
 	"github.com/portworx/kdmp/pkg/drivers"
 	"github.com/portworx/kdmp/pkg/drivers/utils"
 	kdmpops "github.com/portworx/kdmp/pkg/util/ops"
+	"github.com/portworx/sched-ops/k8s/core"
 	kdmpschedops "github.com/portworx/sched-ops/k8s/kdmp"
 	storkops "github.com/portworx/sched-ops/k8s/stork"
 	"github.com/sirupsen/logrus"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/yaml"
@@ -57,6 +62,19 @@ const (
 	ResticType BackupTool = 0
 	// KopiaType for kopia tool
 	KopiaType BackupTool = 1
+)
+
+const (
+	// MetadataObjectName metadat resource file
+	MetadataObjectName = "metadata.json"
+	// NamespacesFile ns file
+	NamespacesFile = "namespaces.json"
+	// CrdFile crd file
+	CrdFile = "crds.json"
+	// ResourcesFile resources file
+	ResourcesFile = "resources.json"
+	// BackupResourcesBatchCount backup processing batch count
+	BackupResourcesBatchCount = 15
 )
 
 // S3Config specifies the config required to connect to an S3-compliant
@@ -579,4 +597,159 @@ func getShortUID(uid string) string {
 		return ""
 	}
 	return uid[0:7]
+}
+
+// CreateNamespacesFromMapping creates namespace if it's not present
+func CreateNamespacesFromMapping(
+	applicationCRName string,
+	restoreNamespace string) error {
+	funct := "createNamespacesFromMapping"
+	restore, err := storkops.Instance().GetApplicationRestore(applicationCRName, restoreNamespace)
+	if err != nil {
+		logrus.Errorf("%s: Error getting restore cr: %v", funct, err)
+		return err
+	}
+	backup, err := storkops.Instance().GetApplicationBackup(restore.Spec.BackupName, restore.Namespace)
+	if err != nil {
+		log.ApplicationRestoreLog(restore).Errorf("Error getting backup: %v", err)
+		return err
+	}
+	return createNamespaces(backup, restore.Spec.BackupLocation, restore.Namespace, restore)
+}
+
+func createNamespaces(backup *storkapi.ApplicationBackup,
+	backupLocation string,
+	backupLocationNamespace string,
+	restore *storkapi.ApplicationRestore) error {
+	var namespaces []*v1.Namespace
+	funct := "create namespaces"
+
+	repo, err := ParseCloudCred()
+	if err != nil {
+		logrus.Errorf("%s: error parsing cloud cred: %v", funct, err)
+		return err
+	}
+	bkpDir := filepath.Join(repo.Path, backup.Status.BackupPath)
+	restoreLocation, err := storkops.Instance().GetBackupLocation(backup.Spec.BackupLocation, backupLocationNamespace)
+	if err != nil {
+		return err
+	}
+
+	nsData, err := DownloadObject(bkpDir, NamespacesFile, restoreLocation.Location.EncryptionV2Key)
+	if err != nil {
+		return err
+	}
+	if nsData != nil {
+		if err = json.Unmarshal(nsData, &namespaces); err != nil {
+			return err
+		}
+		for _, ns := range namespaces {
+			if restoreNS, ok := restore.Spec.NamespaceMapping[ns.Name]; ok {
+				ns.Name = restoreNS
+			} else {
+				// Skip namespaces we aren't restoring
+				continue
+			}
+			// create mapped restore namespace with metadata of backed up
+			// namespace
+			_, err := core.Instance().CreateNamespace(&v1.Namespace{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        ns.Name,
+					Labels:      ns.Labels,
+					Annotations: ns.GetAnnotations(),
+				},
+			})
+			log.ApplicationRestoreLog(restore).Tracef("Creating dest namespace %v", ns.Name)
+			if err != nil {
+				if errors.IsAlreadyExists(err) {
+					oldNS, err := core.Instance().GetNamespace(ns.GetName())
+					if err != nil {
+						return err
+					}
+					annotations := make(map[string]string)
+					labels := make(map[string]string)
+					if restore.Spec.ReplacePolicy == storkapi.ApplicationRestoreReplacePolicyDelete {
+						// overwrite all annotation in case of replace policy set to delete
+						annotations = ns.GetAnnotations()
+						labels = ns.GetLabels()
+					} else if restore.Spec.ReplacePolicy == storkapi.ApplicationRestoreReplacePolicyRetain {
+						// only add new annotation,labels in case of replace policy is set to retain
+						annotations = oldNS.GetAnnotations()
+						if annotations == nil {
+							annotations = make(map[string]string)
+						}
+						for k, v := range ns.GetAnnotations() {
+							if _, ok := annotations[k]; !ok {
+								annotations[k] = v
+							}
+						}
+						labels = oldNS.GetLabels()
+						if labels == nil {
+							labels = make(map[string]string)
+						}
+						for k, v := range ns.GetLabels() {
+							if _, ok := labels[k]; !ok {
+								labels[k] = v
+							}
+						}
+					}
+					log.ApplicationRestoreLog(restore).Tracef("Namespace already exists, updating dest namespace %v", ns.Name)
+					_, err = core.Instance().UpdateNamespace(&v1.Namespace{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:        ns.Name,
+							Labels:      labels,
+							Annotations: annotations,
+						},
+					})
+					if err != nil {
+						return err
+					}
+					continue
+				}
+				return err
+			}
+		}
+		return nil
+	}
+	for _, namespace := range restore.Spec.NamespaceMapping {
+		if ns, err := core.Instance().GetNamespace(namespace); err != nil {
+			if errors.IsNotFound(err) {
+				if _, err := core.Instance().CreateNamespace(&v1.Namespace{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:        ns.Name,
+						Labels:      ns.Labels,
+						Annotations: ns.GetAnnotations(),
+					},
+				}); err != nil {
+					return err
+				}
+			}
+			return err
+		}
+	}
+	return nil
+}
+
+// DownloadObject download nfs resource object
+func DownloadObject(
+	resourcePath string,
+	resourceFileName string,
+	encryptionKey string,
+) ([]byte, error) {
+	logrus.Debugf("downloadObject resourcePath: %s, resourceFileName: %s", resourcePath, resourceFileName)
+	filePath := filepath.Join(resourcePath, resourceFileName)
+	data, err := ioutil.ReadFile(filePath)
+	if err != nil {
+		return nil, fmt.Errorf("getting file content of %s failed: %v", filePath, err)
+	}
+
+	if len(encryptionKey) > 0 {
+		var decryptData []byte
+		if decryptData, err = crypto.Decrypt(data, encryptionKey); err != nil {
+			logrus.Errorf("nfs downloadObject: decrypt failed :%v, returning data direclty", err)
+			return data, nil
+		}
+		return decryptData, nil
+	}
+	return data, nil
 }
