@@ -7,7 +7,7 @@ import (
 	"github.com/libopenstorage/stork/drivers/volume"
 	storkapi "github.com/libopenstorage/stork/pkg/apis/stork/v1alpha1"
 	"github.com/libopenstorage/stork/pkg/log"
-	"github.com/portworx/kdmp/pkg/apis/kdmp/v1alpha1"
+	kdmpapi "github.com/portworx/kdmp/pkg/apis/kdmp/v1alpha1"
 	"github.com/portworx/kdmp/pkg/drivers/utils"
 	"github.com/portworx/kdmp/pkg/executor"
 	"github.com/portworx/sched-ops/k8s/core"
@@ -65,10 +65,10 @@ func newRestoreVolumeCommand() *cobra.Command {
 
 func convertAppBkpVolInfoToResourceVolInfo(
 	volInfo []*storkapi.ApplicationBackupVolumeInfo,
-) (resVolInfo []*v1alpha1.ResourceBackupVolumeInfo) {
-	restoreVolumeInfos := make([]*v1alpha1.ResourceBackupVolumeInfo, 0)
+) (resVolInfo []*kdmpapi.ResourceBackupVolumeInfo) {
+	restoreVolumeInfos := make([]*kdmpapi.ResourceBackupVolumeInfo, 0)
 	for _, vol := range volInfo {
-		resInfo := &v1alpha1.ResourceBackupVolumeInfo{}
+		resInfo := &kdmpapi.ResourceBackupVolumeInfo{}
 
 		resInfo.PersistentVolumeClaim = vol.PersistentVolumeClaim
 		resInfo.PersistentVolumeClaimUID = vol.PersistentVolumeClaimUID
@@ -76,7 +76,7 @@ func convertAppBkpVolInfoToResourceVolInfo(
 		resInfo.Volume = vol.Volume
 		resInfo.BackupID = vol.BackupID
 		resInfo.DriverName = vol.DriverName
-		resInfo.Status = v1alpha1.ResourceBackupStatus(vol.Status)
+		resInfo.Status = kdmpapi.ResourceBackupStatus(vol.Status)
 		resInfo.Zones = vol.Zones
 		resInfo.Reason = "Restore in progress"
 		resInfo.Options = vol.Options
@@ -93,16 +93,16 @@ func convertAppBkpVolInfoToResourceVolInfo(
 
 func convertAppRestoreVolInfoToResourceVolInfo(
 	volInfo []*storkapi.ApplicationRestoreVolumeInfo,
-) (resVolInfo []*v1alpha1.ResourceRestoreVolumeInfo) {
-	restoreVolumeInfos := make([]*v1alpha1.ResourceRestoreVolumeInfo, 0)
+) (resVolInfo []*kdmpapi.ResourceRestoreVolumeInfo) {
+	restoreVolumeInfos := make([]*kdmpapi.ResourceRestoreVolumeInfo, 0)
 	for _, vol := range volInfo {
 		//restoreVolInfo := &storkapi.ApplicationRestoreVolumeInfo{}
-		resInfo := &v1alpha1.ResourceRestoreVolumeInfo{}
+		resInfo := &kdmpapi.ResourceRestoreVolumeInfo{}
 
 		resInfo.PersistentVolumeClaim = vol.PersistentVolumeClaim
 		resInfo.PersistentVolumeClaimUID = vol.PersistentVolumeClaimUID
 		resInfo.DriverName = vol.DriverName
-		resInfo.Status = v1alpha1.ResourceBackupStatus(vol.Status)
+		resInfo.Status = kdmpapi.ResourceBackupStatus(vol.Status)
 		resInfo.Zones = vol.Zones
 		resInfo.Reason = "Restore in progress"
 		resInfo.Options = vol.Options
@@ -128,6 +128,23 @@ func restoreVolResourcesAndApply(
 	if err != nil {
 		return err
 	}
+	err = executor.CreateNamespacesFromMapping(applicationCRName, restoreNamespace)
+	if err != nil {
+		//update resourcebackup CR with status and reason
+		logrus.Errorf("restore resources for [%v/%v] failed with error: %v", rbCrNamespace, rbCrName, err.Error())
+		st := kdmpapi.ResourceBackupProgressStatus{
+			Status:             kdmpapi.ResourceBackupStatusFailed,
+			Reason:             err.Error(),
+			ProgressPercentage: 0,
+		}
+
+		err = executor.UpdateResourceBackupStatus(st, rbCrName, rbCrNamespace, nil)
+		if err != nil {
+			logrus.Errorf("failed to update resorucebackup[%v/%v] status after hitting error in create namespace : %v", rbCrNamespace, rbCrName, err)
+		}
+		return err
+	}
+
 	restore, err := storkops.Instance().GetApplicationRestore(applicationCRName, restoreNamespace)
 	if err != nil {
 		logrus.Errorf("Error getting restore cr: %v", err)
@@ -203,8 +220,8 @@ func restoreVolResourcesAndApply(
 
 	rc := initResourceCollector()
 	// Iterate over bkp vol info and create the pvc
-	resourceBackupVolInfos := make([]*v1alpha1.ResourceBackupVolumeInfo, 0)
-	existingResourceBackupVolInfos := make([]*v1alpha1.ResourceRestoreVolumeInfo, 0)
+	resourceBackupVolInfos := make([]*kdmpapi.ResourceBackupVolumeInfo, 0)
+	existingResourceBackupVolInfos := make([]*kdmpapi.ResourceRestoreVolumeInfo, 0)
 
 	for _, bkpvInfo := range backupVolumeInfoMappings {
 		backupVolInfos := bkpvInfo
@@ -309,7 +326,7 @@ func restoreVolResourcesAndApply(
 			if err = updateResourceStatus(
 				rb,
 				o,
-				v1alpha1.ResourceRestoreStatusInProgress,
+				kdmpapi.ResourceRestoreStatusInProgress,
 				"PVC Bound in progress"); err != nil {
 				return err
 			}
@@ -387,7 +404,7 @@ func fetchObjectFromPVC(
 }
 
 func waitForPVCBound(
-	res *v1alpha1.ResourceRestoreResourceInfo,
+	res *kdmpapi.ResourceRestoreResourceInfo,
 ) (bool, error) {
 	// wait for pvc to get bound
 	var pvc *v1.PersistentVolumeClaim
@@ -416,10 +433,10 @@ func waitForPVCBound(
 }
 
 func isPVCsBounded(
-	rb *v1alpha1.ResourceBackup,
+	rb *kdmpapi.ResourceBackup,
 ) error {
 	funct := "isPVCsBounded"
-	tResources := make([]*v1alpha1.ResourceRestoreResourceInfo, 0)
+	tResources := make([]*kdmpapi.ResourceRestoreResourceInfo, 0)
 	cleanupTask := func() (interface{}, bool, error) {
 		for _, res := range rb.Status.Resources {
 			tempPVC, err := core.Instance().GetPersistentVolumeClaim(res.Name, res.Namespace)
@@ -450,7 +467,7 @@ func isPVCsBounded(
 			}
 			if isBounded {
 				// update the pvc resource status to successful
-				res.Status = v1alpha1.ResourceRestoreStatusSuccessful
+				res.Status = kdmpapi.ResourceRestoreStatusSuccessful
 				res.Reason = utils.PvcBoundSuccessMsg
 				tResources = append(tResources, res)
 			}
@@ -462,12 +479,12 @@ func isPVCsBounded(
 		errMsg := fmt.Sprintf("max retries done, resourceBackup: [%v/%v] failed with %v", rb.Namespace, rb.Name, err)
 		logrus.Errorf("%v", errMsg)
 		// Exhausted all retries, fail the CR
-		rb.Status.Status = v1alpha1.ResourceBackupStatusFailed
+		rb.Status.Status = kdmpapi.ResourceBackupStatusFailed
 		rb.Status.Reason = utils.PvcBoundFailedMsg
 		rb.Status.ProgressPercentage = 0
 	} else {
 		rb.Status.Resources = tResources
-		rb.Status.Status = v1alpha1.ResourceBackupStatusSuccessful
+		rb.Status.Status = kdmpapi.ResourceBackupStatusSuccessful
 		rb.Status.Reason = utils.PvcBoundSuccessMsg
 		rb.Status.ProgressPercentage = 100
 	}
