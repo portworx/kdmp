@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/go-openapi/inflect"
 	stork_api "github.com/libopenstorage/stork/pkg/apis/stork/v1alpha1"
@@ -149,7 +148,6 @@ func uploadBkpResource(
 		logrus.Errorf(errMsg)
 		return fmt.Errorf(errMsg)
 	}
-	time.Sleep(1 * time.Minute)
 	return nil
 }
 
