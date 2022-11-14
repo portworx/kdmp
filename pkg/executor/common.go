@@ -45,10 +45,6 @@ const (
 
 	// DefaultTimeout Max time a command will be retired before failing
 	DefaultTimeout = 1 * time.Minute
-	// QPS Queries per second
-	QPS = 100
-	// Burst value
-	Burst = 100
 	// BackupUID backup UID annotation
 	BackupUID = "portworx.io/backup-uid"
 )
