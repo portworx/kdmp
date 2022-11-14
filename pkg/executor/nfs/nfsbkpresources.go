@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -457,10 +458,28 @@ func min(x, y int) int {
 }
 
 func initResourceCollector() resourcecollector.ResourceCollector {
+	QPS := kdmputils.DefaultQPS
+	Burst := kdmputils.DefaultBurst
+	kdmpData, err := core.Instance().GetConfigMap(kdmputils.KdmpConfigmapName, kdmputils.KdmpConfigmapNamespace)
+	if err != nil {
+		logrus.Warnf("failed reading config map %v: %v", kdmputils.KdmpConfigmapName, err)
+		logrus.Warnf("default to %v for QPS ans Burst value", kdmputils.DefaultQPS)
+	} else {
+		QPS, err = strconv.Atoi(kdmpData.Data[kdmputils.QPSKey])
+		if err != nil {
+			logrus.Debugf("initResourceCollector: conversion of qps value failed, assigning default value [100] : %v", err)
+			QPS = kdmputils.DefaultQPS
+		}
+		Burst, err = strconv.Atoi(kdmpData.Data[kdmputils.BurstKey])
+		if err != nil {
+			logrus.Debugf("initResourceCollector: conversion of burst value failed, assigning default value [100] : %v", err)
+			Burst = kdmputils.DefaultBurst
+		}
+	}
 	resourceCollector := resourcecollector.ResourceCollector{
 		Driver: nil,
-		QPS:    float32(executor.QPS),
-		Burst:  executor.Burst,
+		QPS:    float32(QPS),
+		Burst:  Burst,
 	}
 
 	if err := resourceCollector.Init(nil); err != nil {
