@@ -268,20 +268,20 @@ func restoreVolResourcesAndApply(
 						o,
 					)
 				}
-				tempObjects, err := getNamespacedObjectsToDelete(
-					restore,
-					objectBasedOnIncludeResources,
-				)
-				if err != nil {
-					return err
-				}
+			}
+			tempObjects, err := getNamespacedObjectsToDelete(
+				restore,
+				objectBasedOnIncludeResources,
+			)
+			if err != nil {
+				return err
+			}
 
-				err = rc.DeleteResources(
-					dynamicInterface,
-					tempObjects)
-				if err != nil {
-					return err
-				}
+			err = rc.DeleteResources(
+				dynamicInterface,
+				tempObjects)
+			if err != nil {
+				return err
 			}
 		}
 		for _, vInfo := range bkpvInfo {
