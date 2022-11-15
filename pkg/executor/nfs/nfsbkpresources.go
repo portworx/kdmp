@@ -399,6 +399,10 @@ func uploadMetadatResources(
 	backup.Status.FinishTimestamp = metav1.Now()
 	backup.Status.Status = stork_api.ApplicationBackupStatusSuccessful
 	backup.Status.Reason = "Volumes and resources were backed up successfully"
+	// Only on success compute the total backup size
+	for _, vInfo := range backup.Status.Volumes {
+		backup.Status.TotalSize += vInfo.TotalSize
+	}
 
 	jsonBytes, err := json.MarshalIndent(backup, "", " ")
 	if err != nil {
