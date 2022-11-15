@@ -73,7 +73,7 @@ func uploadResources(
 			ProgressPercentage: 0,
 		}
 
-		err = executor.UpdateResourceBackupStatus(st, rbCrName, rbCrNamespace, nil)
+		err = executor.UpdateResourceBackupStatus(st, rbCrName, rbCrNamespace)
 		if err != nil {
 			logrus.Errorf("failed to update resorucebackup[%v/%v] status: %v", rbCrNamespace, rbCrName, err)
 		}
@@ -85,7 +85,7 @@ func uploadResources(
 		Reason:             kdmputils.ResourceUploadSuccessMsg,
 		ProgressPercentage: 100,
 	}
-	err = executor.UpdateResourceBackupStatus(st, rbCrName, rbCrNamespace, nil)
+	err = executor.UpdateResourceBackupStatus(st, rbCrName, rbCrNamespace)
 	if err != nil {
 		logrus.Errorf("failed to update resorucebackup[%v/%v] status: %v", rbCrNamespace, rbCrName, err)
 		return err

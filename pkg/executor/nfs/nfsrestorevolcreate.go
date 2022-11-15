@@ -138,7 +138,7 @@ func restoreVolResourcesAndApply(
 			ProgressPercentage: 0,
 		}
 
-		err = executor.UpdateResourceBackupStatus(st, rbCrName, rbCrNamespace, nil)
+		err = executor.UpdateResourceBackupStatus(st, rbCrName, rbCrNamespace)
 		if err != nil {
 			logrus.Errorf("failed to update resorucebackup[%v/%v] status after hitting error in create namespace : %v", rbCrNamespace, rbCrName, err)
 		}

@@ -498,8 +498,6 @@ func UpdateResourceBackupStatus(
 	status kdmpapi.ResourceBackupProgressStatus,
 	rbName string,
 	rbNamespace string,
-	resources []*kdmpapi.ResourceRestoreResourceInfo,
-
 ) error {
 	rb, err := kdmpschedops.Instance().GetResourceBackup(rbName, rbNamespace)
 	if err != nil {
@@ -508,7 +506,6 @@ func UpdateResourceBackupStatus(
 	}
 	rb.Status.Status = status.Status
 	rb.Status.Reason = status.Reason
-	rb.Status.Resources = status.Resources
 	rb.Status.ProgressPercentage = status.ProgressPercentage
 	_, err = kdmpschedops.Instance().UpdateResourceBackup(rb)
 	if err != nil {
