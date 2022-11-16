@@ -366,6 +366,30 @@ func (c *Controller) sync(ctx context.Context, in *kdmpapi.DataExport) (bool, er
 			}
 			return true, c.updateStatus(dataExport, data)
 		} else if progress.Status == batchv1.JobConditionType("") {
+
+			blName := dataExport.Spec.Destination.Name
+			blNamespace := dataExport.Spec.Destination.Namespace
+
+			backupLocation, err := readBackupLocation(blName, blNamespace, "")
+
+			if err != nil {
+				msg := fmt.Sprintf("reading of backuplocation [%v/%v] failed: %v", blNamespace, blName, err)
+				logrus.Errorf(msg)
+				data := updateDataExportDetail{
+					status: kdmpapi.DataExportStatusFailed,
+					reason: msg,
+				}
+				return false, c.updateStatus(dataExport, data)
+			}
+			if backupLocation.Location.Type == storkapi.BackupLocationNFS {
+				if utils.IsJobPodMountFailed(dataExport.Status.TransferID) {
+					data := updateDataExportDetail{
+						status: kdmpapi.DataExportStatusFailed,
+						reason: "Failure in mounting NFS volume",
+					}
+					return true, c.updateStatus(dataExport, data)
+				}
+			}
 			data := updateDataExportDetail{
 				status: kdmpapi.DataExportStatusInProgress,
 			}

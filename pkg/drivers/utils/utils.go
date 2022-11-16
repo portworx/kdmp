@@ -14,6 +14,7 @@ import (
 	"github.com/portworx/kdmp/pkg/drivers"
 	"github.com/portworx/kdmp/pkg/version"
 	"github.com/portworx/sched-ops/k8s/apps"
+	"github.com/portworx/sched-ops/k8s/batch"
 	"github.com/portworx/sched-ops/k8s/core"
 	"github.com/sirupsen/logrus"
 	batchv1 "k8s.io/api/batch/v1"
@@ -841,4 +842,49 @@ func GetNodeAffinityFromDeployment(name, namespace string) (*corev1.NodeAffinity
 		return nil, err
 	}
 	return deploy.Spec.Template.Spec.Affinity.NodeAffinity, nil
+}
+
+// IsJobPodMountFailed - checks for mount failure in a Job pod
+func IsJobPodMountFailed(id string) bool {
+	fn := "IsJobPodMountFailed"
+	namespace, name, err := ParseJobID(id)
+	if err != nil {
+		return false
+	}
+
+	job, err := batch.Instance().GetJob(name, namespace)
+	if err != nil {
+		errMsg := fmt.Sprintf("failed to fetch %s/%s job: %v", namespace, name, err)
+		logrus.Debugf("%s: %v", fn, errMsg)
+		return false
+	}
+
+	pod, err := core.Instance().GetPodsByOwner(job.UID, namespace)
+	if err != nil {
+		errMsg := fmt.Sprintf("Getting pod of job [%s/%s] failed: %v", namespace, job.Name, err)
+		logrus.Debugf("%s: %v", fn, errMsg)
+		return false
+	}
+
+	if len(pod[0].Status.ContainerStatuses) != 0 {
+		containerStatus := pod[0].Status.ContainerStatuses[0]
+		if containerStatus.State.Waiting != nil &&
+			containerStatus.State.Waiting.Reason == "ContainerCreating" {
+			opts := metav1.ListOptions{
+				FieldSelector: "involvedObject.name=" + pod[0].Name,
+			}
+			events, err := core.Instance().ListEvents(namespace, opts)
+			if err != nil {
+				errMsg := fmt.Sprintf("failed to fetch events for pod [%s/%s]: %v", namespace, pod[0].Name, err)
+				logrus.Debugf("%s: %v", fn, errMsg)
+				return false
+			}
+			for _, event := range events.Items {
+				if event.Reason == "FailedMount" && event.Count >= 2 {
+					return true
+				}
+			}
+		}
+	}
+	return false
 }

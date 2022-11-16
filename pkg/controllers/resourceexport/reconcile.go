@@ -168,6 +168,14 @@ func (c *Controller) process(ctx context.Context, in *kdmpapi.ResourceExport) (b
 			}
 			return true, c.updateStatus(resourceExport, updateData)
 		} else if progress.Status == batchv1.JobConditionType("") {
+			if utils.IsJobPodMountFailed(resourceExport.Status.TransferID) {
+				updateData := updateResourceExportFields{
+					stage:  kdmpapi.ResourceExportStageFinal,
+					status: kdmpapi.ResourceExportStatusFailed,
+					reason: "Failure in mounting NFS volume",
+				}
+				return true, c.updateStatus(resourceExport, updateData)
+			}
 			updateData := updateResourceExportFields{
 				stage:  kdmpapi.ResourceExportStageInProgress,
 				status: kdmpapi.ResourceExportStatusInProgress,
