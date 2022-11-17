@@ -78,7 +78,7 @@ func convertAppBkpVolInfoToResourceVolInfo(
 		resInfo.DriverName = vol.DriverName
 		resInfo.Status = kdmpapi.ResourceBackupStatus(vol.Status)
 		resInfo.Zones = vol.Zones
-		resInfo.Reason = "Restore in progress"
+		resInfo.Reason = vol.Reason
 		resInfo.Options = vol.Options
 		resInfo.TotalSize = vol.TotalSize
 		resInfo.ActualSize = vol.ActualSize
@@ -104,7 +104,7 @@ func convertAppRestoreVolInfoToResourceVolInfo(
 		resInfo.DriverName = vol.DriverName
 		resInfo.Status = kdmpapi.ResourceBackupStatus(vol.Status)
 		resInfo.Zones = vol.Zones
-		resInfo.Reason = "Restore in progress"
+		resInfo.Reason = vol.Reason
 		resInfo.Options = vol.Options
 		resInfo.TotalSize = vol.TotalSize
 		resInfo.SourceVolume = vol.SourceVolume
