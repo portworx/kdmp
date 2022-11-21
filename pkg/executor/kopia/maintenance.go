@@ -31,6 +31,7 @@ const (
 	fullMaintenanceType = "full"
 	quickMaintenaceTye  = "quick"
 	cacheDir            = "/tmp"
+	kopiaNFSRepositoryFile = "kopia.repository.f"
 )
 
 func newMaintenanceCommand() *cobra.Command {
@@ -145,7 +146,7 @@ func runMaintenance(maintenanceType string) error {
 		}
 		var kopiaFile string
 		for _, subDir := range listOfSubDirs {
-			kopiaFile = filepath.Join(repoBaseDir, subDir, kopiaRepositoryFile)
+			kopiaFile = filepath.Join(repoBaseDir, subDir, kopiaNFSRepositoryFile)
 			_, err := os.Stat(kopiaFile)
 			if os.IsNotExist(err) {
 				continue
