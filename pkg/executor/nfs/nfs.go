@@ -24,11 +24,6 @@ func NewCommand() *cobra.Command {
 		Short: "a command executor for nfs target as support ",
 	}
 
-	cmds.PersistentFlags().StringVarP(&restoreNamespace, "restore-namespace", "", "", "Namespace for restore CR")
-	cmds.PersistentFlags().StringVarP(&appRestoreCRName, "app-cr-name", "", "", "application restore CR name")
-	cmds.PersistentFlags().StringVarP(&rbCrName, "rb-cr-name", "", "", "Name for resourcebackup CR to update job status")
-	cmds.PersistentFlags().StringVarP(&rbCrNamespace, "rb-cr-namespace", "", "", "Namespace for resourcebackup CR to update job status")
-
 	cmds.AddCommand(
 		newUploadBkpResourceCommand(),
 		newRestoreResourcesCommand(),
