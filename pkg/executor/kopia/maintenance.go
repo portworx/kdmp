@@ -28,9 +28,9 @@ var (
 )
 
 const (
-	fullMaintenanceType = "full"
-	quickMaintenaceTye  = "quick"
-	cacheDir            = "/tmp"
+	fullMaintenanceType    = "full"
+	quickMaintenaceTye     = "quick"
+	cacheDir               = "/tmp"
 	kopiaNFSRepositoryFile = "kopia.repository.f"
 )
 
