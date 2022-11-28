@@ -19,8 +19,8 @@ import (
 
 const (
 	kopiaMaintenanceJobPrefix         = "repo-maintenance"
-	defaultFullSchedule               = "0 */24 * * *"
-	defaultQuickSchedule              = "0 */2 * * *"
+	defaultFullSchedule               = "1 */23 * * *"
+	defaultQuickSchedule              = "1 */3 * * *"
 	fullMaintenanceType               = "full"
 	quickMaintenaceTye                = "quick"
 	defaultFailedJobsHistoryLimit     = 1
