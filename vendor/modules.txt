@@ -203,6 +203,7 @@ github.com/libopenstorage/stork/pkg/objectstore/common
 github.com/libopenstorage/stork/pkg/objectstore/google
 github.com/libopenstorage/stork/pkg/objectstore/s3
 github.com/libopenstorage/stork/pkg/snapshotter
+github.com/libopenstorage/stork/pkg/version
 # github.com/liggitt/tabwriter v0.0.0-20181228230101-89fcab3d43de
 github.com/liggitt/tabwriter
 # github.com/mailru/easyjson v0.7.0
