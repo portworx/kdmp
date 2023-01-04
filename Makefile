@@ -1,15 +1,15 @@
-RELEASE_VER ?= latest
+RELEASE_VER ?=1.2.3
 BUILD_DATE  := $(shell date -u +'%Y-%m-%dT%H:%M:%SZ')
 BASE_DIR    := $(shell git rev-parse --show-toplevel)
 GIT_SHA     := $(shell git rev-parse --short HEAD)
 BIN         := $(BASE_DIR)/bin
 
-DOCKER_IMAGE_REPO?=portworx
+DOCKER_IMAGE_REPO?=sivaportworx
 DOCKER_IMAGE_NAME?=kdmp
 DOCKER_IMAGE_TAG?=$(RELEASE_VER)
 
 DOCKER_KDMP_UNITTEST_IMAGE?=px-kdmp-unittest
-DOCKER_KDMP_TAG?=latest
+DOCKER_KDMP_TAG?=1.2.3
 
 DOCKER_IMAGE=$(DOCKER_IMAGE_REPO)/$(DOCKER_IMAGE_NAME):$(DOCKER_IMAGE_TAG)
 KDMP_UNITTEST_IMG=$(DOCKER_IMAGE_REPO)/$(DOCKER_KDMP_UNITTEST_IMAGE):$(DOCKER_KDMP_TAG)

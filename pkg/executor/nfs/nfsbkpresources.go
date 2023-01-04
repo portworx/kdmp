@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	storagev1 "k8s.io/api/storage/v1"
 )
 
 var (
@@ -41,6 +42,7 @@ const (
 	namespacesFile            = "namespaces.json"
 	crdFile                   = "crds.json"
 	resourcesFile             = "resources.json"
+	storageClassFile	= "storageclass.json"
 	backupResourcesBatchCount = 15
 )
 
@@ -137,6 +139,13 @@ func uploadBkpResource(
 		return fmt.Errorf(errMsg)
 	}
 
+	err = uploadStorageClasses(bkpNamespace, backup, bkpDir)
+	if err != nil {
+		errMsg := fmt.Sprintf("%s: error uploading namespace resource %v", funct, err)
+		logrus.Errorf(errMsg)
+		return fmt.Errorf(errMsg)
+	}
+
 	err = uploadCRDResources(resKinds, bkpDir, backup)
 	if err != nil {
 		errMsg := fmt.Sprintf("%s: error uploading CRD resource %v", funct, err)
@@ -151,7 +160,7 @@ func uploadBkpResource(
 		return fmt.Errorf(errMsg)
 	}
 	return nil
-	
+
 }
 
 func uploadResource(
@@ -221,6 +230,54 @@ func uploadResource(
 		return err
 	}
 
+	return nil
+}
+
+func uploadStorageClasses(
+	bkpNamespace string,
+	backup *stork_api.ApplicationBackup,
+	resourcePath string,
+) error {
+	funct := "uploadStorageClasses"
+	storageClassAdded := make(map[string]bool)
+	var storageClasses []*storagev1.StorageClass
+	for _, volume := range backup.Status.Volumes {
+		// Get the pvc spec
+		pvc, err := core.Instance().GetPersistentVolumeClaim(volume.PersistentVolumeClaim, volume.Namespace)
+		if err != nil {
+			return err
+		}
+		// Get storageclass
+		sc, err := core.Instance().GetStorageClassForPVC(pvc)
+		if err != nil {
+			return fmt.Errorf("failed to get storage class for PVC %s: %v", pvc.Name, err)
+		}
+		// only add one instance of a storageclass
+		if !storageClassAdded[sc.Name] {
+			sc.Kind = "StorageClass"
+			sc.APIVersion = "storage.k8s.io/v1"
+			sc.ResourceVersion = ""
+			storageClasses = append(storageClasses, sc)
+			storageClassAdded[sc.Name] = true
+		}
+		/*
+		// Backup the storage class
+		err = backupStorageClasses(storageClasses, backup)
+		if err != nil {
+			return fmt.Errorf("failed to backup storage classes: %v", err)
+		}
+		*/
+
+	}
+	scJsonBytes, err := json.Marshal(storageClasses)
+	if err != nil {
+		return err
+	}
+	err = uploadData(resourcePath, scJsonBytes, storageClassFile, "")
+	if err != nil {
+		logrus.Errorf("%s err: %v", funct, err)
+		return err
+	}
 	return nil
 }
 
