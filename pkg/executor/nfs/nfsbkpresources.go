@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/go-openapi/inflect"
 	stork_api "github.com/libopenstorage/stork/pkg/apis/stork/v1alpha1"
@@ -31,11 +32,24 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	storagev1 "k8s.io/api/storage/v1"
+	"github.com/libopenstorage/stork/pkg/snapshotter"
+	kSnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
+	kSnapshotv1beta1 "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1beta1"
+	"k8s.io/apimachinery/pkg/types"
+	storkvolume "github.com/libopenstorage/stork/drivers/volume"
 )
 
 var (
 	resKinds map[string]string
 )
+
+// csiBackupObject represents a backup of a series of CSI objects
+type csiBackupObject struct {
+	VolumeSnapshots          interface{} `json:"volumeSnapshots"`
+	VolumeSnapshotContents   interface{} `json:"volumeSnapshotContents"`
+	VolumeSnapshotClasses    interface{} `json:"volumeSnapshotClasses"`
+	v1VolumeSnapshotRequired bool
+}
 
 const (
 	metadataObjectName        = "metadata.json"
@@ -43,8 +57,20 @@ const (
 	crdFile                   = "crds.json"
 	resourcesFile             = "resources.json"
 	storageClassFile	= "storageclass.json"
+	snapshotObjectName = "snapshots.json"
+	snapshotBackupPrefix = "backup"
 	backupResourcesBatchCount = 15
 )
+
+func getUIDLastSection(uid types.UID) string {
+	parts := strings.Split(string(uid), "-")
+	uidLastSection := parts[len(parts)-1]
+
+	if uidLastSection == "" {
+		uidLastSection = string(uid)
+	}
+	return uidLastSection
+}
 
 func newUploadBkpResourceCommand() *cobra.Command {
 	bkpUploadCommand := &cobra.Command{
@@ -146,6 +172,13 @@ func uploadBkpResource(
 		return fmt.Errorf(errMsg)
 	}
 
+	err = uploadCSISnapshots(bkpNamespace, backup, bkpDir)
+	if err != nil {
+		errMsg := fmt.Sprintf("%s: error uploading namespace resource %v", funct, err)
+		logrus.Errorf(errMsg)
+		return fmt.Errorf(errMsg)
+	}
+
 	err = uploadCRDResources(resKinds, bkpDir, backup)
 	if err != nil {
 		errMsg := fmt.Sprintf("%s: error uploading CRD resource %v", funct, err)
@@ -233,6 +266,148 @@ func uploadResource(
 	return nil
 }
 
+func uploadCSISnapshots(
+	bkpNamespace string,
+	backup *stork_api.ApplicationBackup,
+	resourcePath string,
+) error {
+	funct := "uploadStorageClasses"
+	// snapshot.json changes
+	snapshotter, err := snapshotter.NewCSIDriver()
+	if err != nil {
+		return err
+	}
+
+	v1SnapshotRequired, err := version.RequiresV1VolumeSnapshot()
+	if err != nil {
+		return err
+	}
+	var vsMap, vsContentMap, vsClassMap interface{}
+
+	if v1SnapshotRequired {
+		vsMap = make(map[string]*kSnapshotv1.VolumeSnapshot)
+		vsContentMap = make(map[string]*kSnapshotv1.VolumeSnapshotContent)
+		vsClassMap = make(map[string]*kSnapshotv1.VolumeSnapshotClass)
+	} else {
+		vsMap = make(map[string]*kSnapshotv1beta1.VolumeSnapshot)
+		vsContentMap = make(map[string]*kSnapshotv1beta1.VolumeSnapshotContent)
+		vsClassMap = make(map[string]*kSnapshotv1beta1.VolumeSnapshotClass)
+	}
+
+	for _, volume := range backup.Status.Volumes {
+		if volume.DriverName != storkvolume.CSIDriverName {
+			continue
+		}
+		// Get PVC we're checking the backup for
+		pvc, err := core.Instance().GetPersistentVolumeClaim(volume.PersistentVolumeClaim, volume.Namespace)
+		if err != nil {
+			return err
+		}
+
+		// Not in cleanup state. From here on, we're checking if the PVC snapshot has finished.
+		snapshotName := fmt.Sprintf("%s-%s-%s", snapshotBackupPrefix, getUIDLastSection(backup.UID), getUIDLastSection(pvc.UID))
+		// getBackupSnapshotName(pvc, backup)
+
+		snapshotInfo, err := snapshotter.SnapshotStatus(
+				snapshotName,
+				volume.Namespace,
+			)
+		if err != nil {
+			logrus.Infof("sivakumar -- c.snapshotter.SnapshotStatus failed with %v", err)
+			return err
+			/*
+			vInfo.Reason = snapshotInfo.Reason
+			vInfo.Status = mapSnapshotInfoStatus(snapshotInfo.Status)
+			anyFailed = true
+			volumeInfos = append(volumeInfos, vInfo)
+			continue
+			*/
+		}
+		if v1SnapshotRequired {
+			snapshot, ok := snapshotInfo.SnapshotRequest.(*kSnapshotv1.VolumeSnapshot)
+			if !ok {
+				logrus.Infof("sivakumar -- snapshotInfo.SnapshotRequest. failed")
+				return  fmt.Errorf("failed to map volumesnapshor object")
+			}
+			vsMap.(map[string]*kSnapshotv1.VolumeSnapshot)[volume.BackupID] = snapshot
+		} else {
+			snapshot, ok := snapshotInfo.SnapshotRequest.(*kSnapshotv1beta1.VolumeSnapshot)
+			if !ok {
+				logrus.Infof("sivakumar -- snapshotInfo.SnapshotRequest. failed")
+				return  fmt.Errorf("failed to map volumesnapshor object")
+			}
+			vsMap.(map[string]*kSnapshotv1beta1.VolumeSnapshot)[volume.BackupID] = snapshot
+		}
+		if v1SnapshotRequired {
+			snapshotContent, ok := snapshotInfo.Content.(*kSnapshotv1.VolumeSnapshotContent)
+			if !ok {
+				logrus.Infof("sivakumar --- snapshotInfo.Content failed")
+				return  fmt.Errorf("failed to map volumesnapshotcontent object")
+			}
+			vsContentMap.(map[string]*kSnapshotv1.VolumeSnapshotContent)[volume.BackupID] = snapshotContent
+		} else {
+			snapshotContent, ok := snapshotInfo.Content.(*kSnapshotv1beta1.VolumeSnapshotContent)
+			if !ok {
+				logrus.Infof("sivakumar --- snapshotInfo.Content failed")
+                                return  fmt.Errorf("failed to map volumesnapshotcontent object")
+			}
+			vsContentMap.(map[string]*kSnapshotv1beta1.VolumeSnapshotContent)[volume.BackupID] = snapshotContent
+		}
+		if v1SnapshotRequired {
+			snapshotClass, ok := snapshotInfo.Class.(*kSnapshotv1.VolumeSnapshotClass)
+			if !ok {
+				logrus.Infof("sivakumar --- snapshotInfo.Class failed")
+                                return  fmt.Errorf("failed to map volumesnapshotClass object")
+			}
+			vsClassMap.(map[string]*kSnapshotv1.VolumeSnapshotClass)[snapshotClass.Name] = snapshotClass
+		} else {
+			snapshotClass, ok := snapshotInfo.Class.(*kSnapshotv1beta1.VolumeSnapshotClass)
+			if !ok {
+				logrus.Infof("sivakumar --- snapshotInfo.Class failed")
+				return  fmt.Errorf("failed to map volumesnapshotClass object")
+			}
+			vsClassMap.(map[string]*kSnapshotv1beta1.VolumeSnapshotClass)[snapshotClass.Name] = snapshotClass
+		}
+	}
+
+	var csiBackup interface{}
+	v1VolumeSnapshotRequired, err := version.RequiresV1VolumeSnapshot()
+	if err != nil {
+		return fmt.Errorf("failed to get volumesnapshot version supported by cluster")
+	}
+	if v1VolumeSnapshotRequired {
+		csiBackup = csiBackupObject{
+			VolumeSnapshots:          vsMap.(map[string]*kSnapshotv1.VolumeSnapshot),
+			VolumeSnapshotContents:   vsContentMap.(map[string]*kSnapshotv1.VolumeSnapshotContent),
+			VolumeSnapshotClasses:    vsClassMap.(map[string]*kSnapshotv1.VolumeSnapshotClass),
+			v1VolumeSnapshotRequired: true,
+		}
+	} else {
+		csiBackup = csiBackupObject{
+			VolumeSnapshots:          vsMap.(map[string]*kSnapshotv1beta1.VolumeSnapshot),
+			VolumeSnapshotContents:   vsContentMap.(map[string]*kSnapshotv1beta1.VolumeSnapshotContent),
+			VolumeSnapshotClasses:    vsClassMap.(map[string]*kSnapshotv1beta1.VolumeSnapshotClass),
+			v1VolumeSnapshotRequired: false,
+		}
+	}
+
+	var csiBackupBytes []byte
+
+	csiBackupBytes, err = json.Marshal(csiBackup)
+	if err != nil {
+		return err
+	}
+	err = uploadData(resourcePath, csiBackupBytes, snapshotObjectName, "")
+	if err != nil {
+		logrus.Errorf("%s err: %v", funct, err)
+		return err
+	}
+
+	logrus.Infof("sivakumar --->>>  Sleeping for 120 sec")
+	time.Sleep(time.Second * 120)
+	return nil
+}
+
 func uploadStorageClasses(
 	bkpNamespace string,
 	backup *stork_api.ApplicationBackup,
@@ -278,6 +453,56 @@ func uploadStorageClasses(
 		logrus.Errorf("%s err: %v", funct, err)
 		return err
 	}
+	/*
+	// snapshot.json changes
+	snapshotter, err := snapshotter.NewCSIDriver()
+	if err != nil {
+		return err
+	}
+	v1SnapshotRequired, err := version.RequiresV1VolumeSnapshot()
+	if err != nil {
+		return err
+	}
+	for _, volume := range backup.Status.Volumes {
+		// Get PVC we're checking the backup for
+		pvc, err := core.Instance().GetPersistentVolumeClaim(volume.PersistentVolumeClaim, volume.Namespace)
+		if err != nil {
+			return err
+		}
+
+		// Not in cleanup state. From here on, we're checking if the PVC snapshot has finished.
+		snapshotName := fmt.Sprintf("%s-%s-%s", snapshotBackupPrefix, getUIDLastSection(backup.UID), getUIDLastSection(pvc.UID))
+		// getBackupSnapshotName(pvc, backup)
+
+		snapshotInfo, err := snapshotter.SnapshotStatus(
+				snapshotName,
+				volume.Namespace,
+			)
+		if err != nil {
+			logrus.Infof("sivakumar -- c.snapshotter.SnapshotStatus failed with %v", err)
+			vInfo.Reason = snapshotInfo.Reason
+			vInfo.Status = mapSnapshotInfoStatus(snapshotInfo.Status)
+			anyFailed = true
+			volumeInfos = append(volumeInfos, vInfo)
+			continue
+		}
+		if v1SnapshotRequired {
+			snapshot, ok := snapshotInfo.SnapshotRequest.(*kSnapshotv1.VolumeSnapshot)
+			if !ok {
+				logrus.Infof("sivakumar -- snapshotInfo.SnapshotRequest. failed")
+			}
+			logrus.Infof("sivakumar ---->>> snapshot %+v", snapshot)
+		} else {
+			snapshot, ok := snapshotInfo.SnapshotRequest.(*kSnapshotv1beta1.VolumeSnapshot)
+			if !ok {
+				logrus.Infof("sivakumar -- snapshotInfo.SnapshotRequest. failed")
+			}
+			logrus.Infof("sivakumar ---->>> snapshot %+v", snapshot)
+		}
+	}
+	logrus.Infof("sivakumar --->>>  Sleeping for 120 sec")
+	time.Sleep(time.Second * 120)
+	*/
 	return nil
 }
 
