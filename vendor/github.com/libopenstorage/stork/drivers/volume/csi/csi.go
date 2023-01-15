@@ -22,6 +22,7 @@ import (
 	"github.com/libopenstorage/stork/pkg/objectstore"
 	"github.com/libopenstorage/stork/pkg/snapshotter"
 	"github.com/libopenstorage/stork/pkg/version"
+	"github.com/portworx/kdmp/pkg/executor"
 	"github.com/portworx/sched-ops/k8s/core"
 	storkops "github.com/portworx/sched-ops/k8s/stork"
 	"github.com/sirupsen/logrus"
@@ -309,7 +310,12 @@ func (c *csi) OwnsPVCForBackup(
 	pvc *v1.PersistentVolumeClaim,
 	cmBackupType string,
 	crBackupType string,
+	blType storkapi.BackupLocationType,
 ) bool {
+	// For CSI volume and backuplocation type is NFS, It will default to kdmp
+	if blType == storkapi.BackupLocationNFS {
+		return false
+	}
 	if cmBackupType == storkapi.ApplicationBackupGeneric || crBackupType == storkapi.ApplicationBackupGeneric {
 		// If user has forced the backupType in config map or applicationbackup CR, default to generic always
 		return false
@@ -1208,6 +1214,7 @@ func (c *csi) GetPreRestoreResources(
 	backup *storkapi.ApplicationBackup,
 	restore *storkapi.ApplicationRestore,
 	resources []runtime.Unstructured,
+	storageClassBytes []byte,
 ) ([]runtime.Unstructured, error) {
 	return c.getRestoreStorageClasses(backup, resources)
 }
@@ -1218,35 +1225,73 @@ func (c *csi) downloadObject(
 	namespace string,
 	objectName string,
 ) ([]byte, error) {
+	funct := "downloadObject"
+	var data []byte
 	restoreLocation, err := storkops.Instance().GetBackupLocation(backupLocation, namespace)
 	if err != nil {
 		return nil, err
 	}
-	bucket, err := objectstore.GetBucket(restoreLocation)
-	if err != nil {
-		return nil, err
-	}
-
-	objectPath := backup.Status.BackupPath
-	exists, err := bucket.Exists(context.TODO(), filepath.Join(objectPath, objectName))
-	if err != nil || !exists {
-		return nil, nil
-	}
-
-	data, err := bucket.ReadAll(context.TODO(), filepath.Join(objectPath, objectName))
-	if err != nil {
-		return nil, err
-	}
-	if restoreLocation.Location.EncryptionKey != "" {
-		return nil, fmt.Errorf("EncryptionKey is deprecated, use EncryptionKeyV2 instead")
-	}
-	if restoreLocation.Location.EncryptionV2Key != "" {
-		var decryptData []byte
-		if decryptData, err = crypto.Decrypt(data, restoreLocation.Location.EncryptionV2Key); err != nil {
-			logrus.Debugf("decrypt failed with: %v and returning the data as it is", err)
-			return data, nil
+	if restoreLocation.Location.Type == storkapi.BackupLocationNFS {
+		// NFS backuplocation type.
+		repo, err := executor.ParseCloudCred()
+		if err != nil {
+			logrus.Errorf("%s: error parsing cloud cred: %v", funct, err)
+			return nil, err
 		}
-		return decryptData, nil
+		bkpDir := filepath.Join(repo.Path, backup.Status.BackupPath)
+		/*
+			restoreLocation, err := storkops.Instance().GetBackupLocation(backup.Spec.BackupLocation, namespace)
+			if err != nil {
+				return nil, err
+			}
+			// create CRD resource first
+			if err := downloadCRD(bkpDir, crdFile, restoreLocation.Location.EncryptionV2Key); err != nil {
+				return nil, fmt.Errorf("error downloading CRDs: %v", err)
+			}
+		*/
+		data, err = executor.DownloadObject(bkpDir, objectName, restoreLocation.Location.EncryptionV2Key)
+		if err != nil {
+			return nil, fmt.Errorf("error downloading resources: %v", err)
+		}
+		/*
+			objects := make([]*unstructured.Unstructured, 0)
+			if err = json.Unmarshal(data, &objects); err != nil {
+				return nil, err
+			}
+			runtimeObjects := make([]runtime.Unstructured, 0)
+			for _, o := range objects {
+				runtimeObjects = append(runtimeObjects, o)
+			}
+		*/
+		return data, nil
+	} else {
+		// Non NFS backuplocation type
+		bucket, err := objectstore.GetBucket(restoreLocation)
+		if err != nil {
+			return nil, err
+		}
+
+		objectPath := backup.Status.BackupPath
+		exists, err := bucket.Exists(context.TODO(), filepath.Join(objectPath, objectName))
+		if err != nil || !exists {
+			return nil, nil
+		}
+
+		data, err = bucket.ReadAll(context.TODO(), filepath.Join(objectPath, objectName))
+		if err != nil {
+			return nil, err
+		}
+		if restoreLocation.Location.EncryptionKey != "" {
+			return nil, fmt.Errorf("EncryptionKey is deprecated, use EncryptionKeyV2 instead")
+		}
+		if restoreLocation.Location.EncryptionV2Key != "" {
+			var decryptData []byte
+			if decryptData, err = crypto.Decrypt(data, restoreLocation.Location.EncryptionV2Key); err != nil {
+				logrus.Debugf("decrypt failed with: %v and returning the data as it is", err)
+				return data, nil
+			}
+			return decryptData, nil
+		}
 	}
 
 	return data, nil
