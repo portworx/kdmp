@@ -167,10 +167,18 @@ func restoreVolResourcesAndApply(
 		log.ApplicationRestoreLog(restore).Errorf("Error downloading resources: %v", err)
 		return err
 	}
-	driver, err := volume.Get("kdmp")
+
+	storageClassByte, err := downloadStorageClass(backup, restore.Spec.BackupLocation, restore.Namespace)
 	if err != nil {
+		log.ApplicationRestoreLog(restore).Errorf("Error downloading storageclass: %v", err)
 		return err
 	}
+	/*
+		driver, err := volume.Get("kdmp")
+		if err != nil {
+			return err
+		}
+	*/
 	existingRestoreVolInfos := make([]*storkapi.ApplicationRestoreVolumeInfo, 0)
 	info := storkapi.ObjectInfo{
 		GroupVersionKind: metav1.GroupVersionKind{
@@ -182,13 +190,14 @@ func restoreVolResourcesAndApply(
 	objectMap := storkapi.CreateObjectsMap(restore.Spec.IncludeResources)
 	pvcCount := 0
 	restoreDone := 0
-	driverName := "kdmp"
+	// driverName := "kdmp"
 	backupVolumeInfoMappings := make(map[string][]*storkapi.ApplicationBackupVolumeInfo)
 	for _, namespace := range backup.Spec.Namespaces {
 		if _, ok := restore.Spec.NamespaceMapping[namespace]; !ok {
 			continue
 		}
 		for _, volumeBackup := range backup.Status.Volumes {
+			driverName := volumeBackup.DriverName
 			if volumeBackup.Namespace != namespace {
 				continue
 			}
@@ -226,8 +235,14 @@ func restoreVolResourcesAndApply(
 	// Iterate over bkp vol info and create the pvc
 	resourceBackupVolInfos := make([]*kdmpapi.ResourceBackupVolumeInfo, 0)
 	existingResourceBackupVolInfos := make([]*kdmpapi.ResourceRestoreVolumeInfo, 0)
+	restoreResourceBackupVolInfos := make([]*kdmpapi.ResourceRestoreVolumeInfo, 0)
+	restoreResourceBackupCompleteList := make([]*kdmpapi.ResourceRestoreVolumeInfo, 0)
 
-	for _, bkpvInfo := range backupVolumeInfoMappings {
+	for driverName, bkpvInfo := range backupVolumeInfoMappings {
+		driver, err := volume.Get(driverName)
+		if err != nil {
+			return err
+		}
 		backupVolInfos := bkpvInfo
 		// Skip pv/pvc if replacepolicy is set to retain to avoid creating
 		if restore.Spec.ReplacePolicy == storkapi.ApplicationRestoreReplacePolicyRetain {
@@ -243,7 +258,8 @@ func restoreVolResourcesAndApply(
 		// Convert ApplicationRestoreVolumeInfo to ResourceRestoreVolumeInfo
 		resourceBackupVolInfos = convertAppBkpVolInfoToResourceVolInfo(backupVolInfos)
 		existingResourceBackupVolInfos = convertAppRestoreVolInfoToResourceVolInfo(existingRestoreVolInfos)
-		preRestoreObjects, err := GetPreRestoreResources(backup, restore, objects)
+		restoreCompleteList = append(restoreCompleteList, existingRestoreVolInfos...)
+		preRestoreObjects, err := driver.GetPreRestoreResources(backup, restore, objects, storageClassByte)
 		if err != nil {
 			log.ApplicationRestoreLog(restore).Errorf("Error getting PreRestore Resources: %v", err)
 			return err
@@ -288,58 +304,66 @@ func restoreVolResourcesAndApply(
 				return err
 			}
 		}
-		for _, vInfo := range bkpvInfo {
-			restoreNamespace, ok := restore.Spec.NamespaceMapping[vInfo.Namespace]
-			if !ok {
-				return fmt.Errorf("restore namespace mapping not found: %s", vInfo.Namespace)
+		/*
+			for _, vInfo := range bkpvInfo {
+				restoreNamespace, ok := restore.Spec.NamespaceMapping[vInfo.Namespace]
+				if !ok {
+					return fmt.Errorf("restore namespace mapping not found: %s", vInfo.Namespace)
 
-			}
-			pvc, err := volume.GetPVCFromObjects(preRestoreObjects, vInfo)
-			if err != nil {
-				return err
-			}
-			pvc.Namespace = restoreNamespace
-			// TODO:
-			// Also need to add zone supports for cloud provider (EBS)
-			// We have to make sure restore pod comes up on the same zone where PVC is
-			// provisioned
-			logrus.Tracef("content of pvc being created: %+v", pvc)
-			logrus.Infof("creating pvc [%v/%v]", pvc.Namespace, pvc.Name)
-			_, err = core.Instance().CreatePersistentVolumeClaim(pvc)
-			if err != nil {
-				if !k8s_errors.IsAlreadyExists(err) {
-					return fmt.Errorf("failed to create PVC %s: %s", pvc.Name, err.Error())
 				}
-				logrus.Infof("skipping pvc creation [%v/%v] as it already exists", pvc.Namespace, pvc.Name)
+				pvc, err := volume.GetPVCFromObjects(preRestoreObjects, vInfo)
+				if err != nil {
+					return err
+				}
+				pvc.Namespace = restoreNamespace
+				// TODO:
+				// Also need to add zone supports for cloud provider (EBS)
+				// We have to make sure restore pod comes up on the same zone where PVC is
+				// provisioned
+				logrus.Tracef("content of pvc being created: %+v", pvc)
+				logrus.Infof("creating pvc [%v/%v]", pvc.Namespace, pvc.Name)
+				_, err = core.Instance().CreatePersistentVolumeClaim(pvc)
+				if err != nil {
+					if !k8s_errors.IsAlreadyExists(err) {
+						return fmt.Errorf("failed to create PVC %s: %s", pvc.Name, err.Error())
+					}
+					logrus.Infof("skipping pvc creation [%v/%v] as it already exists", pvc.Namespace, pvc.Name)
+				}
+				// Once a PVC is created, update the reference to it in the resourceBackup CR and later
+				// check if PVC is bounded or not
+				// Check the PVC state to be in bounded state and update the resourceBackup CR with the same
+				rb, err := kdmpschedops.Instance().GetResourceBackup(rbCrName, rbCrNamespace)
+				if err != nil {
+					errMsg := fmt.Sprintf("error reading ResourceBackup CR[%v/%v]: %v", rbCrNamespace, rbCrName, err)
+					return fmt.Errorf(errMsg)
+				}
+				// TODO: In future we can optimize this path where we can directly get runtime.Unstructured from the preRestoreObjects
+				// for the respective pvc
+				o, err := fetchObjectFromPVC(preRestoreObjects, pvc, restore.Spec.NamespaceMapping)
+				if err != nil {
+					// Proceed to next PVC
+					continue
+				}
+				if err = updateResourceStatus(
+					rb,
+					o,
+					kdmpapi.ResourceRestoreStatusInProgress,
+					"PVC Bound in progress"); err != nil {
+					return err
+				}
+				_, err = kdmpschedops.Instance().UpdateResourceBackup(rb)
+				if err != nil {
+					errMsg := fmt.Sprintf("error updating ResourceBackup CR[%v/%v]: %v", rbCrNamespace, rbCrName, err)
+					return fmt.Errorf(errMsg)
+				}
 			}
-			// Once a PVC is created, update the reference to it in the resourceBackup CR and later
-			// check if PVC is bounded or not
-			// Check the PVC state to be in bounded state and update the resourceBackup CR with the same
-			rb, err := kdmpschedops.Instance().GetResourceBackup(rbCrName, rbCrNamespace)
-			if err != nil {
-				errMsg := fmt.Sprintf("error reading ResourceBackup CR[%v/%v]: %v", rbCrNamespace, rbCrName, err)
-				return fmt.Errorf(errMsg)
-			}
-			// TODO: In future we can optimize this path where we can directly get runtime.Unstructured from the preRestoreObjects
-			// for the respective pvc
-			o, err := fetchObjectFromPVC(preRestoreObjects, pvc, restore.Spec.NamespaceMapping)
-			if err != nil {
-				// Proceed to next PVC
-				continue
-			}
-			if err = updateResourceStatus(
-				rb,
-				o,
-				kdmpapi.ResourceRestoreStatusInProgress,
-				"PVC Bound in progress"); err != nil {
-				return err
-			}
-			_, err = kdmpschedops.Instance().UpdateResourceBackup(rb)
-			if err != nil {
-				errMsg := fmt.Sprintf("error updating ResourceBackup CR[%v/%v]: %v", rbCrNamespace, rbCrName, err)
-				return fmt.Errorf(errMsg)
-			}
+		*/
+		restoreVolumeInfos, sErr := driver.StartRestore(restore, backupVolInfos, preRestoreObjects)
+		if err != nil {
+			return err
 		}
+		restoreResourceBackupVolInfos = convertAppRestoreVolInfoToResourceVolInfo(restoreVolumeInfos)
+		restoreResourceBackupCompleteList = append(restoreResourceBackupCompleteList, restoreResourceBackupVolInfos...)
 	}
 
 	// Check if all the PVC's are in bounded state
@@ -351,19 +375,27 @@ func restoreVolResourcesAndApply(
 	// Updating vol info
 
 	rb.VolumesInfo = resourceBackupVolInfos
-	rb.ExistingVolumesInfo = existingResourceBackupVolInfos
-	// Updation of rb cr happens inside isPVCsBounded()
-	err = isPVCsBounded(rb)
+	rb.ExistingVolumesInfo = restoreCompleteList
+	/*
+		// Updation of rb cr happens inside isPVCsBounded()
+		err = isPVCsBounded(rb)
+		if err != nil {
+			return err
+		}
+	*/
+	rb, err := kdmpschedops.Instance().UpdateResourceBackup(rb)
 	if err != nil {
-		return err
-	}
-
-	rbUpdated, err := kdmpschedops.Instance().GetResourceBackup(rbCrName, rbCrNamespace)
-	if err != nil {
-		errMsg := fmt.Sprintf("error reading ResourceBackup CR[%v/%v]: %v", rbCrNamespace, rbCrName, err)
+		errMsg := fmt.Sprintf("error updating ResourceBackup CR[%v/%v]: %v", rbCrNamespace, rbCrName, err)
 		return fmt.Errorf(errMsg)
 	}
-	logrus.Infof("%s rb cr after update: %+v", funct, rbUpdated)
+	/*
+		rbUpdated, err := kdmpschedops.Instance().GetResourceBackup(rbCrName, rbCrNamespace)
+		if err != nil {
+			errMsg := fmt.Sprintf("error reading ResourceBackup CR[%v/%v]: %v", rbCrNamespace, rbCrName, err)
+			return fmt.Errorf(errMsg)
+		}
+	*/
+	logrus.Infof("%s rb cr after update: %+v", funct, rb)
 	logrus.Infof("Completed job successfully")
 	return nil
 }
