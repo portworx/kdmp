@@ -278,8 +278,7 @@ func downloadStorageClass(
 	if err != nil {
 		return nil, err
 	}
-	}
-	data, err := executor.DownloadObject(bkpDir, "storageclasses.json", restoreLocation.Location.EncryptionV2Key)
+	data, err := executor.DownloadObject(bkpDir, "storageclass.json", restoreLocation.Location.EncryptionV2Key)
 	if err != nil {
 		return nil, fmt.Errorf("error downloading storageclass: %v", err)
 	}

@@ -237,7 +237,8 @@ func restoreVolResourcesAndApply(
 	existingResourceBackupVolInfos := make([]*kdmpapi.ResourceRestoreVolumeInfo, 0)
 	restoreResourceBackupVolInfos := make([]*kdmpapi.ResourceRestoreVolumeInfo, 0)
 	restoreResourceBackupCompleteList := make([]*kdmpapi.ResourceRestoreVolumeInfo, 0)
-
+	var sErr error
+	var restoreVolumeInfos []*storkapi.ApplicationRestoreVolumeInfo
 	for driverName, bkpvInfo := range backupVolumeInfoMappings {
 		driver, err := volume.Get(driverName)
 		if err != nil {
@@ -258,7 +259,7 @@ func restoreVolResourcesAndApply(
 		// Convert ApplicationRestoreVolumeInfo to ResourceRestoreVolumeInfo
 		resourceBackupVolInfos = convertAppBkpVolInfoToResourceVolInfo(backupVolInfos)
 		existingResourceBackupVolInfos = convertAppRestoreVolInfoToResourceVolInfo(existingRestoreVolInfos)
-		restoreCompleteList = append(restoreCompleteList, existingRestoreVolInfos...)
+		restoreResourceBackupCompleteList = append(restoreResourceBackupCompleteList, existingResourceBackupVolInfos...)
 		preRestoreObjects, err := driver.GetPreRestoreResources(backup, restore, objects, storageClassByte)
 		if err != nil {
 			log.ApplicationRestoreLog(restore).Errorf("Error getting PreRestore Resources: %v", err)
@@ -358,10 +359,11 @@ func restoreVolResourcesAndApply(
 				}
 			}
 		*/
-		restoreVolumeInfos, sErr := driver.StartRestore(restore, backupVolInfos, preRestoreObjects)
+		restoreVolumeInfos, sErr = driver.StartRestore(restore, backupVolInfos, preRestoreObjects)
 		if err != nil {
 			return err
 		}
+		logrus.Infof("sErr --- sivakumar -- %v", sErr)
 		restoreResourceBackupVolInfos = convertAppRestoreVolInfoToResourceVolInfo(restoreVolumeInfos)
 		restoreResourceBackupCompleteList = append(restoreResourceBackupCompleteList, restoreResourceBackupVolInfos...)
 	}
@@ -374,8 +376,13 @@ func restoreVolResourcesAndApply(
 	}
 	// Updating vol info
 
+	if sErr != nil {
+		rb.Status.Status = kdmpapi.ResourceBackupStatusSuccessful
+		rb.Status.Reason = utils.PvcBoundSuccessMsg
+		rb.Status.ProgressPercentage = 100
+	}
 	rb.VolumesInfo = resourceBackupVolInfos
-	rb.ExistingVolumesInfo = restoreCompleteList
+	rb.ExistingVolumesInfo = restoreResourceBackupCompleteList
 	/*
 		// Updation of rb cr happens inside isPVCsBounded()
 		err = isPVCsBounded(rb)
@@ -383,7 +390,7 @@ func restoreVolResourcesAndApply(
 			return err
 		}
 	*/
-	rb, err := kdmpschedops.Instance().UpdateResourceBackup(rb)
+	rb, err = kdmpschedops.Instance().UpdateResourceBackup(rb)
 	if err != nil {
 		errMsg := fmt.Sprintf("error updating ResourceBackup CR[%v/%v]: %v", rbCrNamespace, rbCrName, err)
 		return fmt.Errorf(errMsg)
