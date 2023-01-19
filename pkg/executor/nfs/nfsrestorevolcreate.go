@@ -376,7 +376,7 @@ func restoreVolResourcesAndApply(
 	}
 	// Updating vol info
 
-	if sErr != nil {
+	if sErr == nil {
 		rb.Status.Status = kdmpapi.ResourceBackupStatusSuccessful
 		rb.Status.Reason = utils.PvcBoundSuccessMsg
 		rb.Status.ProgressPercentage = 100
