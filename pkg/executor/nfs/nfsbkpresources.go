@@ -24,6 +24,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	v1 "k8s.io/api/core/v1"
+	storagev1 "k8s.io/api/storage/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	k8s_errors "k8s.io/apimachinery/pkg/api/errors"
@@ -41,6 +42,7 @@ const (
 	namespacesFile            = "namespaces.json"
 	crdFile                   = "crds.json"
 	resourcesFile             = "resources.json"
+	storageClassFile          = "storageclass.json"
 	backupResourcesBatchCount = 15
 )
 
@@ -123,28 +125,40 @@ func uploadBkpResource(
 		return fmt.Errorf(errMsg)
 	}
 	// First create the required directory
-	err = uploadResource(bkpNamespace, backup, bkpDir)
+	encryptionKey, err := getEncryptionKey(bkpNamespace, backup)
+	if err != nil {
+		logrus.Errorf("%s err: %v", funct, err)
+		return err
+	}
+	err = uploadResource(bkpNamespace, backup, bkpDir, encryptionKey)
 	if err != nil {
 		errMsg := fmt.Sprintf("%s: error uploading resources: %v", funct, err)
 		logrus.Errorf(errMsg)
 		return fmt.Errorf(errMsg)
 	}
 
-	err = uploadNamespaces(bkpNamespace, backup, bkpDir)
+	err = uploadNamespaces(bkpNamespace, backup, bkpDir, encryptionKey)
 	if err != nil {
 		errMsg := fmt.Sprintf("%s: error uploading namespace resource %v", funct, err)
 		logrus.Errorf(errMsg)
 		return fmt.Errorf(errMsg)
 	}
 
-	err = uploadCRDResources(resKinds, bkpDir, backup)
+	err = uploadStorageClasses(bkpNamespace, backup, bkpDir, encryptionKey)
+	if err != nil {
+		errMsg := fmt.Sprintf("%s: error uploading storageclasses %v", funct, err)
+		logrus.Errorf(errMsg)
+		return fmt.Errorf(errMsg)
+	}
+
+	err = uploadCRDResources(resKinds, bkpDir, backup, encryptionKey)
 	if err != nil {
 		errMsg := fmt.Sprintf("%s: error uploading CRD resource %v", funct, err)
 		logrus.Errorf(errMsg)
 		return fmt.Errorf(errMsg)
 	}
 
-	err = uploadMetadatResources(bkpNamespace, backup, bkpDir)
+	err = uploadMetadatResources(bkpNamespace, backup, bkpDir, encryptionKey)
 	if err != nil {
 		errMsg := fmt.Sprintf("%s: error uploading metadata resource %v", funct, err)
 		logrus.Errorf(errMsg)
@@ -158,6 +172,7 @@ func uploadResource(
 	bkpNamespace string,
 	backup *stork_api.ApplicationBackup,
 	resourcePath string,
+	encryptionKey string,
 ) error {
 	funct := "uploadResource"
 	rc := initResourceCollector()
@@ -209,12 +224,6 @@ func uploadResource(
 		return err
 	}
 
-	encryptionKey, err := getEncryptionKey(bkpNamespace, backup)
-	if err != nil {
-		logrus.Errorf("%s err: %v", funct, err)
-		return err
-	}
-
 	err = uploadData(resourcePath, jsonBytes, resourcesFile, encryptionKey)
 	if err != nil {
 		logrus.Errorf("%s: %v", funct, err)
@@ -224,10 +233,53 @@ func uploadResource(
 	return nil
 }
 
+func uploadStorageClasses(
+	bkpNamespace string,
+	backup *stork_api.ApplicationBackup,
+	resourcePath string,
+	encryptionKey string,
+) error {
+	funct := "uploadStorageClasses"
+	storageClassAdded := make(map[string]bool)
+	var storageClasses []*storagev1.StorageClass
+	for _, volume := range backup.Status.Volumes {
+		// Get the pvc spec
+		pvc, err := core.Instance().GetPersistentVolumeClaim(volume.PersistentVolumeClaim, volume.Namespace)
+		if err != nil {
+			return err
+		}
+		// Get storageclass
+		sc, err := core.Instance().GetStorageClassForPVC(pvc)
+		if err != nil {
+			return fmt.Errorf("failed to get storage class for PVC %s: %v", pvc.Name, err)
+		}
+		// only add one instance of a storageclass
+		if !storageClassAdded[sc.Name] {
+			sc.Kind = "StorageClass"
+			sc.APIVersion = "storage.k8s.io/v1"
+			sc.ResourceVersion = ""
+			storageClasses = append(storageClasses, sc)
+			storageClassAdded[sc.Name] = true
+		}
+
+	}
+	scJSONBytes, err := json.Marshal(storageClasses)
+	if err != nil {
+		return err
+	}
+	err = uploadData(resourcePath, scJSONBytes, storageClassFile, encryptionKey)
+	if err != nil {
+		logrus.Errorf("%s err: %v", funct, err)
+		return err
+	}
+	return nil
+}
+
 func uploadNamespaces(
 	bkpNamespace string,
 	backup *stork_api.ApplicationBackup,
 	resourcePath string,
+	encryptionKey string,
 ) error {
 	funct := "uploadNamespaces"
 	var namespaces []*v1.Namespace
@@ -247,12 +299,6 @@ func uploadNamespaces(
 		return err
 	}
 
-	encryptionKey, err := getEncryptionKey(bkpNamespace, backup)
-	if err != nil {
-		logrus.Errorf("%s err: %v", funct, err)
-		return err
-	}
-
 	err = uploadData(resourcePath, jsonBytes, namespacesFile, encryptionKey)
 	if err != nil {
 		logrus.Errorf("%s err: %v", funct, err)
@@ -266,6 +312,7 @@ func uploadCRDResources(
 	resKinds map[string]string,
 	resourcePath string,
 	backup *stork_api.ApplicationBackup,
+	encryptionKey string,
 ) error {
 	funct := "uploadCRDResources"
 	crdList, err := storkops.Instance().ListApplicationRegistrations()
@@ -318,12 +365,6 @@ func uploadCRDResources(
 			return err
 		}
 
-		encryptionKey, err := getEncryptionKey(bkpNamespace, backup)
-		if err != nil {
-			logrus.Errorf("%s err: %v", funct, err)
-			return err
-		}
-
 		err = uploadData(resourcePath, jsonBytes, crdFile, encryptionKey)
 		if err != nil {
 			logrus.Errorf("%s err: %v", funct, err)
@@ -366,13 +407,6 @@ func uploadCRDResources(
 		logrus.Errorf("%s err: %v", funct, err)
 		return err
 	}
-
-	encryptionKey, err := getEncryptionKey(bkpNamespace, backup)
-	if err != nil {
-		logrus.Errorf("%s err: %v", funct, err)
-		return err
-	}
-
 	err = uploadData(resourcePath, jsonBytes, crdFile, encryptionKey)
 	if err != nil {
 		logrus.Errorf("%s err: %v", funct, err)
@@ -393,6 +427,7 @@ func uploadMetadatResources(
 	bkpNamespace string,
 	backup *stork_api.ApplicationBackup,
 	resourcePath string,
+	encryptionKey string,
 ) error {
 	funct := "uploadMetadatResources"
 	// In the in-memory copy alone, we will update the backup status to success.
@@ -409,12 +444,6 @@ func uploadMetadatResources(
 
 	jsonBytes, err := json.MarshalIndent(backup, "", " ")
 	if err != nil {
-		return err
-	}
-
-	encryptionKey, err := getEncryptionKey(bkpNamespace, backup)
-	if err != nil {
-		logrus.Errorf("%s err: %v", funct, err)
 		return err
 	}
 
