@@ -1261,7 +1261,6 @@ func (c *Controller) stageLocalSnapshotRestoreInProgress(ctx context.Context, da
 }
 
 func (c *Controller) cleanUp(driver drivers.Interface, de *kdmpapi.DataExport) error {
-	var bl *storkapi.BackupLocation
 	doCleanup, err := utils.DoCleanupResource()
 	if err != nil {
 		return err
@@ -1279,35 +1278,6 @@ func (c *Controller) cleanUp(driver drivers.Interface, de *kdmpapi.DataExport) e
 			return fmt.Errorf(msg)
 		}
 	} else if hasSnapshotStage(de) {
-		snapshotDriverName, err := c.getSnapshotDriverName(de)
-		if err != nil {
-			return fmt.Errorf("failed to get snapshot driver name: %v", err)
-		}
-
-		snapshotDriver, err := c.snapshotter.Driver(snapshotDriverName)
-		if err != nil {
-			return fmt.Errorf("failed to get snapshot driver for %v: %v", snapshotDriverName, err)
-		}
-		if de.Status.SnapshotPVCName != "" && de.Status.SnapshotPVCNamespace != "" {
-			pvcUID := getAnnotationValue(de, pvcUIDKey)
-			// Construct the backuplocation from the secret
-			// Since we same name across the resources, using the de name and namespace as secret name and namespace
-			bl, err = getBackuplocationFromSecret(de.Name, de.Spec.Source.Namespace)
-			if err != nil {
-				// If secret is not found, we assume, it is retry
-				if k8sErrors.IsNotFound(err) {
-					return nil
-				}
-				return fmt.Errorf("backuplocation fetch error: %v", err)
-			}
-			objectPath := getCSICRUploadDirectory(pvcUID)
-			err = snapshotDriver.RetainLocalSnapshots(bl, snapshotDriverName, de.Spec.SnapshotStorageClass, de.Status.SnapshotPVCNamespace, pvcUID, objectPath, false)
-			msg := fmt.Sprintf("failed in removing older local snapshots for %s/%s: %v", de.Status.SnapshotPVCNamespace, de.Status.SnapshotPVCName, err)
-			if err != nil {
-				logrus.Errorf(msg)
-				return fmt.Errorf(msg)
-			}
-		}
 		if de.Status.SnapshotPVCName != "" && de.Status.SnapshotPVCNamespace != "" {
 			if err := cleanupJobBoundResources(de.Status.SnapshotPVCName, de.Status.SnapshotPVCNamespace); err != nil {
 				return fmt.Errorf("cleaning up of bound job resources failed: %v", err)
