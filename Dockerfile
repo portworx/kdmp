@@ -1,4 +1,4 @@
-FROM ubuntu:latest
+FROM ubuntu:jammy
 MAINTAINER Portworx Inc. <support@portworx.com>
 
 RUN apt-get update \
