@@ -18,6 +18,10 @@ type Interface interface {
 	BackupLocationMaintenances() BackupLocationMaintenanceInformer
 	// DataExports returns a DataExportInformer.
 	DataExports() DataExportInformer
+	// ResourceBackups returns a ResourceBackupInformer.
+	ResourceBackups() ResourceBackupInformer
+	// ResourceExports returns a ResourceExportInformer.
+	ResourceExports() ResourceExportInformer
 	// VolumeBackups returns a VolumeBackupInformer.
 	VolumeBackups() VolumeBackupInformer
 	// VolumeBackupDeletes returns a VolumeBackupDeleteInformer.
@@ -43,6 +47,16 @@ func (v *version) BackupLocationMaintenances() BackupLocationMaintenanceInformer
 // DataExports returns a DataExportInformer.
 func (v *version) DataExports() DataExportInformer {
 	return &dataExportInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
+}
+
+// ResourceBackups returns a ResourceBackupInformer.
+func (v *version) ResourceBackups() ResourceBackupInformer {
+	return &resourceBackupInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
+}
+
+// ResourceExports returns a ResourceExportInformer.
+func (v *version) ResourceExports() ResourceExportInformer {
+	return &resourceExportInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
 // VolumeBackups returns a VolumeBackupInformer.
