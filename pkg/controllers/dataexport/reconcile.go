@@ -294,7 +294,7 @@ func (c *Controller) sync(ctx context.Context, in *kdmpapi.DataExport) (bool, er
 		}
 
 		if backupLocation.Location.Type != storkapi.BackupLocationNFS {
-			backupLocation.Location.NfsConfig = &storkapi.NfsConfig{}
+			backupLocation.Location.NFSConfig = &storkapi.NFSConfig{}
 		}
 		// start data transfer
 		id, err := startTransferJob(
@@ -305,9 +305,9 @@ func (c *Controller) sync(ctx context.Context, in *kdmpapi.DataExport) (bool, er
 			podDataPath,
 			utils.KdmpConfigmapName,
 			utils.KdmpConfigmapNamespace,
-			backupLocation.Location.NfsConfig.ServerAddr,
+			backupLocation.Location.NFSConfig.ServerAddr,
 			backupLocation.Location.Path,
-			backupLocation.Location.NfsConfig.MountOption,
+			backupLocation.Location.NFSConfig.MountOptions,
 		)
 		if err != nil && err != utils.ErrJobAlreadyRunning && err != utils.ErrOutOfJobResources {
 			msg := fmt.Sprintf("failed to start a data transfer job, dataexport [%v]: %v", dataExport.Name, err)
