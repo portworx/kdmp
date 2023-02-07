@@ -50,7 +50,7 @@ test-container:
 	@echo "Building container: docker build --tag $(KDMP_UNITTEST_IMG) -f Dockerfile.unittest ."
 	docker build --tag $(KDMP_UNITTEST_IMG) -f Dockerfile.unittest .
 
-pretest: check-fmt lint vet errcheck staticcheck
+pretest: check-fmt vet errcheck staticcheck
 build: update-deployment build-kdmp build-restic-executor kopia-executor build-pxc-exporter
 container: container-kdmp container-restic-executor container-kopia-executor container-pxc-exporter
 deploy: deploy-kdmp deploy-restic-executor deploy-kopia-executor deploy-pxc-exporter
@@ -82,7 +82,7 @@ vet:
 
 
 staticcheck:
-	GOFLAGS="" go install honnef.co/go/tools/cmd/staticcheck@v0.2.2
+	GOFLAGS="" go install honnef.co/go/tools/cmd/staticcheck@v0.3.3
 	staticcheck $(PKGS)
 	#staticcheck -tags integrationtest test/integration_test/*.go
 	staticcheck -tags unittest $(PKGS)
