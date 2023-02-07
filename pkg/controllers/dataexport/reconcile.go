@@ -3,7 +3,6 @@ package dataexport
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -1976,7 +1975,7 @@ func createAzureSecret(secretName string, backupLocation *storkapi.BackupLocatio
 func createCertificateSecret(secretName, namespace string, labels map[string]string) error {
 	drivers.CertFilePath = os.Getenv(drivers.CertDirPath)
 	if drivers.CertFilePath != "" {
-		certificateData, err := ioutil.ReadFile(filepath.Join(drivers.CertFilePath, drivers.CertFileName))
+		certificateData, err := os.ReadFile(filepath.Join(drivers.CertFilePath, drivers.CertFileName))
 		if err != nil {
 			errMsg := fmt.Sprintf("failed reading data from file %s : %s", drivers.CertFilePath, err)
 			logrus.Errorf("%v", errMsg)
