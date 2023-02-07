@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"time"
@@ -245,7 +244,7 @@ func runMaintenance(maintenanceType string) error {
 
 func returnDirList(parentDir string) ([]string, error) {
 	var files []string
-	fileInfo, err := ioutil.ReadDir(parentDir)
+	fileInfo, err := os.ReadDir(parentDir)
 	if err != nil {
 		return files, err
 	}
