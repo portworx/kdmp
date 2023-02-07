@@ -3,7 +3,6 @@ package executor
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -211,7 +210,7 @@ func parseGce(repoName string, backupLocation storkapi.BackupLocationItem) (*Rep
 		return nil, fmt.Errorf("failed to parse google config from BackupLocation")
 	}
 
-	if err := ioutil.WriteFile(
+	if err := os.WriteFile(
 		googleAccountFilePath,
 		[]byte(backupLocation.GoogleConfig.AccountKey),
 		0644,
@@ -237,7 +236,7 @@ func parseGce(repoName string, backupLocation storkapi.BackupLocationItem) (*Rep
 func ParseCloudCred() (*Repository, error) {
 	// Read the BL type
 	fPath := drivers.KopiaCredSecretMount + "/" + "type"
-	blType, err := ioutil.ReadFile(fPath)
+	blType, err := os.ReadFile(fPath)
 	if err != nil {
 		errMsg := fmt.Sprintf("failed reading data from file %s : %s", fPath, err)
 		logrus.Errorf("%v", errMsg)
@@ -258,13 +257,13 @@ func ParseCloudCred() (*Repository, error) {
 		return nil, rErr
 	}
 
-	password, err := ioutil.ReadFile(passwordPath)
+	password, err := os.ReadFile(passwordPath)
 	if err != nil {
 		errMsg := fmt.Sprintf("failed reading data from file %s : %s", passwordPath, err)
 		logrus.Errorf("%v", errMsg)
 		return nil, fmt.Errorf(errMsg)
 	}
-	bucket, err := ioutil.ReadFile(bucketPath)
+	bucket, err := os.ReadFile(bucketPath)
 	if err != nil {
 		errMsg := fmt.Sprintf("failed reading data from file %s : %s", bucketPath, err)
 		logrus.Errorf("%v", errMsg)
@@ -280,28 +279,28 @@ func parseS3Creds() (*Repository, error) {
 	repository := &Repository{
 		S3Config: &S3Config{},
 	}
-	accessKey, err := ioutil.ReadFile(accessKeypath)
+	accessKey, err := os.ReadFile(accessKeypath)
 	if err != nil {
 		errMsg := fmt.Sprintf("failed reading data from file %s : %s", accessKeypath, err)
 		logrus.Errorf("%v", errMsg)
 		return nil, fmt.Errorf(errMsg)
 	}
 
-	secretAccessKey, err := ioutil.ReadFile(secretAccessKeyPath)
+	secretAccessKey, err := os.ReadFile(secretAccessKeyPath)
 	if err != nil {
 		errMsg := fmt.Sprintf("failed reading data from file %s : %s", secretAccessKeyPath, err)
 		logrus.Errorf("%v", errMsg)
 		return nil, fmt.Errorf(errMsg)
 	}
 
-	endpoint, err := ioutil.ReadFile(endpointPath)
+	endpoint, err := os.ReadFile(endpointPath)
 	if err != nil {
 		errMsg := fmt.Sprintf("failed reading data from file %s : %s", endpointPath, err)
 		logrus.Errorf("%v", errMsg)
 		return nil, fmt.Errorf(errMsg)
 	}
 
-	disableSsl, err := ioutil.ReadFile(disableSslPath)
+	disableSsl, err := os.ReadFile(disableSslPath)
 	if err != nil {
 		errMsg := fmt.Sprintf("failed reading data from file %s : %s", disableSslPath, err)
 		logrus.Errorf("%v", errMsg)
@@ -319,7 +318,7 @@ func parseS3Creds() (*Repository, error) {
 	repository.S3Config.Endpoint = string(endpoint)
 	repository.S3Config.DisableSSL = isSsl
 	repository.Type = storkapi.BackupLocationS3
-	region, err := ioutil.ReadFile(regionPath)
+	region, err := os.ReadFile(regionPath)
 	if err != nil {
 		errMsg := fmt.Sprintf("failed reading data from file %s : %s", regionPath, err)
 		logrus.Errorf("%v", errMsg)
@@ -335,13 +334,13 @@ func parseGoogleCreds() (*Repository, error) {
 		GoogleConfig: &GoogleConfig{},
 	}
 
-	projectID, err := ioutil.ReadFile(projectIDKeypath)
+	projectID, err := os.ReadFile(projectIDKeypath)
 	if err != nil {
 		errMsg := fmt.Sprintf("failed reading data from file %s : %s", projectIDKeypath, err)
 		logrus.Errorf("%v", errMsg)
 		return nil, fmt.Errorf(errMsg)
 	}
-	accountKey, err := ioutil.ReadFile(AccountKeyPath)
+	accountKey, err := os.ReadFile(AccountKeyPath)
 	if err != nil {
 		errMsg := fmt.Sprintf("failed reading data from file %s : %s", AccountKeyPath, err)
 		logrus.Errorf("%v", errMsg)
@@ -360,14 +359,14 @@ func parseAzureCreds() (*Repository, error) {
 		AzureConfig: &AzureConfig{},
 	}
 
-	storageAccountName, err := ioutil.ReadFile(storageAccountNamePath)
+	storageAccountName, err := os.ReadFile(storageAccountNamePath)
 	if err != nil {
 		errMsg := fmt.Sprintf("failed reading data from file %s : %s", storageAccountNamePath, err)
 		logrus.Errorf("%v", errMsg)
 		return nil, fmt.Errorf(errMsg)
 	}
 
-	storageAccountKey, err := ioutil.ReadFile(storageAccountKeyPath)
+	storageAccountKey, err := os.ReadFile(storageAccountKeyPath)
 	if err != nil {
 		errMsg := fmt.Sprintf("failed reading data from file %s : %s", storageAccountKeyPath, err)
 		logrus.Errorf("%v", errMsg)
