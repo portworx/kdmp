@@ -165,7 +165,7 @@ func (bl *BackupLocation) UpdateFromSecret(client kubernetes.Interface) error {
 	case BackupLocationGoogle:
 		return bl.getMergedGoogleConfig(client)
 	case BackupLocationNFS:
-		return bl.getMergedNfsConfig(client)
+		return bl.getMergedNFSConfig(client)
 	default:
 		return fmt.Errorf("Invalid BackupLocation type %v", bl.Location.Type)
 	}
@@ -188,7 +188,7 @@ func (bl *BackupLocation) UpdateFromClusterSecret(client kubernetes.Interface) e
 	return nil
 }
 
-func (bl *BackupLocation) getMergedNfsConfig(client kubernetes.Interface) error {
+func (bl *BackupLocation) getMergedNFSConfig(client kubernetes.Interface) error {
 	if bl.Location.NFSConfig == nil {
 		bl.Location.NFSConfig = &NFSConfig{}
 	}
@@ -203,8 +203,11 @@ func (bl *BackupLocation) getMergedNfsConfig(client kubernetes.Interface) error 
 		if val, ok := secretConfig.Data["subPath"]; ok && val != nil {
 			bl.Location.NFSConfig.SubPath = strings.TrimSuffix(string(val), "\n")
 		}
-		if val, ok := secretConfig.Data["mountOption"]; ok && val != nil {
+		if val, ok := secretConfig.Data["mountOptions"]; ok && val != nil {
 			bl.Location.NFSConfig.MountOptions = strings.TrimSuffix(string(val), "\n")
+		}
+		if val, ok := secretConfig.Data["nfsIOTimeoutInSecs"]; ok && val != nil {
+			bl.Location.NFSConfig.NFSIOTimeoutInSecs = strings.TrimSuffix(string(val), "\n")
 		}
 	}
 	return nil

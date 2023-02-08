@@ -63,16 +63,33 @@ const (
 	backupCancelBackoffFactor       = 1
 	backupCancelBackoffSteps        = math.MaxInt32
 
-	allNamespacesSpecifier        = "*"
-	backupVolumeBatchCountEnvVar  = "BACKUP-VOLUME-BATCH-COUNT"
-	defaultBackupVolumeBatchCount = 3
-	backupResourcesBatchCount     = 15
-	maxRetry                      = 10
-	retrySleep                    = 10 * time.Second
-	genericBackupKey              = "BACKUP_TYPE"
-	kdmpDriverOnly                = "kdmp"
-	nonKdmpDriverOnly             = "nonkdmp"
-	mixedDriver                   = "mixed"
+	allNamespacesSpecifier          = "*"
+	backupVolumeBatchCountEnvVar    = "BACKUP-VOLUME-BATCH-COUNT"
+	defaultBackupVolumeBatchCount   = 3
+	backupResourcesBatchCount       = 15
+	maxRetry                        = 10
+	retrySleep                      = 10 * time.Second
+	genericBackupKey                = "BACKUP_TYPE"
+	kdmpDriverOnly                  = "kdmp"
+	nonKdmpDriverOnly               = "nonkdmp"
+	mixedDriver                     = "mixed"
+	prefixBackup                    = "backup"
+	prefixRestore                   = "restore"
+	applicationBackupCRNameKey      = kdmpAnnotationPrefix + "applicationbackup-cr-name"
+	applicationRestoreCRNameKey     = kdmpAnnotationPrefix + "applicationrestore-cr-name"
+	applicationBackupCRUIDKey       = kdmpAnnotationPrefix + "applicationbackup-cr-uid"
+	applicationRestoreCRUIDKey      = kdmpAnnotationPrefix + "applicationrestore-cr-uid"
+	kdmpAnnotationPrefix            = "kdmp.portworx.com/"
+	pxbackupAnnotationCreateByKey   = pxbackupAnnotationPrefix + "created-by"
+	pxbackupAnnotationCreateByValue = "px-backup"
+	backupObjectNameKey             = kdmpAnnotationPrefix + "backupobject-name"
+	restoreObjectNameKey            = kdmpAnnotationPrefix + "restoreobject-name"
+	pxbackupObjectUIDKey            = pxbackupAnnotationPrefix + "backup-uid"
+	pxbackupAnnotationPrefix        = "portworx.io/"
+	pxbackupObjectNameKey           = pxbackupAnnotationPrefix + "backup-name"
+	backupObjectUIDKey              = kdmpAnnotationPrefix + "backupobject-uid"
+	restoreObjectUIDKey             = kdmpAnnotationPrefix + "restoreobject-uid"
+	skipResourceAnnotation          = "stork.libopenstorage.org/skip-resource"
 )
 
 var (
@@ -1078,6 +1095,8 @@ func (a *ApplicationBackupController) uploadCRDResources(backup *stork_api.Appli
 	ruleset.AddPlural("quota", "quotas")
 	ruleset.AddPlural("prometheus", "prometheuses")
 	ruleset.AddPlural("mongodbcommunity", "mongodbcommunity")
+	ruleset.AddPlural("mongodbopsmanager", "opsmanagers")
+	ruleset.AddPlural("mongodb", "mongodb")
 	v1CrdApiReqrd, err := version.RequiresV1Registration()
 	if err != nil {
 		return err
