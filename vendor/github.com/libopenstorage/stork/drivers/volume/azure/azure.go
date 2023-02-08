@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"time"
 
@@ -127,7 +127,7 @@ func (a *azure) getMetadata() (map[string]string, error) {
 	if resp.StatusCode != 200 {
 		return nil, fmt.Errorf("error querying Azure metadata: Code %d returned for url %s", resp.StatusCode, req.URL)
 	}
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("error querying Azure metadata: %v", err)
 	}
@@ -683,6 +683,11 @@ func (a *azure) getAzureSession(backupLocationName, ns string) (*azureSession, e
 // GetPodPatches returns driver-specific json patches to mutate the pod in a webhook
 func (a *azure) GetPodPatches(podNamespace string, pod *v1.Pod) ([]k8sutils.JSONPatchOp, error) {
 	return nil, nil
+}
+
+// GetCSIPodPrefix returns prefix for the csi pod names in the deployment
+func (a *azure) GetCSIPodPrefix() (string, error) {
+	return "", &errors.ErrNotSupported{}
 }
 
 func init() {

@@ -2,10 +2,10 @@ package portworx
 
 import (
 	"context"
+	"crypto/tls"
 	"encoding/csv"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"math"
 	"os"
 	"path"
@@ -37,6 +37,7 @@ import (
 	storkvolume "github.com/libopenstorage/stork/drivers/volume"
 	storkapi "github.com/libopenstorage/stork/pkg/apis/stork/v1alpha1"
 	applicationcontrollers "github.com/libopenstorage/stork/pkg/applicationmanager/controllers"
+	storkcache "github.com/libopenstorage/stork/pkg/cache"
 	"github.com/libopenstorage/stork/pkg/errors"
 	"github.com/libopenstorage/stork/pkg/k8sutils"
 	"github.com/libopenstorage/stork/pkg/log"
@@ -45,7 +46,6 @@ import (
 	snapshotcontrollers "github.com/libopenstorage/stork/pkg/snapshot/controllers"
 	"github.com/portworx/sched-ops/k8s/core"
 	k8sextops "github.com/portworx/sched-ops/k8s/externalstorage"
-	"github.com/portworx/sched-ops/k8s/storage"
 	storkops "github.com/portworx/sched-ops/k8s/stork"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
@@ -155,6 +155,8 @@ const (
 	restoreNamePrefix = "in-place-restore-"
 	restoreTaskPrefix = "restore-"
 
+	csiPodNamePrefix = "px-csi-ext"
+
 	// Annotation to skip checking if the backup is being done to the same
 	// BackupLocationName
 	skipBackupLocationNameCheckAnnotation = "portworx.io/skip-backup-location-name-check"
@@ -245,6 +247,7 @@ type portworx struct {
 	sdkConn         *portworxGrpcConnection
 	id              string
 	endpoint        string
+	tlsConfig       *tls.Config
 	jwtSharedSecret string
 	jwtIssuer       string
 	initDone        bool
@@ -324,7 +327,9 @@ func (p *portworx) getClusterManagerClient() (cluster.Cluster, error) {
 	if err != nil {
 		return nil, err
 	}
-
+	if p.tlsConfig != nil {
+		clnt.SetTLS(p.tlsConfig)
+	}
 	return clusterclient.ClusterManager(clnt), nil
 }
 
@@ -349,12 +354,16 @@ func (p *portworx) initPortworxClients() error {
 		return err
 	}
 
-	sdkDialOps, err := paramsBuilder.BuildDialOps()
+	p.endpoint = pxMgmtEndpoint
+	p.tlsConfig, err = paramsBuilder.BuildTlsConfig()
 	if err != nil {
 		return err
 	}
 
-	p.endpoint = pxMgmtEndpoint
+	sdkDialOps, err := paramsBuilder.BuildDialOps()
+	if err != nil {
+		return err
+	}
 
 	// Setup gRPC clients
 	p.sdkConn = &portworxGrpcConnection{
@@ -490,6 +499,7 @@ func (p *portworx) inspectVolume(volDriver volume.VolumeDriver, volumeID string)
 
 	info := &storkvolume.Info{}
 	info.VolumeID = vols[0].Id
+
 	info.VolumeName = vols[0].Locator.Name
 	for _, rset := range vols[0].ReplicaSets {
 		info.DataNodes = append(info.DataNodes, rset.Nodes...)
@@ -511,8 +521,9 @@ func (p *portworx) inspectVolume(volDriver volume.VolumeDriver, volumeID string)
 	for k, v := range vols[0].Locator.GetVolumeLabels() {
 		info.Labels[k] = v
 	}
-
+	info.NeedsAntiHyperconvergence = vols[0].Spec.Sharedv4 && vols[0].Spec.Sharedv4ServiceSpec != nil
 	info.VolumeSourceRef = vols[0]
+
 	return info, nil
 }
 
@@ -696,7 +707,7 @@ func (p *portworx) IsSupportedPVC(coreOps core.Ops, pvc *v1.PersistentVolumeClai
 	provisioner := ""
 	storageClassName := k8shelper.GetPersistentVolumeClaimClass(pvc)
 	if storageClassName != "" {
-		storageClass, err := storage.Instance().GetStorageClass(storageClassName)
+		storageClass, err := storkcache.Instance().GetStorageClass(storageClassName)
 		if err == nil {
 			if _, ok := storageClass.Parameters[proxyEndpoint]; ok && skipDirectAccessVolumes {
 				logrus.Tracef("proxy endpoint is set, not classifying it as pxd for pvc [%v]", pvc.Name)
@@ -828,7 +839,7 @@ func isWaitingForFirstConsumer(pvc *v1.PersistentVolumeClaim) bool {
 	var err error
 	storageClassName := k8shelper.GetPersistentVolumeClaimClass(pvc)
 	if storageClassName != "" {
-		sc, err = storage.Instance().GetStorageClass(storageClassName)
+		sc, err = storkcache.Instance().GetStorageClass(storageClassName)
 		if err != nil {
 			logrus.Warnf("Did not get the storageclass %s for pvc %s/%s, err: %v", storageClassName, pvc.Namespace, pvc.Name, err)
 			return false
@@ -947,7 +958,7 @@ func (p *portworx) getPVSecretRefLabels(pvc *v1.PersistentVolumeClaim, pv *v1.Pe
 		// If the secret ref namespace is same as the PVC namespace check if
 		// templatized namespace was provided
 		if pv.Spec.CSI.NodePublishSecretRef.Namespace == pvc.Namespace {
-			sc, err := core.Instance().GetStorageClassForPVC(pvc)
+			sc, err := storkcache.Instance().GetStorageClassForPVC(pvc)
 			if err != nil {
 				logrus.Warnf("Failed to fetch storage class for PVC %v/%v: %v", pvc.Name, pvc.Namespace, err)
 				// Best effort - return what we have
@@ -963,7 +974,7 @@ func (p *portworx) getPVSecretRefLabels(pvc *v1.PersistentVolumeClaim, pv *v1.Pe
 		return pv.Spec.CSI.NodePublishSecretRef.Name, pv.Spec.CSI.NodePublishSecretRef.Namespace
 	} else if pvc != nil {
 		// Check if auth tokens are provided as in-tree storage class parameters
-		sc, err := core.Instance().GetStorageClassForPVC(pvc)
+		sc, err := storkcache.Instance().GetStorageClassForPVC(pvc)
 		if err == nil && sc != nil {
 			return sc.Parameters[auth_secrets.SecretNameKey], sc.Parameters[auth_secrets.SecretNamespaceKey]
 		}
@@ -1058,11 +1069,19 @@ func (p *portworx) getAdminVolDriver() (volume.VolumeDriver, error) {
 }
 
 func (p *portworx) getRestClientWithAuth(token string) (*apiclient.Client, error) {
-	return volumeclient.NewAuthDriverClient(p.endpoint, storkvolume.PortworxDriverName, "", token, "", "stork")
+	restClient, err := volumeclient.NewAuthDriverClient(p.endpoint, storkvolume.PortworxDriverName, "", token, "", "stork")
+	if err == nil && p.tlsConfig != nil {
+		restClient.SetTLS(p.tlsConfig)
+	}
+	return restClient, err
 }
 
 func (p *portworx) getRestClient() (*apiclient.Client, error) {
-	return volumeclient.NewDriverClient(p.endpoint, storkvolume.PortworxDriverName, "", "stork")
+	restClient, err := volumeclient.NewDriverClient(p.endpoint, storkvolume.PortworxDriverName, "", "stork")
+	if err == nil && p.tlsConfig != nil {
+		restClient.SetTLS(p.tlsConfig)
+	}
+	return restClient, err
 }
 
 func (p *portworx) addCloudsnapInfo(
@@ -2608,7 +2627,7 @@ func (p *portworx) UpdateMigratedPersistentVolumeSpec(
 ) (*v1.PersistentVolume, error) {
 	// Get the pv storageclass and get the provision detail and decide on csi section.
 	if len(pv.Spec.StorageClassName) != 0 {
-		sc, err := storage.Instance().GetStorageClass(pv.Spec.StorageClassName)
+		sc, err := storkcache.Instance().GetStorageClass(pv.Spec.StorageClassName)
 		if err != nil {
 			logrus.Warnf("failed in getting the storage class [%v]: %v", pv.Spec.StorageClassName, err)
 		}
@@ -3546,7 +3565,7 @@ func (p *portworx) getCloudBackupRestoreSpec(
 		// No mapping provided
 		return locator, restoreSpec, nil
 	}
-	sc, err := storage.Instance().GetStorageClass(destStorageClass)
+	sc, err := storkcache.Instance().GetStorageClass(destStorageClass)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to fetch storage class %v: %v", destStorageClass, err)
 	}
@@ -4064,6 +4083,11 @@ func (p *portworx) GetPodPatches(podNamespace string, pod *v1.Pod) ([]k8sutils.J
 	return p.getVirtLauncherPatches(podNamespace, pod)
 }
 
+// GetCSIPodPrefix returns prefix for the csi pod names in the deployment
+func (a *portworx) GetCSIPodPrefix() (string, error) {
+	return csiPodNamePrefix, nil
+}
+
 func (p *portworx) getVirtLauncherPatches(podNamespace string, pod *v1.Pod) ([]k8sutils.JSONPatchOp, error) {
 	if pod.Labels["kubevirt.io"] != "virt-launcher" {
 		return nil, nil
@@ -4138,7 +4162,7 @@ func (p *portworx) getVirtLauncherPatches(podNamespace string, pod *v1.Pod) ([]k
 
 func (p *portworx) createStatfsConfigMap(cmNamespace string) error {
 	soPath := path.Join(statfsSODirInStork, statfsSOName)
-	statfsSOContents, err := ioutil.ReadFile(soPath)
+	statfsSOContents, err := os.ReadFile(soPath)
 	if err != nil {
 		logrus.Errorf("Failed to read %s: %v", soPath, err)
 		return err
