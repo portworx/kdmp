@@ -86,7 +86,7 @@ vet:
 
 
 staticcheck:
-	GOFLAGS="" go install honnef.co/go/tools/cmd/staticcheck@v0.2.2
+	GOFLAGS="" go install honnef.co/go/tools/cmd/staticcheck@v0.3.3
 	staticcheck $(PKGS)
 	#staticcheck -tags integrationtest test/integration_test/*.go
 	staticcheck -tags unittest $(PKGS)
