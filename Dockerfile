@@ -1,4 +1,5 @@
-FROM ubuntu:latest
+FROM portworx/ubuntu:focal
+
 MAINTAINER Portworx Inc. <support@portworx.com>
 
 RUN apt-get update \
