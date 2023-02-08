@@ -1,4 +1,4 @@
-FROM ubuntu:jammy
+FROM portworx/ubuntu:focal
 
 MAINTAINER Portworx Inc. <support@portworx.com>
 
