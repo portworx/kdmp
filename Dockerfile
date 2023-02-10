@@ -1,4 +1,4 @@
-FROM portworx/ubuntu:focal
+FROM ubuntu:latest
 
 MAINTAINER Portworx Inc. <support@portworx.com>
 

@@ -1,6 +1,6 @@
 FROM restic/restic:latest AS restic
 
-FROM portworx/ubuntu:focal
+FROM ubuntu:latest
 MAINTAINER Portworx Inc. <support@portworx.com>
 
 RUN apt-get update \
