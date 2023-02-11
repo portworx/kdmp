@@ -261,6 +261,30 @@ func downloadResources(
 	return runtimeObjects, nil
 }
 
+func downloadStorageClass(
+	backup *storkapi.ApplicationBackup,
+	backupLocation string,
+	namespace string,
+) ([]byte, error) {
+	funct := "downloadResources"
+	repo, err := executor.ParseCloudCred()
+	if err != nil {
+		logrus.Errorf("%s: error parsing cloud cred: %v", funct, err)
+		return nil, err
+	}
+	bkpDir := filepath.Join(repo.Path, backup.Status.BackupPath)
+
+	restoreLocation, err := storkops.Instance().GetBackupLocation(backup.Spec.BackupLocation, namespace)
+	if err != nil {
+		return nil, err
+	}
+	data, err := executor.DownloadObject(bkpDir, "storageclass.json", restoreLocation.Location.EncryptionV2Key)
+	if err != nil {
+		return nil, fmt.Errorf("error downloading storageclass: %v", err)
+	}
+	return data, nil
+}
+
 func getPVNameMappings(
 	restore *storkapi.ApplicationRestore,
 	objects []runtime.Unstructured,
