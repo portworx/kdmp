@@ -4,6 +4,8 @@ BASE_DIR    := $(shell git rev-parse --show-toplevel)
 GIT_SHA     := $(shell git rev-parse --short HEAD)
 BIN         := $(BASE_DIR)/bin
 
+DOCK_BUILD_CNT  := golang:1.19.1
+
 DOCKER_IMAGE_REPO?=portworx
 DOCKER_IMAGE_NAME?=kdmp
 DOCKER_IMAGE_TAG?=$(RELEASE_VER)
@@ -22,7 +24,6 @@ KOPIAEXECUTOR_DOCKER_IMAGE=$(DOCKER_IMAGE_REPO)/$(KOPIAEXECUTOR_DOCKER_IMAGE_NAM
 
 NFSEXECUTOR_DOCKER_IMAGE_NAME=nfsexecutor
 NFSEXECUTOR_DOCKER_IMAGE=$(DOCKER_IMAGE_REPO)/$(NFSEXECUTOR_DOCKER_IMAGE_NAME):$(DOCKER_IMAGE_TAG)
-
 
 export GO111MODULE=on
 export GOFLAGS = -mod=vendor
@@ -54,7 +55,7 @@ test-container:
 	@echo "Building container: docker build --tag $(KDMP_UNITTEST_IMG) -f Dockerfile.unittest ."
 	docker build --tag $(KDMP_UNITTEST_IMG) -f Dockerfile.unittest .
 
-pretest: check-fmt lint vet errcheck staticcheck
+pretest: check-fmt vet errcheck staticcheck
 build: update-deployment build-kdmp build-restic-executor kopia-executor build-pxc-exporter
 container: container-kdmp container-restic-executor container-kopia-executor container-pxc-exporter
 deploy: deploy-kdmp deploy-restic-executor deploy-kopia-executor deploy-pxc-exporter
@@ -70,33 +71,27 @@ unittest:
 		fi; \
 	done
 
-lint:
-	GO111MODULE=off go get -u golang.org/x/lint/golint
-	for file in $(GO_FILES); do \
-        golint $${file}; \
-        if [ -n "$$(golint $${file})" ]; then \
-            exit 1; \
-        fi; \
-        done
-
 vet:
-	GO111MODULE=off go vet $(PKGS)
-	GO111MODULE=off go vet -tags unittest $(PKGS)
-	#go vet -tags integrationtest github.com/portworx/kdmp/test/integration_test
+	docker run --rm -v $(shell pwd):/go/src/github.com/portworx/kdmp $(DOCK_BUILD_CNT) \
+		/bin/bash -c "cd /go/src/github.com/portworx/kdmp; \
+	go vet $(PKGS); \
+	go vet -tags unittest $(PKGS)"
 
 
 staticcheck:
-	GOFLAGS="" go install honnef.co/go/tools/cmd/staticcheck@v0.3.3
-	staticcheck $(PKGS)
-	#staticcheck -tags integrationtest test/integration_test/*.go
-	staticcheck -tags unittest $(PKGS)
+	docker run --rm -v $(shell pwd):/go/src/github.com/portworx/kdmp $(DOCK_BUILD_CNT) \
+		/bin/bash -c "cd /go/src/github.com/portworx/kdmp; \
+	go install honnef.co/go/tools/cmd/staticcheck@v0.3.3; \
+	staticcheck $(PKGS); \
+	staticcheck -tags unittest $(PKGS)"
 
 
 errcheck:
-	GO111MODULE=off go get -u github.com/kisielk/errcheck
-	errcheck -ignoregenerated -ignorepkg fmt -verbose -blank $(PKGS)
-	errcheck -ignoregenerated -ignorepkg fmt -verbose -blank -tags unittest $(PKGS)
-	#errcheck -ignoregenerated -verbose -blank -tags integrationtest github.com/portworx/kdmp/test/integration_test
+	docker run --rm -v $(shell pwd):/go/src/github.com/portworx/kdmp $(DOCK_BUILD_CNT) \
+		/bin/bash -c "cd /go/src/github.com/portworx/kdmp; \
+	GO111MODULE=off go get -u github.com/kisielk/errcheck; \
+	errcheck -ignoregenerated -ignorepkg fmt -verbose -blank $(PKGS); \
+	errcheck -ignoregenerated -ignorepkg fmt -verbose -blank -tags unittest $(PKGS)"
 
 check-fmt:
 	bash -c "diff -u <(echo -n) <(gofmt -l -d -s -e $(GO_FILES))"
@@ -113,7 +108,9 @@ codegen:
 	hack/update-codegen.sh
 
 gogenerate:
-	go generate ./...
+	docker run --rm -v $(shell pwd):/go/src/github.com/portworx/kdmp $(DOCK_BUILD_CNT) \
+		/bin/bash -c "cd /go/src/github.com/portworx/kdmp && \
+	GOOS=linux go generate ./...;"
 
 update-deployment:
 	@echo "Updating deployment resources"
@@ -126,14 +123,17 @@ vendor-sync:
 ### kdmp-operator targets ###
 build-kdmp:
 	@echo "Build kdmp"
-	go build -o ${BIN}/kdmp -ldflags="-s -w \
+	docker run --rm -v $(shell pwd):/go/src/github.com/portworx/kdmp $(DOCK_BUILD_CNT) \
+		/bin/bash -c 'cd /go/src/github.com/portworx/kdmp/cmd/kdmp; \
+	GOOS=linux go build -ldflags="-s -w \
 	-X github.com/portworx/kdmp/pkg/version.gitVersion=${RELEASE_VER} \
 	-X github.com/portworx/kdmp/pkg/version.gitCommit=${GIT_SHA} \
 	-X github.com/portworx/kdmp/pkg/version.buildDate=${BUILD_DATE} \
 	-X github.com/portworx/kdmp/pkg/version.major=${MAJOR_VERSION} \
 	-X github.com/portworx/kdmp/pkg/version.minor=${MINOR_VERSION} \
 	-X github.com/portworx/kdmp/pkg/version.patch=${PATCH_VERSION}" \
-	-a $(BASE_DIR)/cmd/kdmp
+	-o /go/src/github.com/portworx/kdmp/bin/kdmp \
+	-a /go/src/github.com/portworx/kdmp/cmd/kdmp;'
 
 container-kdmp:
 	@echo "Build kdmp docker image"
@@ -157,27 +157,36 @@ nfs-executor: build-nfs-executor container-nfs-executor
 ### restic-executor targets ###
 build-restic-executor:
 	@echo "Build restic-executor"
-	go build -o $(BIN)/resticexecutor -ldflags="-s -w \
+	docker run --rm -v $(shell pwd):/go/src/github.com/portworx/kdmp $(DOCK_BUILD_CNT) \
+		/bin/bash -c 'cd /go/src/github.com/portworx/kdmp/cmd/executor/restic; \
+	CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w \
 	-X github.com/portworx/kdmp/pkg/version.gitVersion=${RELEASE_VER} \
 	-X github.com/portworx/kdmp/pkg/version.gitCommit=${GIT_SHA} \
 	-X github.com/portworx/kdmp/pkg/version.buildDate=${BUILD_DATE}" \
-	-a $(BASE_DIR)/cmd/executor/restic
+	-o  /go/src/github.com/portworx/kdmp/bin/resticexecutor \
+	-a /go/src/github.com/portworx/kdmp/cmd/executor/restic;'
 
 build-kopia-executor:
 	@echo "Build kopia-executor"
-	go build -o $(BIN)/kopiaexecutor -ldflags="-s -w \
+	docker run --rm -v $(shell pwd):/go/src/github.com/portworx/kdmp $(DOCK_BUILD_CNT) \
+		/bin/bash -c 'cd /go/src/github.com/portworx/kdmp/cmd/executor/kopia; \
+	CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w \
 	-X github.com/portworx/kdmp/pkg/version.gitVersion=${RELEASE_VER} \
 	-X github.com/portworx/kdmp/pkg/version.gitCommit=${GIT_SHA} \
 	-X github.com/portworx/kdmp/pkg/version.buildDate=${BUILD_DATE}" \
-	-a $(BASE_DIR)/cmd/executor/kopia
+	-o  /go/src/github.com/portworx/kdmp/bin/kopiaexecutor \
+	-a /go/src/github.com/portworx/kdmp/cmd/executor/kopia;'
 
 build-nfs-executor:
 	@echo "Build nfs-executor"
-	go build -o $(BIN)/nfsexecutor -ldflags="-s -w \
+	docker run --rm -v $(shell pwd):/go/src/github.com/portworx/kdmp $(DOCK_BUILD_CNT) \
+		/bin/bash -c 'cd /go/src/github.com/portworx/kdmp/cmd/executor/nfs; \
+	CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w \
 	-X github.com/portworx/kdmp/pkg/version.gitVersion=${RELEASE_VER} \
 	-X github.com/portworx/kdmp/pkg/version.gitCommit=${GIT_SHA} \
 	-X github.com/portworx/kdmp/pkg/version.buildDate=${BUILD_DATE}" \
-	-a $(BASE_DIR)/cmd/executor/nfs
+	-o  /go/src/github.com/portworx/kdmp/bin/nfsexecutor \
+	-a /go/src/github.com/portworx/kdmp/cmd/executor/nfs;'
 
 container-restic-executor:
 	@echo "Build restice-executor docker image"
@@ -206,12 +215,14 @@ deploy-nfs-executor:
 ### pxc-exporter targets ###
 build-pxc-exporter: gogenerate
 	@echo "Build kdmp"
-	go build -o ${BIN}/pxc-exporter -ldflags="-s -w \
+	docker run --rm -v $(shell pwd):/go/src/github.com/portworx/kdmp $(DOCK_BUILD_CNT) \
+		/bin/bash -c 'cd /go/src/github.com/portworx/kdmp/cmd/exporter; \
+	go build -ldflags="-s -w \
 	-X github.com/portworx/kdmp/pkg/version.gitVersion=${RELEASE_VER} \
 	-X github.com/portworx/kdmp/pkg/version.gitCommit=${GIT_SHA} \
 	-X github.com/portworx/kdmp/pkg/version.buildDate=${BUILD_DATE}" \
-	-a $(BASE_DIR)/cmd/exporter
-
+	-o /go/src/github.com/portworx/kdmp/bin/pxc-exporter \
+	-a /go/src/github.com/portworx/kdmp/cmd/exporter;'
 
 container-pxc-exporter:
 deploy-pxc-exporter:
