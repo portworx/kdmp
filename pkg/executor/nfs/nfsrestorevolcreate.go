@@ -234,7 +234,6 @@ func restoreVolResourcesAndApply(
 	var restoreVolumeInfos []*storkapi.ApplicationRestoreVolumeInfo
 	var sErr error
 
-	var restoreVolumeInfos []*storkapi.ApplicationRestoreVolumeInfo
 	for driverName, bkpvInfo := range backupVolumeInfoMappings {
 		driver, err := volume.Get(driverName)
 		if err != nil {

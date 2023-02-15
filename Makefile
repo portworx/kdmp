@@ -1,4 +1,4 @@
-RELEASE_VER ?= latest
+RELEASE_VER ?= 1.2.5
 BUILD_DATE  := $(shell date -u +'%Y-%m-%dT%H:%M:%SZ')
 BASE_DIR    := $(shell git rev-parse --show-toplevel)
 GIT_SHA     := $(shell git rev-parse --short HEAD)
@@ -30,7 +30,7 @@ export GOFLAGS = -mod=vendor
 
 MAJOR_VERSION := 1
 MINOR_VERSION := 2
-PATCH_VERSION := 1
+PATCH_VERSION := 5
 
 ifndef PKGS
 	PKGS := $(shell GOFLAGS=-mod=vendor go list ./... 2>&1 | grep -v 'go: ' | grep -v 'github.com/portworx/kdmp/vendor' | grep -v versioned | grep -v 'pkg/apis/v1')
