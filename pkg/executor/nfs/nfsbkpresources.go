@@ -200,7 +200,7 @@ func uploadResource(
 	allObjects := make([]runtime.Unstructured, 0)
 	for i := 0; i < len(backup.Spec.Namespaces); i += backupResourcesBatchCount {
 		batch := backup.Spec.Namespaces[i:min(i+backupResourcesBatchCount, len(backup.Spec.Namespaces))]
-		objects, err := rc.GetResources(
+		objects, _, err := rc.GetResources(
 			batch,
 			backup.Spec.Selectors,
 			dummyObjects,
