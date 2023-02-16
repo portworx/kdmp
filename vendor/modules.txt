@@ -493,8 +493,8 @@ github.com/portworx/pxc/pkg/component
 github.com/portworx/pxc/pkg/config
 github.com/portworx/pxc/pkg/kubernetes
 github.com/portworx/pxc/pkg/util
-# github.com/portworx/sched-ops v1.20.4-rc1.0.20230207070155-2e0ef25efadd => github.com/portworx/sched-ops v1.20.4-rc1.0.20221102055014-b3a55a3df5c8
-## explicit; go 1.12
+# github.com/portworx/sched-ops v1.20.4-rc1.0.20230207071213-7a8e221c9ebf => github.com/portworx/sched-ops v1.20.4-rc1.0.20230207071213-7a8e221c9ebf
+## explicit; go 1.19
 github.com/portworx/sched-ops/k8s/apiextensions
 github.com/portworx/sched-ops/k8s/apps
 github.com/portworx/sched-ops/k8s/batch
@@ -1492,7 +1492,7 @@ sigs.k8s.io/yaml
 # github.com/kubernetes-incubator/external-storage => github.com/libopenstorage/external-storage v0.20.4-openstorage-rc10
 # github.com/kubernetes-incubator/external-storage v0.20.4-openstorage-rc10 => github.com/libopenstorage/external-storage v0.20.4-openstorage-rc10
 # github.com/libopenstorage/openstorage => github.com/libopenstorage/openstorage v1.0.1-0.20220804223926-812cb10d08c4
-# github.com/portworx/sched-ops => github.com/portworx/sched-ops v1.20.4-rc1.0.20221102055014-b3a55a3df5c8
+# github.com/portworx/sched-ops => github.com/portworx/sched-ops v1.20.4-rc1.0.20230207071213-7a8e221c9ebf
 # k8s.io/api => k8s.io/api v0.25.0
 # k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.25.0
 # k8s.io/apimachinery => k8s.io/apimachinery v0.25.0
