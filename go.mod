@@ -8,7 +8,7 @@ require (
 	github.com/hashicorp/go-version v1.6.0
 	github.com/kubernetes-csi/external-snapshotter/client/v4 v4.0.0
 	github.com/kubernetes-incubator/external-storage v0.20.4-openstorage-rc7
-	github.com/libopenstorage/stork v1.4.1-0.20230216111318-15ed8c1a7d43
+	github.com/libopenstorage/stork v1.4.1-0.20230220135555-e7677b4945dd
 	github.com/portworx/pxc v0.33.0
 	github.com/portworx/sched-ops v1.20.4-rc1.0.20230207071213-7a8e221c9ebf
 	github.com/sirupsen/logrus v1.9.0
