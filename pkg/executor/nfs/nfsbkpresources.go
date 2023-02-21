@@ -48,6 +48,7 @@ const (
 	resourcesFile             = "resources.json"
 	storageClassFile          = "storageclass.json"
 	backupResourcesBatchCount = 15
+	volumeSnapShotCRDirectory = "csi-generic"
 )
 
 func newUploadBkpResourceCommand() *cobra.Command {
@@ -158,6 +159,20 @@ func uploadBkpResource(
 	err = uploadCSISnapshots(bkpNamespace, backup, bkpDir, encryptionKey)
 	if err != nil {
 		errMsg := fmt.Sprintf("%s: error uploading CSI snapshot file %v", funct, err)
+		logrus.Errorf(errMsg)
+		return fmt.Errorf(errMsg)
+	}
+
+	csiGenericBackupDirectory := filepath.Join(repo.Path, volumeSnapShotCRDirectory)
+	logrus.Infof("csi generic backup directory: %v", csiGenericBackupDirectory)
+	if err := os.MkdirAll(csiGenericBackupDirectory, 0777); err != nil {
+		errMsg := fmt.Sprintf("%s: error creating csi generic backup directory: %v", funct, err)
+		logrus.Errorf(errMsg)
+		return fmt.Errorf(errMsg)
+	}
+	err = uploadCSISnapshotInfoForPVCs(bkpNamespace, backup, csiGenericBackupDirectory, encryptionKey)
+	if err != nil {
+		errMsg := fmt.Sprintf("%s: error uploading csi snapshot info for pvcs for generic backup %v", funct, err)
 		logrus.Errorf(errMsg)
 		return fmt.Errorf(errMsg)
 	}
@@ -414,6 +429,160 @@ func uploadCSISnapshots(
 	return nil
 }
 
+func uploadCSISnapshotInfoForPVCs(
+	bkpNamespace string,
+	backup *stork_api.ApplicationBackup,
+	resourcePath string,
+	encryptionKey string,
+) error {
+	funct := "uploadCSISnapshotInfoForPVCs"
+	backupUID := string(backup.GetUID())
+	for _, volInfo := range backup.Status.Volumes {
+		if volInfo.DriverName == storkvolume.KDMPDriverName {
+			volumeSnapshot := volInfo.VolumeSnapshot
+			if len(volumeSnapshot) > 0 {
+				_, volumeSnapshot := splitVolumeSnapshotInfoInVolumeInfo(volumeSnapshot)
+				timestampEpoch := strconv.FormatInt(backup.GetObjectMeta().GetCreationTimestamp().Unix(), 10)
+				err := uploadSnapshotObjectsForPVC(volumeSnapshot, volInfo.Namespace, getCSICRUploadDirectory(resourcePath, volInfo.PersistentVolumeClaimUID), getVSFileName(backupUID, timestampEpoch), encryptionKey)
+				if err != nil {
+					logrus.Errorf("%s err: %v", funct, err)
+					return err
+				}
+			}
+		}
+	}
+	return nil
+}
+
+func splitVolumeSnapshotInfoInVolumeInfo(volumeSnapshot string) (string, string) {
+	subStrings := strings.Split(volumeSnapshot, ",")
+	return subStrings[0], subStrings[1]
+}
+
+func uploadSnapshotObjectsForPVC(
+	snapshotName string,
+	namespace string,
+	resourcePath string,
+	objectName string,
+	encryptionKey string,
+) error {
+	funct := "uploadSnapshotObjectsForPVC"
+	snapshotter, err := snapshotter.NewCSIDriver()
+	if err != nil {
+		return err
+	}
+	snapshotInfo, err := snapshotter.SnapshotStatus(
+		snapshotName,
+		namespace,
+	)
+	if err != nil {
+		logrus.Infof("%s getting snapshotstatus failed with %v", funct, err)
+		return err
+	}
+
+	v1SnapshotRequired, err := version.RequiresV1VolumeSnapshot()
+	if err != nil {
+		return err
+	}
+	var vsMap, vsContentMap, vsClassMap interface{}
+	var snapID string
+
+	if v1SnapshotRequired {
+		vsMap = make(map[string]*kSnapshotv1.VolumeSnapshot)
+		vsContentMap = make(map[string]*kSnapshotv1.VolumeSnapshotContent)
+		vsClassMap = make(map[string]*kSnapshotv1.VolumeSnapshotClass)
+	} else {
+		vsMap = make(map[string]*kSnapshotv1beta1.VolumeSnapshot)
+		vsContentMap = make(map[string]*kSnapshotv1beta1.VolumeSnapshotContent)
+		vsClassMap = make(map[string]*kSnapshotv1beta1.VolumeSnapshotClass)
+	}
+
+	if v1SnapshotRequired {
+		snapshot, ok := snapshotInfo.SnapshotRequest.(*kSnapshotv1.VolumeSnapshot)
+		if !ok {
+			return fmt.Errorf("failed to map volumesnapshot object")
+		}
+		snapID = snapshot.Name
+		vsMap.(map[string]*kSnapshotv1.VolumeSnapshot)[snapID] = snapshot
+	} else {
+		snapshot, ok := snapshotInfo.SnapshotRequest.(*kSnapshotv1beta1.VolumeSnapshot)
+		if !ok {
+			return fmt.Errorf("failed to map volumesnapshor object")
+		}
+		snapID = snapshot.Name
+		vsMap.(map[string]*kSnapshotv1beta1.VolumeSnapshot)[snapID] = snapshot
+	}
+	if v1SnapshotRequired {
+		snapshotContent, ok := snapshotInfo.Content.(*kSnapshotv1.VolumeSnapshotContent)
+		if !ok {
+			return fmt.Errorf("failed to map volumesnapshotcontent object")
+		}
+		vsContentMap.(map[string]*kSnapshotv1.VolumeSnapshotContent)[snapID] = snapshotContent
+	} else {
+		snapshotContent, ok := snapshotInfo.Content.(*kSnapshotv1beta1.VolumeSnapshotContent)
+		if !ok {
+			return fmt.Errorf("failed to map volumesnapshotcontent object")
+		}
+		vsContentMap.(map[string]*kSnapshotv1beta1.VolumeSnapshotContent)[snapID] = snapshotContent
+	}
+	if v1SnapshotRequired {
+		snapshotClass, ok := snapshotInfo.Class.(*kSnapshotv1.VolumeSnapshotClass)
+		if !ok {
+			return fmt.Errorf("failed to map volumesnapshotClass object")
+		}
+		vsClassMap.(map[string]*kSnapshotv1.VolumeSnapshotClass)[snapshotClass.Name] = snapshotClass
+	} else {
+		snapshotClass, ok := snapshotInfo.Class.(*kSnapshotv1beta1.VolumeSnapshotClass)
+		if !ok {
+			return fmt.Errorf("failed to map volumesnapshotClass object")
+		}
+		vsClassMap.(map[string]*kSnapshotv1beta1.VolumeSnapshotClass)[snapshotClass.Name] = snapshotClass
+	}
+
+	var csiBackup interface{}
+	v1VolumeSnapshotRequired, err := version.RequiresV1VolumeSnapshot()
+	if err != nil {
+		return fmt.Errorf("failed to get volumesnapshot version supported by cluster")
+	}
+	if v1VolumeSnapshotRequired {
+		csiBackup = csi.CsiBackupObject{
+			VolumeSnapshots:          vsMap.(map[string]*kSnapshotv1.VolumeSnapshot),
+			VolumeSnapshotContents:   vsContentMap.(map[string]*kSnapshotv1.VolumeSnapshotContent),
+			VolumeSnapshotClasses:    vsClassMap.(map[string]*kSnapshotv1.VolumeSnapshotClass),
+			V1VolumeSnapshotRequired: true,
+		}
+	} else {
+		csiBackup = csi.CsiBackupObject{
+			VolumeSnapshots:          vsMap.(map[string]*kSnapshotv1beta1.VolumeSnapshot),
+			VolumeSnapshotContents:   vsContentMap.(map[string]*kSnapshotv1beta1.VolumeSnapshotContent),
+			VolumeSnapshotClasses:    vsClassMap.(map[string]*kSnapshotv1beta1.VolumeSnapshotClass),
+			V1VolumeSnapshotRequired: false,
+		}
+	}
+
+	var csiBackupBytes []byte
+
+	csiBackupBytes, err = json.Marshal(csiBackup)
+	if err != nil {
+		return err
+	}
+	err = uploadData(resourcePath, csiBackupBytes, objectName, encryptionKey)
+	if err != nil {
+		logrus.Errorf("%s err: %v", funct, err)
+		return err
+	}
+
+	return nil
+}
+
+func getVSFileName(backupUUID, timestamp string) string {
+	return fmt.Sprintf("%s-%s.json", backupUUID, timestamp)
+}
+
+func getCSICRUploadDirectory(resourcePath, pvcUID string) string {
+	return filepath.Join(resourcePath, pvcUID)
+}
+
 func uploadNamespaces(
 	bkpNamespace string,
 	backup *stork_api.ApplicationBackup,
@@ -603,6 +772,13 @@ func uploadData(
 	var err error
 	var encryptedData []byte
 	funct := "uploadData"
+
+	logrus.Infof("resourcepath needs to be created: %v", resourcePath)
+	if err := os.MkdirAll(resourcePath, 0777); err != nil {
+		errMsg := fmt.Sprintf("%s: error creating resourcepath: %v", funct, err)
+		logrus.Errorf(errMsg)
+		return fmt.Errorf(errMsg)
+	}
 
 	filePath := filepath.Join(resourcePath, resourceFileName)
 	// Encrypt data before writing with passed encryption key
