@@ -842,35 +842,37 @@ func (c *Controller) stageSnapshotInProgress(ctx context.Context, dataExport *kd
 		return false, c.updateStatus(dataExport, data)
 	}
 
-	v1SnapshotRequired, err := version.RequiresV1VolumeSnapshot()
-	if err != nil {
-		return false, err
-	}
-
-	var vsName, vsNamespace string
-	if v1SnapshotRequired {
-		vs := snapInfo.SnapshotRequest.(*kSnapshotv1.VolumeSnapshot)
-		timestampEpoch := strconv.FormatInt(vs.GetObjectMeta().GetCreationTimestamp().Unix(), 10)
-		snapInfoList := []snapshotter.SnapshotInfo{snapInfo}
-		err = snapshotDriver.UploadSnapshotObjects(bl, snapInfoList, getCSICRUploadDirectory(pvcUID), getVSFileName(backupUID, timestampEpoch))
-		vsName = vs.Name
-		vsNamespace = vs.Namespace
-	} else {
-		vs := snapInfo.SnapshotRequest.(*kSnapshotv1beta1.VolumeSnapshot)
-		timestampEpoch := strconv.FormatInt(vs.GetObjectMeta().GetCreationTimestamp().Unix(), 10)
-		snapInfoList := []snapshotter.SnapshotInfo{snapInfo}
-		err = snapshotDriver.UploadSnapshotObjects(bl, snapInfoList, getCSICRUploadDirectory(pvcUID), getVSFileName(backupUID, timestampEpoch))
-		vsName = vs.Name
-		vsNamespace = vs.Namespace
-	}
-	if err != nil {
-		msg := fmt.Sprintf("uploading snapshot objects for pvc %s/%s failed with error : %v", vsNamespace, vsName, err)
-		logrus.Errorf(msg)
-		data := updateDataExportDetail{
-			status: kdmpapi.DataExportStatusFailed,
-			reason: msg,
+	if bl.Location.Type != storkapi.BackupLocationNFS {
+		v1SnapshotRequired, err := version.RequiresV1VolumeSnapshot()
+		if err != nil {
+			return false, err
 		}
-		return false, c.updateStatus(dataExport, data)
+
+		var vsName, vsNamespace string
+		if v1SnapshotRequired {
+			vs := snapInfo.SnapshotRequest.(*kSnapshotv1.VolumeSnapshot)
+			timestampEpoch := strconv.FormatInt(vs.GetObjectMeta().GetCreationTimestamp().Unix(), 10)
+			snapInfoList := []snapshotter.SnapshotInfo{snapInfo}
+			err = snapshotDriver.UploadSnapshotObjects(bl, snapInfoList, getCSICRUploadDirectory(pvcUID), getVSFileName(backupUID, timestampEpoch))
+			vsName = vs.Name
+			vsNamespace = vs.Namespace
+		} else {
+			vs := snapInfo.SnapshotRequest.(*kSnapshotv1beta1.VolumeSnapshot)
+			timestampEpoch := strconv.FormatInt(vs.GetObjectMeta().GetCreationTimestamp().Unix(), 10)
+			snapInfoList := []snapshotter.SnapshotInfo{snapInfo}
+			err = snapshotDriver.UploadSnapshotObjects(bl, snapInfoList, getCSICRUploadDirectory(pvcUID), getVSFileName(backupUID, timestampEpoch))
+			vsName = vs.Name
+			vsNamespace = vs.Namespace
+		}
+		if err != nil {
+			msg := fmt.Sprintf("uploading snapshot objects for pvc %s/%s failed with error : %v", vsNamespace, vsName, err)
+			logrus.Errorf(msg)
+			data := updateDataExportDetail{
+				status: kdmpapi.DataExportStatusFailed,
+				reason: msg,
+			}
+			return false, c.updateStatus(dataExport, data)
+		}
 	}
 
 	data := updateDataExportDetail{
@@ -1277,12 +1279,27 @@ func (c *Controller) cleanUp(driver drivers.Interface, de *kdmpapi.DataExport) e
 			return fmt.Errorf(msg)
 		}
 	} else if hasSnapshotStage(de) {
+		snapshotDriverName, err := c.getSnapshotDriverName(de)
+		if err != nil {
+			return fmt.Errorf("failed to get snapshot driver name: %v", err)
+		}
+
+		snapshotDriver, err := c.snapshotter.Driver(snapshotDriverName)
+		if err != nil {
+			return fmt.Errorf("failed to get snapshot driver for %v: %v", snapshotDriverName, err)
+		}
 		if de.Status.SnapshotPVCName != "" && de.Status.SnapshotPVCNamespace != "" {
 			if err := cleanupJobBoundResources(de.Status.SnapshotPVCName, de.Status.SnapshotPVCNamespace); err != nil {
 				return fmt.Errorf("cleaning up of bound job resources failed: %v", err)
 			}
 			if err := core.Instance().DeletePersistentVolumeClaim(de.Status.SnapshotPVCName, de.Status.SnapshotPVCNamespace); err != nil && !k8sErrors.IsNotFound(err) {
 				return fmt.Errorf("delete %s/%s pvc: %s", de.Status.SnapshotPVCNamespace, de.Status.SnapshotPVCName, err)
+			}
+			err = snapshotDriver.DeleteSnapshot(de.Status.VolumeSnapshot, de.Status.SnapshotPVCNamespace, true)
+			msg := fmt.Sprintf("failed in removing local volume snapshot CRs for %s/%s: %v", de.Status.VolumeSnapshot, de.Status.SnapshotPVCName, err)
+			if err != nil {
+				logrus.Errorf(msg)
+				return fmt.Errorf(msg)
 			}
 		}
 	}
