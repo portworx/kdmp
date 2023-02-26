@@ -2,6 +2,7 @@ package v1alpha1
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	storkapi "github.com/libopenstorage/stork/pkg/apis/stork/v1alpha1"
 )
 
 const (
@@ -96,6 +97,8 @@ type ResourceExport struct {
 	VolumesInfo []*ResourceBackupVolumeInfo `json:"volumesInfo"`
 	// ExistingVolumesInfo existing vols which are not be restored
 	ExistingVolumesInfo []*ResourceRestoreVolumeInfo `json:"existingVolumesInfo,omitempty"`
+	// RestoreCompleteList - restore complete volumeInfo
+        RestoreCompleteList []*storkapi.ApplicationRestoreVolumeInfo `json:"restoreCompleteList,omitempty"`
 }
 
 // ResourceExportSpec configuration parameters for ResourceExport

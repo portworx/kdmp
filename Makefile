@@ -105,7 +105,9 @@ gocyclo:
 
 codegen:
 	@echo "Generating CRD"
-	hack/update-codegen.sh
+	docker run --rm -v $(shell pwd):/go/src/github.com/portworx/kdmp $(DOCK_BUILD_CNT) \
+		/bin/bash -c "cd /go/src/github.com/portworx/kdmp && \
+	hack/update-codegen.sh"
 
 gogenerate:
 	docker run --rm -v $(shell pwd):/go/src/github.com/portworx/kdmp $(DOCK_BUILD_CNT) \

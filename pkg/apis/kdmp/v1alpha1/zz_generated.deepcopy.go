@@ -12,6 +12,7 @@ LICENSE
 package v1alpha1
 
 import (
+	storkv1alpha1 "github.com/libopenstorage/stork/pkg/apis/stork/v1alpha1"
 	v1 "k8s.io/api/core/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 )
@@ -302,6 +303,17 @@ func (in *ResourceBackup) DeepCopyInto(out *ResourceBackup) {
 			}
 		}
 	}
+	if in.RestoreCompleteList != nil {
+		in, out := &in.RestoreCompleteList, &out.RestoreCompleteList
+		*out = make([]*storkv1alpha1.ApplicationRestoreVolumeInfo, len(*in))
+		for i := range *in {
+			if (*in)[i] != nil {
+				in, out := &(*in)[i], &(*out)[i]
+				*out = new(storkv1alpha1.ApplicationRestoreVolumeInfo)
+				(*in).DeepCopyInto(*out)
+			}
+		}
+	}
 	return
 }
 
@@ -470,6 +482,17 @@ func (in *ResourceExport) DeepCopyInto(out *ResourceExport) {
 			if (*in)[i] != nil {
 				in, out := &(*in)[i], &(*out)[i]
 				*out = new(ResourceRestoreVolumeInfo)
+				(*in).DeepCopyInto(*out)
+			}
+		}
+	}
+	if in.RestoreCompleteList != nil {
+		in, out := &in.RestoreCompleteList, &out.RestoreCompleteList
+		*out = make([]*storkv1alpha1.ApplicationRestoreVolumeInfo, len(*in))
+		for i := range *in {
+			if (*in)[i] != nil {
+				in, out := &(*in)[i], &(*out)[i]
+				*out = new(storkv1alpha1.ApplicationRestoreVolumeInfo)
 				(*in).DeepCopyInto(*out)
 			}
 		}
