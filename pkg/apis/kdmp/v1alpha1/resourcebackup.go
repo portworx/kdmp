@@ -58,10 +58,6 @@ type ResourceBackup struct {
 	Type ResourceBackupType `json:"type,omitempty"`
 	// Status Overall status
 	Status ResourceBackupProgressStatus `json:"status,omitempty"`
-	// VolumesInfo Contains list of vols to be restored. Filled in by nfs executor job
-	VolumesInfo []*ResourceBackupVolumeInfo `json:"volumesInfo,omitempty"`
-	// ExistingVolumesInfo existing vols which are not be restored
-	ExistingVolumesInfo []*ResourceRestoreVolumeInfo `json:"existingVolumesInfo,omitempty"`
 	// RestoreCompleteList - restore complete volumeInfo
         RestoreCompleteList []*storkapi.ApplicationRestoreVolumeInfo `json:"restoreCompleteList,omitempty"`
 }

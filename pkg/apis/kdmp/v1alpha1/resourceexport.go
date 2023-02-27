@@ -93,10 +93,6 @@ type ResourceExport struct {
 	Spec              ResourceExportSpec `json:"spec"`
 	// Status Overall status
 	Status ResourceStatus `json:"status,omitempty"`
-	// VolumesInfo Contains list of vols to be restored. Filled in by nfs executor job
-	VolumesInfo []*ResourceBackupVolumeInfo `json:"volumesInfo"`
-	// ExistingVolumesInfo existing vols which are not be restored
-	ExistingVolumesInfo []*ResourceRestoreVolumeInfo `json:"existingVolumesInfo,omitempty"`
 	// RestoreCompleteList - restore complete volumeInfo
         RestoreCompleteList []*storkapi.ApplicationRestoreVolumeInfo `json:"restoreCompleteList,omitempty"`
 }

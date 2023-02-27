@@ -281,28 +281,6 @@ func (in *ResourceBackup) DeepCopyInto(out *ResourceBackup) {
 	in.ObjectMeta.DeepCopyInto(&out.ObjectMeta)
 	out.Spec = in.Spec
 	in.Status.DeepCopyInto(&out.Status)
-	if in.VolumesInfo != nil {
-		in, out := &in.VolumesInfo, &out.VolumesInfo
-		*out = make([]*ResourceBackupVolumeInfo, len(*in))
-		for i := range *in {
-			if (*in)[i] != nil {
-				in, out := &(*in)[i], &(*out)[i]
-				*out = new(ResourceBackupVolumeInfo)
-				(*in).DeepCopyInto(*out)
-			}
-		}
-	}
-	if in.ExistingVolumesInfo != nil {
-		in, out := &in.ExistingVolumesInfo, &out.ExistingVolumesInfo
-		*out = make([]*ResourceRestoreVolumeInfo, len(*in))
-		for i := range *in {
-			if (*in)[i] != nil {
-				in, out := &(*in)[i], &(*out)[i]
-				*out = new(ResourceRestoreVolumeInfo)
-				(*in).DeepCopyInto(*out)
-			}
-		}
-	}
 	if in.RestoreCompleteList != nil {
 		in, out := &in.RestoreCompleteList, &out.RestoreCompleteList
 		*out = make([]*storkv1alpha1.ApplicationRestoreVolumeInfo, len(*in))
@@ -464,28 +442,6 @@ func (in *ResourceExport) DeepCopyInto(out *ResourceExport) {
 	in.ObjectMeta.DeepCopyInto(&out.ObjectMeta)
 	out.Spec = in.Spec
 	in.Status.DeepCopyInto(&out.Status)
-	if in.VolumesInfo != nil {
-		in, out := &in.VolumesInfo, &out.VolumesInfo
-		*out = make([]*ResourceBackupVolumeInfo, len(*in))
-		for i := range *in {
-			if (*in)[i] != nil {
-				in, out := &(*in)[i], &(*out)[i]
-				*out = new(ResourceBackupVolumeInfo)
-				(*in).DeepCopyInto(*out)
-			}
-		}
-	}
-	if in.ExistingVolumesInfo != nil {
-		in, out := &in.ExistingVolumesInfo, &out.ExistingVolumesInfo
-		*out = make([]*ResourceRestoreVolumeInfo, len(*in))
-		for i := range *in {
-			if (*in)[i] != nil {
-				in, out := &(*in)[i], &(*out)[i]
-				*out = new(ResourceRestoreVolumeInfo)
-				(*in).DeepCopyInto(*out)
-			}
-		}
-	}
 	if in.RestoreCompleteList != nil {
 		in, out := &in.RestoreCompleteList, &out.RestoreCompleteList
 		*out = make([]*storkv1alpha1.ApplicationRestoreVolumeInfo, len(*in))
