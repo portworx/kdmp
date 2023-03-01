@@ -1,4 +1,4 @@
-package nfsbackup
+package nfscsirestore
 
 import (
 	"fmt"
@@ -8,6 +8,7 @@ import (
 	"github.com/portworx/kdmp/pkg/drivers/utils"
 	"github.com/portworx/sched-ops/k8s/batch"
 	"github.com/portworx/sched-ops/k8s/kdmp"
+	storkops "github.com/portworx/sched-ops/k8s/stork"
 
 	"github.com/sirupsen/logrus"
 	batchv1 "k8s.io/api/batch/v1"
@@ -22,13 +23,13 @@ type Driver struct{}
 
 // Name returns a name of the driver.
 func (d Driver) Name() string {
-	return drivers.NFSBackup
+	return drivers.NFSCSIRestore
 }
 
 // StartJob creates a job for data transfer between volumes.
 func (d Driver) StartJob(opts ...drivers.JobOption) (id string, err error) {
 	// FOr every ns to be backed up a new job should be created
-	funct := "NfsStartJob"
+	funct := "NfsCSIRestore"
 	logrus.Infof("Inside function %s", funct)
 	o := drivers.JobOpts{}
 	for _, opt := range opts {
@@ -43,18 +44,16 @@ func (d Driver) StartJob(opts ...drivers.JobOption) (id string, err error) {
 	if err != nil {
 		return "", err
 	}
-
 	// Create PV & PVC only in case of NFS.
-	jobName := o.RestoreExportName
 	if o.NfsServer != "" {
-		err := utils.CreateNFSPvPvcForJob(jobName, job.ObjectMeta.Namespace, o)
+		err := utils.CreateNFSPvPvcForJob(o.DataExportName, job.ObjectMeta.Namespace, o)
 		if err != nil {
 			return "", err
 		}
 	}
 
 	if _, err = batch.Instance().CreateJob(job); err != nil && !apierrors.IsAlreadyExists(err) {
-		errMsg := fmt.Sprintf("creation of nfs backup job %s failed: %v", o.RestoreExportName, err)
+		errMsg := fmt.Sprintf("creation of restore job %s failed: %v", o.DataExportName, err)
 		logrus.Errorf("%s: %v", funct, errMsg)
 		return "", fmt.Errorf(errMsg)
 	}
@@ -78,7 +77,7 @@ func (d Driver) JobStatus(id string) (*drivers.JobStatus, error) {
 
 	job, err := batch.Instance().GetJob(name, namespace)
 	if err != nil {
-		errMsg := fmt.Sprintf("failed to fetch backup %s/%s job: %v", namespace, name, err)
+		errMsg := fmt.Sprintf("failed to fetch restore %s/%s job: %v", namespace, name, err)
 		logrus.Errorf("%s: %v", fn, errMsg)
 		return nil, fmt.Errorf(errMsg)
 	}
@@ -94,6 +93,7 @@ func (d Driver) JobStatus(id string) (*drivers.JobStatus, error) {
 		return nil, fmt.Errorf(errMsg)
 	}
 	jobErr, nodeErr := utils.IsJobOrNodeFailed(job)
+
 	var errMsg string
 	if jobErr {
 		errMsg = fmt.Sprintf("check %s/%s job for details: %s", namespace, name, drivers.ErrJobFailed)
@@ -108,12 +108,12 @@ func (d Driver) JobStatus(id string) (*drivers.JobStatus, error) {
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			if utils.IsJobPending(job) {
-				logrus.Warnf("backup job %s is in pending state", job.Name)
+				logrus.Warnf("restore job %s is in pending state", job.Name)
 				return utils.ToJobStatus(0, err.Error(), jobStatus), nil
 			}
 		}
 	}
-	logrus.Tracef("res.Status: %v", res.Status)
+	logrus.Tracef("%s jobStatus:%v", fn, jobStatus)
 	return utils.ToJobStatus(res.Status.ProgressPercentage, res.Status.Reason, jobStatus), nil
 }
 
@@ -123,8 +123,8 @@ func buildJob(
 	funct := "NfsbuildJob"
 	// Setup service account using same role permission as stork role
 	logrus.Infof("Inside %s function", funct)
-	if err := utils.SetupNFSServiceAccount(jobOptions.RestoreExportName, jobOptions.Namespace, roleFor()); err != nil {
-		errMsg := fmt.Sprintf("error creating service account %s/%s: %v", jobOptions.Namespace, jobOptions.RestoreExportName, err)
+	if err := utils.SetupNFSServiceAccount(jobOptions.DataExportName, jobOptions.Namespace, roleFor()); err != nil {
+		errMsg := fmt.Sprintf("error creating service account %s/%s: %v", jobOptions.Namespace, jobOptions.DataExportName, err)
 		logrus.Errorf("%s: %v", funct, errMsg)
 		return nil, fmt.Errorf(errMsg)
 	}
@@ -133,10 +133,9 @@ func buildJob(
 	if err != nil {
 		return nil, err
 	}
-
-	job, err := jobForBackupResource(jobOptions, resources)
+	job, err := jobForRestoreCSISnapshot(jobOptions, resources)
 	if err != nil {
-		errMsg := fmt.Sprintf("building csi resource restore job %s failed: %v", jobOptions.RestoreExportName, err)
+		errMsg := fmt.Sprintf("building resource backup job %s failed: %v", jobOptions.DataExportName, err)
 		logrus.Errorf("%s: %v", funct, errMsg)
 		return nil, fmt.Errorf(errMsg)
 	}
@@ -163,27 +162,31 @@ func addJobLabels(labels map[string]string) map[string]string {
 		labels = make(map[string]string)
 	}
 
-	labels[drivers.DriverNameLabel] = drivers.NFSBackup
+	labels[drivers.DriverNameLabel] = drivers.NFSRestore
 	return labels
 }
 
-func jobForBackupResource(
+func jobForRestoreCSISnapshot(
 	jobOption drivers.JobOpts,
 	resources corev1.ResourceRequirements,
 ) (*batchv1.Job, error) {
+	funct := "jobForRestoreResource"
+	// Read the ApplicationRestore stage and decide which restore operation to perform
+	_, err := storkops.Instance().GetApplicationRestore(jobOption.AppCRName, jobOption.AppCRNamespace)
+	if err != nil {
+		logrus.Errorf("%s: Error getting restore cr[%v/%v]: %v", funct, jobOption.AppCRNamespace, jobOption.AppCRName, err)
+		return nil, err
+	}
+
 	cmd := strings.Join([]string{
 		"/nfsexecutor",
-		"backup",
-		"--app-cr-name",
-		jobOption.AppCRName,
-		"--backup-namespace",
-		jobOption.AppCRNamespace,
-		// resourcebackup CR name
-		"--rb-cr-name",
-		jobOption.ResoureBackupName,
-		// resourcebackup CR namespace
-		"--rb-cr-namespace",
-		jobOption.ResoureBackupNamespace,
+		"restore-csi-vol",
+		// dataexport CR name
+		"--de-name",
+		jobOption.DataExportName,
+		// dataexport CR namespace
+		"--de-namespace",
+		jobOption.Namespace,
 	}, " ")
 
 	labels := addJobLabels(jobOption.Labels)
@@ -191,9 +194,8 @@ func jobForBackupResource(
 	nfsExecutorImage, _, err := utils.GetExecutorImageAndSecret(drivers.NfsExecutorImage,
 		jobOption.NfsImageExecutorSource,
 		jobOption.NfsImageExecutorSourceNs,
-		jobOption.RestoreExportName,
+		jobOption.DataExportName,
 		jobOption)
-
 	if err != nil {
 		logrus.Errorf("failed to get the executor image details")
 		return nil, fmt.Errorf("failed to get the executor image details for job %s", jobOption.JobName)
@@ -202,11 +204,11 @@ func jobForBackupResource(
 		jobOption.NfsImageExecutorSourceNs)
 	if err != nil {
 		logrus.Errorf("failed to get the toleration details: %v", err)
-		return nil, fmt.Errorf("failed to get the toleration details for job [%s/%s]", jobOption.Namespace, jobOption.RestoreExportName)
+		return nil, fmt.Errorf("failed to get the toleration details for job [%s/%s]", jobOption.Namespace, jobOption.DataExportName)
 	}
 	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      jobOption.RestoreExportName,
+			Name:      jobOption.DataExportName,
 			Namespace: jobOption.Namespace,
 			Annotations: map[string]string{
 				utils.SkipResourceAnnotation: "true",
@@ -221,8 +223,8 @@ func jobForBackupResource(
 				},
 				Spec: corev1.PodSpec{
 					RestartPolicy:      corev1.RestartPolicyOnFailure,
-					ImagePullSecrets:   utils.ToImagePullSecret(utils.GetImageSecretName(jobOption.RestoreExportName)),
-					ServiceAccountName: jobOption.RestoreExportName,
+					ImagePullSecrets:   utils.ToImagePullSecret(utils.GetImageSecretName(jobOption.DataExportName)),
+					ServiceAccountName: jobOption.DataExportName,
 					Containers: []corev1.Container{
 						{
 							Name:            drivers.NfsExecutorImage,
@@ -250,7 +252,7 @@ func jobForBackupResource(
 							Name: "cred-secret",
 							VolumeSource: corev1.VolumeSource{
 								Secret: &corev1.SecretVolumeSource{
-									SecretName: utils.GetCredSecretName(jobOption.RestoreExportName),
+									SecretName: utils.GetCredSecretName(jobOption.DataExportName),
 								},
 							},
 						},
@@ -272,7 +274,7 @@ func jobForBackupResource(
 			Name: utils.NfsVolumeName,
 			VolumeSource: corev1.VolumeSource{
 				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-					ClaimName: utils.GetPvcNameForJob(jobOption.RestoreExportName),
+					ClaimName: utils.GetPvcNameForJob(jobOption.DataExportName),
 				},
 			},
 		}

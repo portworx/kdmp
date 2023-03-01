@@ -137,7 +137,7 @@ func buildJob(
 	}
 	job, err := jobForRestoreResource(jobOptions, resources)
 	if err != nil {
-		errMsg := fmt.Sprintf("building resource backup job %s failed: %v", jobOptions.RestoreExportName, err)
+		errMsg := fmt.Sprintf("building resource restore job %s failed: %v", jobOptions.RestoreExportName, err)
 		logrus.Errorf("%s: %v", funct, errMsg)
 		return nil, fmt.Errorf(errMsg)
 	}
