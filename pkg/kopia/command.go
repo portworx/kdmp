@@ -46,6 +46,8 @@ type Command struct {
 	DisableSsl bool
 	// Compression to be used for backup
 	Compression string
+	// Region for S3 object
+	Region string
 }
 
 // Executor interface defines APIs for implementing a command wrapper
@@ -116,6 +118,8 @@ func (c *Command) CreateCmd() *exec.Cmd {
 			logDir,
 			"--config-file",
 			configFile,
+			"--region",
+			c.Region,
 		}
 
 		if c.DisableSsl {
@@ -233,6 +237,8 @@ func (c *Command) ConnectCmd() *exec.Cmd {
 			logDir,
 			"--config-file",
 			configFile,
+			"--region",
+			c.Region,
 		}
 		if c.DisableSsl {
 			ssl := []string{
