@@ -5,12 +5,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"path/filepath"
+	"strings"
 
 	"github.com/libopenstorage/stork/drivers/volume"
 	"github.com/libopenstorage/stork/drivers/volume/kdmp"
 	storkapi "github.com/libopenstorage/stork/pkg/apis/stork/v1alpha1"
 	"github.com/libopenstorage/stork/pkg/k8sutils"
 	"github.com/libopenstorage/stork/pkg/log"
+	"github.com/libopenstorage/stork/pkg/resourcecollector"
 	kdmpapi "github.com/portworx/kdmp/pkg/apis/kdmp/v1alpha1"
 	"github.com/portworx/kdmp/pkg/drivers/utils"
 	"github.com/portworx/kdmp/pkg/executor"
@@ -31,6 +33,47 @@ import (
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/rest"
 )
+
+func downloadStorageClass(
+	backup *storkapi.ApplicationBackup,
+	backupLocation string,
+	namespace string,
+) ([]byte, error) {
+	funct := "downloadResources"
+	repo, err := executor.ParseCloudCred()
+	if err != nil {
+		logrus.Errorf("%s: error parsing cloud cred: %v", funct, err)
+		return nil, err
+	}
+	bkpDir := filepath.Join(repo.Path, backup.Status.BackupPath)
+
+	restoreLocation, err := storkops.Instance().GetBackupLocation(backup.Spec.BackupLocation, namespace)
+	if err != nil {
+		return nil, err
+	}
+	data, err := executor.DownloadObject(bkpDir, "storageclass.json", restoreLocation.Location.EncryptionV2Key)
+	if err != nil {
+		return nil, fmt.Errorf("error downloading storageclass: %v", err)
+	}
+	return data, nil
+}
+
+func getRancherProjectMapping(restore *storkapi.ApplicationRestore) map[string]string {
+	rancherProjectMapping := map[string]string{}
+	if restore.Spec.RancherProjectMapping != nil {
+		for key, value := range restore.Spec.RancherProjectMapping {
+			rancherProjectMapping[key] = value
+			dataKey := strings.Split(key, ":")
+			dataVal := strings.Split(value, ":")
+			if len(dataKey) == 2 && len(dataVal) == 2 {
+				rancherProjectMapping[dataKey[1]] = dataVal[1]
+			} else if len(dataKey) == 1 && len(dataVal) == 2 {
+				rancherProjectMapping[dataKey[0]] = dataVal[1]
+			}
+		}
+	}
+	return rancherProjectMapping
+}
 
 func newRestoreResourcesCommand() *cobra.Command {
 	restoreCommand := &cobra.Command{
@@ -497,6 +540,14 @@ func applyResources(
 	}
 	objectMap := storkapi.CreateObjectsMap(restore.Spec.IncludeResources)
 	tempObjects := make([]runtime.Unstructured, 0)
+	var opts resourcecollector.Options
+	if len(restore.Spec.RancherProjectMapping) != 0 {
+		rancherProjectMapping := getRancherProjectMapping(restore)
+		opts = resourcecollector.Options{
+			RancherProjectMappings: rancherProjectMapping,
+		}
+	}
+
 	for _, o := range objects {
 		skip, err := resourceCollector.PrepareResourceForApply(
 			o,
@@ -507,6 +558,7 @@ func applyResources(
 			pvNameMappings,
 			restore.Spec.IncludeOptionalResourceTypes,
 			restore.Status.Volumes,
+			&opts,
 		)
 		if err != nil {
 			return err
@@ -548,7 +600,9 @@ func applyResources(
 
 		err = resourceCollector.ApplyResource(
 			dynamicInterface,
-			o)
+			o,
+			&opts,
+		)
 		if err != nil && errors.IsAlreadyExists(err) {
 			switch restore.Spec.ReplacePolicy {
 			case storkapi.ApplicationRestoreReplacePolicyDelete:
