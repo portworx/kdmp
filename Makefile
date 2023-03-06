@@ -1,4 +1,4 @@
-RELEASE_VER ?= 1.2.5-dev
+RELEASE_VER ?= siva-2.5.0-nfs-restore
 BUILD_DATE  := $(shell date -u +'%Y-%m-%dT%H:%M:%SZ')
 BASE_DIR    := $(shell git rev-parse --show-toplevel)
 GIT_SHA     := $(shell git rev-parse --short HEAD)
