@@ -59,7 +59,7 @@ deploy: deploy-kdmp deploy-restic-executor deploy-kopia-executor deploy-pxc-expo
 unittest:
 	echo "mode: atomic" > coverage.txt
 	for pkg in $(PKGS); do \
-		go test -v -tags unittest -coverprofile=profile.out -covermode=atomic $(BUILD_OPTIONS) $${pkg} || exit 1; \
+		go test -v -buildvcs=false -tags unittest -coverprofile=profile.out -covermode=atomic $(BUILD_OPTIONS) $${pkg} || exit 1; \
 		if [ -f profile.out ]; then \
 			cat profile.out | grep -v "mode: atomic">> coverage.txt; \
 			rm profile.out; \

@@ -1,9 +1,9 @@
-FROM ubuntu:latest
+FROM registry.access.redhat.com/ubi8-minimal:latest
 
 MAINTAINER Portworx Inc. <support@portworx.com>
 
-RUN apt-get update && apt-get install bash curl vim make git wget gpg bzip2 -y
-RUN apt-get install gcc -y
+RUN microdnf install gzip gcc.x86_64 openssl.x86_64 openssl-devel.i686 openssl-devel.x86_64 openssl-libs.i686 yum && microdnf clean all
+RUN yum -y install gzip git tar wget curl bash vim make gpg bzip2
 
 RUN curl https://dl.google.com/go/go1.19.1.linux-amd64.tar.gz -o go1.19.1.linux-amd64.tar.gz
 RUN tar -xf go1.19.1.linux-amd64.tar.gz && mv go /usr/local/
