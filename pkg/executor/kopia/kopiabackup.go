@@ -198,7 +198,7 @@ func runKopiaCreateRepo(repository *executor.Repository) error {
 			repository.Path,
 			repository.Name,
 			repository.Password,
-			kopiaProviderType[repository.Type],
+			kopiaProvderType[repository.Type],
 			repository.S3Config.Region,
 			repository.S3Config.DisableSSL,
 		)
@@ -207,7 +207,7 @@ func runKopiaCreateRepo(repository *executor.Repository) error {
 			repository.Path,
 			repository.Name,
 			repository.Password,
-			kopiaProviderType[repository.Type],
+			kopiaProvderType[repository.Type],
 			"",
 			false,
 		)
@@ -333,7 +333,7 @@ func runKopiaRepositoryConnect(repository *executor.Repository) error {
 			repository.Path,
 			repository.Name,
 			repository.Password,
-			kopiaProviderType[repository.Type],
+			kopiaProvderType[repository.Type],
 			repository.S3Config.Region,
 			repository.S3Config.DisableSSL,
 		)
@@ -343,7 +343,7 @@ func runKopiaRepositoryConnect(repository *executor.Repository) error {
 			repository.Name,
 			repository.Password,
 			"",
-			kopiaProviderType[repository.Type],
+			kopiaProvderType[repository.Type],
 			false,
 		)
 	}
