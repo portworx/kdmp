@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"time"
 
 	"github.com/libopenstorage/stork/drivers/volume"
@@ -120,7 +121,25 @@ func (a *ApplicationRestoreController) setDefaults(restore *storkapi.Application
 			restore.Spec.NamespaceMapping[ns] = ns
 		}
 	}
+
 	return nil
+}
+
+func getRancherProjectMapping(restore *storkapi.ApplicationRestore) map[string]string {
+	rancherProjectMapping := map[string]string{}
+	if restore.Spec.RancherProjectMapping != nil {
+		for key, value := range restore.Spec.RancherProjectMapping {
+			rancherProjectMapping[key] = value
+			dataKey := strings.Split(key, ":")
+			dataVal := strings.Split(value, ":")
+			if len(dataKey) == 2 && len(dataVal) == 2 {
+				rancherProjectMapping[dataKey[1]] = dataVal[1]
+			} else if len(dataKey) == 1 && len(dataVal) == 2 {
+				rancherProjectMapping[dataKey[0]] = dataVal[1]
+			}
+		}
+	}
+	return rancherProjectMapping
 }
 
 func (a *ApplicationRestoreController) verifyNamespaces(restore *storkapi.ApplicationRestore) error {
@@ -147,6 +166,8 @@ func (a *ApplicationRestoreController) createNamespaces(backup *storkapi.Applica
 	if err != nil {
 		return err
 	}
+
+	rancherProjectMapping := getRancherProjectMapping(restore)
 	if nsData != nil {
 		if err = json.Unmarshal(nsData, &namespaces); err != nil {
 			return err
@@ -158,6 +179,8 @@ func (a *ApplicationRestoreController) createNamespaces(backup *storkapi.Applica
 				// Skip namespaces we aren't restoring
 				continue
 			}
+			utils.ParseRancherProjectMapping(ns.Annotations, rancherProjectMapping)
+			utils.ParseRancherProjectMapping(ns.Labels, rancherProjectMapping)
 			// create mapped restore namespace with metadata of backed up
 			// namespace
 			_, err := core.Instance().CreateNamespace(&v1.Namespace{
@@ -187,7 +210,7 @@ func (a *ApplicationRestoreController) createNamespaces(backup *storkapi.Applica
 							annotations = make(map[string]string)
 						}
 						for k, v := range ns.GetAnnotations() {
-							if _, ok := annotations[k]; !ok {
+							if _, ok := annotations[k]; !ok && !strings.Contains(k, utils.CattleProjectPrefix) {
 								annotations[k] = v
 							}
 						}
@@ -196,10 +219,12 @@ func (a *ApplicationRestoreController) createNamespaces(backup *storkapi.Applica
 							labels = make(map[string]string)
 						}
 						for k, v := range ns.GetLabels() {
-							if _, ok := labels[k]; !ok {
+							if _, ok := labels[k]; !ok && !strings.Contains(k, utils.CattleProjectPrefix) {
 								labels[k] = v
 							}
 						}
+						utils.ParseRancherProjectMapping(annotations, rancherProjectMapping)
+						utils.ParseRancherProjectMapping(labels, rancherProjectMapping)
 					}
 					log.ApplicationRestoreLog(restore).Tracef("Namespace already exists, updating dest namespace %v", ns.Name)
 					_, err = core.Instance().UpdateNamespace(&v1.Namespace{
@@ -411,6 +436,7 @@ func (a *ApplicationRestoreController) namespaceRestoreAllowed(restore *storkapi
 				return false
 			}
 		}
+		return true
 	}
 	return true
 }
@@ -649,9 +675,10 @@ func (a *ApplicationRestoreController) restoreVolumes(restore *storkapi.Applicat
 				}
 
 				// Pre-delete resources for CSI driver
-				if (driverName == "csi" || driverName == volume.KDMPDriverName) && restore.Spec.ReplacePolicy == storkapi.ApplicationRestoreReplacePolicyDelete {
+				if (driverName == "csi" || driverName == "kdmp") && restore.Spec.ReplacePolicy == storkapi.ApplicationRestoreReplacePolicyDelete {
 					objectMap := storkapi.CreateObjectsMap(restore.Spec.IncludeResources)
 					objectBasedOnIncludeResources := make([]runtime.Unstructured, 0)
+					var opts resourcecollector.Options
 					for _, o := range objects {
 						skip, err := a.resourceCollector.PrepareResourceForApply(
 							o,
@@ -662,6 +689,7 @@ func (a *ApplicationRestoreController) restoreVolumes(restore *storkapi.Applicat
 							nil,
 							restore.Spec.IncludeOptionalResourceTypes,
 							nil,
+							&opts,
 						)
 						if err != nil {
 							return err
@@ -1416,6 +1444,13 @@ func (a *ApplicationRestoreController) applyResources(
 	}
 	objectMap := storkapi.CreateObjectsMap(restore.Spec.IncludeResources)
 	tempObjects := make([]runtime.Unstructured, 0)
+	var opts resourcecollector.Options
+	if len(restore.Spec.RancherProjectMapping) != 0 {
+		rancherProjectMapping := getRancherProjectMapping(restore)
+		opts = resourcecollector.Options{
+			RancherProjectMappings: rancherProjectMapping,
+		}
+	}
 	for _, o := range objects {
 		skip, err := a.resourceCollector.PrepareResourceForApply(
 			o,
@@ -1426,6 +1461,7 @@ func (a *ApplicationRestoreController) applyResources(
 			pvNameMappings,
 			restore.Spec.IncludeOptionalResourceTypes,
 			restore.Status.Volumes,
+			&opts,
 		)
 		if err != nil {
 			return err
@@ -1467,7 +1503,9 @@ func (a *ApplicationRestoreController) applyResources(
 
 		err = a.resourceCollector.ApplyResource(
 			a.dynamicInterface,
-			o)
+			o,
+			&opts,
+		)
 		if err != nil && k8s_errors.IsAlreadyExists(err) {
 			switch restore.Spec.ReplacePolicy {
 			case storkapi.ApplicationRestoreReplacePolicyDelete:
