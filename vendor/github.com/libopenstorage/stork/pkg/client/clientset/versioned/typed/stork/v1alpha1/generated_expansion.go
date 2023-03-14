@@ -46,6 +46,10 @@ type MigrationScheduleExpansion interface{}
 
 type NamespacedSchedulePolicyExpansion interface{}
 
+type PlatformCredentialExpansion interface{}
+
+type ResourceTransformationExpansion interface{}
+
 type RuleExpansion interface{}
 
 type SchedulePolicyExpansion interface{}
