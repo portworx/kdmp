@@ -11,9 +11,11 @@ import (
 	storkapi "github.com/libopenstorage/stork/pkg/apis/stork/v1alpha1"
 	"github.com/libopenstorage/stork/pkg/k8sutils"
 	"github.com/libopenstorage/stork/pkg/log"
+	"github.com/libopenstorage/stork/pkg/resourcecollector"
 	kdmpapi "github.com/portworx/kdmp/pkg/apis/kdmp/v1alpha1"
 	"github.com/portworx/kdmp/pkg/drivers/utils"
 	"github.com/portworx/kdmp/pkg/executor"
+
 	//"github.com/portworx/sched-ops/k8s/core"
 	kdmpschedops "github.com/portworx/sched-ops/k8s/kdmp"
 	storkops "github.com/portworx/sched-ops/k8s/stork"
@@ -131,7 +133,7 @@ func restoreResources(
 		return err
 	}
 
-	if err := applyResources(restore, rb, objects); err != nil {
+	if err := applyResources(restore, rb, objects, nil); err != nil {
 		return err
 	}
 	return nil
@@ -485,6 +487,7 @@ func applyResources(
 	restore *storkapi.ApplicationRestore,
 	rb *kdmpapi.ResourceBackup,
 	objects []runtime.Unstructured,
+	opts *resourcecollector.Options,
 ) error {
 	resourceCollector := initResourceCollector()
 	dynamicInterface, err := getDynamicInterface()
@@ -497,6 +500,8 @@ func applyResources(
 	}
 	objectMap := storkapi.CreateObjectsMap(restore.Spec.IncludeResources)
 	tempObjects := make([]runtime.Unstructured, 0)
+	// TODO: When NFS restore starts to support Rancher the last argument sent as Nil need to be populated accordingly.
+	// It is not taken care in this PR yet.
 	for _, o := range objects {
 		skip, err := resourceCollector.PrepareResourceForApply(
 			o,
@@ -507,6 +512,7 @@ func applyResources(
 			pvNameMappings,
 			restore.Spec.IncludeOptionalResourceTypes,
 			restore.Status.Volumes,
+			nil,
 		)
 		if err != nil {
 			return err
@@ -548,7 +554,7 @@ func applyResources(
 
 		err = resourceCollector.ApplyResource(
 			dynamicInterface,
-			o)
+			o, nil)
 		if err != nil && errors.IsAlreadyExists(err) {
 			switch restore.Spec.ReplacePolicy {
 			case storkapi.ApplicationRestoreReplacePolicyDelete:

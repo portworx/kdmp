@@ -262,6 +262,7 @@ func restoreVolResourcesAndApply(
 					nil,
 					restore.Spec.IncludeOptionalResourceTypes,
 					nil,
+					nil,
 				)
 				if err != nil {
 					return err
