@@ -342,8 +342,8 @@ func runKopiaRepositoryConnect(repository *executor.Repository) error {
 			repository.Path,
 			repository.Name,
 			repository.Password,
-			"",
 			kopiaProvderType[repository.Type],
+			"",
 			false,
 		)
 	}
