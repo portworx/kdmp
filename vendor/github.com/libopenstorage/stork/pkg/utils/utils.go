@@ -1,8 +1,11 @@
 package utils
 
 import (
+	"bytes"
+	"encoding/gob"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/aquilax/truncate"
 	"github.com/libopenstorage/stork/drivers"
@@ -25,7 +28,16 @@ const (
 	PXIncrementalCountAnnotation = "portworx.io/cloudsnap-incremental-count"
 	// trimCRDGroupNameKey - groups name containing the string from this configmap field will be trimmed
 	trimCRDGroupNameKey = "TRIM_CRD_GROUP_NAME"
-
+	// QuitRestoreCrTimestampUpdate is sent in the channel to informs the go routine to stop any further update
+	QuitRestoreCrTimestampUpdate = 13
+	// UpdateRestoreCrTimestamp is sent in channel to signify go routine to update the timestamp
+	UpdateRestoreCrTimestamp = 11
+	// duration in which the restore CR to be updated
+	FifteenMinuteWait = 15 * time.Minute
+	// sleep interval for restore time stamp update go-routine to check channel for any data
+	SleepIntervalForCheckingChannel = 10 * time.Second
+	// RestoreCrChannelBufferSize is the count of maximum signals it can hold in restore CR update related channel
+	RestoreCrChannelBufferSize = 11
 	// PrefixBackup - prefix string that will be used for the kdmp backup job
 	PrefixBackup = "backup"
 	// PrefixNFSBackup prefix string that will be used for the nfs backup job
@@ -148,6 +160,17 @@ func ParseRancherProjectMapping(
 			}
 		}
 	}
+}
+
+// GetSizeOfObject - Gets the in-memory size of a object
+// It may include the golang runtime headers related to GC
+// If the structure object contains unexported field, then encoder will fail.
+func GetSizeOfObject(object interface{}) (int, error) {
+	buf := new(bytes.Buffer)
+	if err := gob.NewEncoder(buf).Encode(object); err != nil {
+		return 0, err
+	}
+	return buf.Len(), nil
 }
 
 // GetValidLabel - will validate the label to make sure the length is less 63 and contains valid label format.

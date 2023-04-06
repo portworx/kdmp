@@ -686,7 +686,7 @@ func (a *ApplicationCloneController) applyResources(
 	if clone.Spec.ReplacePolicy == stork_api.ApplicationCloneReplacePolicyDelete {
 		err := a.resourceCollector.DeleteResources(
 			a.dynamicInterface,
-			objects)
+			objects, nil)
 		if err != nil {
 			return err
 		}
@@ -758,6 +758,7 @@ func (a *ApplicationCloneController) cloneResources(
 	allObjects, _, err := a.resourceCollector.GetResources(
 		[]string{clone.Spec.SourceNamespace},
 		clone.Spec.Selectors,
+		nil,
 		nil,
 		clone.Spec.IncludeOptionalResourceTypes,
 		false,

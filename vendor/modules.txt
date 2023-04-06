@@ -352,7 +352,7 @@ github.com/kubernetes-sigs/aws-ebs-csi-driver/pkg/util
 # github.com/libopenstorage/gossip v0.0.0-20220309192431-44c895e0923e
 ## explicit
 github.com/libopenstorage/gossip/types
-# github.com/libopenstorage/openstorage v9.4.46+incompatible => github.com/libopenstorage/openstorage v1.0.1-0.20220804223926-812cb10d08c4
+# github.com/libopenstorage/openstorage v9.4.47+incompatible => github.com/libopenstorage/openstorage v1.0.1-0.20220804223926-812cb10d08c4
 ## explicit; go 1.15
 github.com/libopenstorage/openstorage/api
 github.com/libopenstorage/openstorage/api/client
@@ -390,7 +390,7 @@ github.com/libopenstorage/openstorage-sdk-clients/sdk/golang
 github.com/libopenstorage/secrets
 github.com/libopenstorage/secrets/aws/credentials
 github.com/libopenstorage/secrets/k8s
-# github.com/libopenstorage/stork v1.4.1-0.20230310131740-6799188e7fac
+# github.com/libopenstorage/stork v1.4.1-0.20230406052032-4da60c7d3a83
 ## explicit; go 1.19
 github.com/libopenstorage/stork/drivers
 github.com/libopenstorage/stork/drivers/volume
@@ -572,7 +572,7 @@ github.com/spf13/cobra/doc
 # github.com/spf13/pflag v1.0.5
 ## explicit; go 1.12
 github.com/spf13/pflag
-# github.com/stretchr/testify v1.8.1
+# github.com/stretchr/testify v1.8.2
 ## explicit; go 1.13
 github.com/stretchr/testify/assert
 github.com/stretchr/testify/require

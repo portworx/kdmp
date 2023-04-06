@@ -12,7 +12,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/go-openapi/inflect"
 	"github.com/libopenstorage/stork/drivers"
 	"github.com/libopenstorage/stork/drivers/volume"
 	"github.com/libopenstorage/stork/pkg/apis/stork"
@@ -76,6 +75,7 @@ const (
 	kdmpDriverOnly                  = "kdmp"
 	nonKdmpDriverOnly               = "nonkdmp"
 	mixedDriver                     = "mixed"
+	oneMBSizeBytes                  = 1 << (10 * 2)
 	prefixBackup                    = "backup"
 	prefixRestore                   = "restore"
 	applicationBackupCRNameKey      = kdmpAnnotationPrefix + "applicationbackup-cr-name"
@@ -461,7 +461,7 @@ func (a *ApplicationBackupController) namespaceBackupAllowed(backup *stork_api.A
 	}
 	// Restrict backups to only the namespace that the object belongs to
 	// except for the namespace designated by the admin
-	if backup.Namespace != a.backupAdminNamespace {
+	if backup.Namespace != a.backupAdminNamespace && backup.Namespace != k8sutils.DefaultAdminNamespace {
 		for _, ns := range backup.Spec.Namespaces {
 			if ns != backup.Namespace {
 				return false
@@ -1361,12 +1361,8 @@ func (a *ApplicationBackupController) uploadCRDResources(backup *stork_api.Appli
 	if err != nil {
 		return err
 	}
-	ruleset := inflect.NewDefaultRuleset()
-	ruleset.AddPlural("quota", "quotas")
-	ruleset.AddPlural("prometheus", "prometheuses")
-	ruleset.AddPlural("mongodbcommunity", "mongodbcommunity")
-	ruleset.AddPlural("mongodbopsmanager", "opsmanagers")
-	ruleset.AddPlural("mongodb", "mongodb")
+	ruleset := resourcecollector.GetDefaultRuleSet()
+
 	v1CrdApiReqrd, err := version.RequiresV1Registration()
 	if err != nil {
 		return err
@@ -1526,6 +1522,7 @@ func (a *ApplicationBackupController) backupResources(
 			objects, _, err := a.resourceCollector.GetResources(
 				incResNsBatch,
 				backup.Spec.Selectors,
+				nil,
 				objectMap,
 				optionalBackupResources,
 				true,
@@ -1543,7 +1540,7 @@ func (a *ApplicationBackupController) backupResources(
 				for _, resource := range resourceTypes {
 					if resource.Kind == backupResourceType || (backupResourceType == "PersistentVolumeClaim" && resource.Kind == "PersistentVolume") {
 						log.ApplicationBackupLog(backup).Tracef("GetResourcesType for : %v", resource.Kind)
-						objects, _, err := a.resourceCollector.GetResourcesForType(resource, nil, resourceTypeNsBatch, backup.Spec.Selectors, nil, true, resourceCollectorOpts)
+						objects, _, err := a.resourceCollector.GetResourcesForType(resource, nil, resourceTypeNsBatch, backup.Spec.Selectors, nil, nil, true, resourceCollectorOpts)
 						if err != nil {
 							log.ApplicationBackupLog(backup).Errorf("Error getting resources: %v", err)
 							return err
@@ -1604,6 +1601,20 @@ func (a *ApplicationBackupController) backupResources(
 		}
 		backup.Status.Resources = resourceInfos
 		backup.Status.LastUpdateTimestamp = metav1.Now()
+		backupCrSize, err := utils.GetSizeOfObject(backup)
+		if err != nil {
+			log.ApplicationBackupLog(backup).Errorf("Failed to calculate size of resource info array for backup %v", backup.GetName())
+			return err
+		}
+		if backupCrSize > oneMBSizeBytes {
+			logrus.Infof("The size of application backup CR obtained %v bytes", backupCrSize)
+			logrus.Infof("Stripping all the resource info from Application backup-cr %v in namespace %v", backup.GetName(), backup.GetNamespace())
+			// update the flag and resource-count.
+			// Strip off the resource info it contributes to bigger size of AB CR in case of large number of resource
+			backup.Status.Resources = make([]*stork_api.ApplicationBackupResourceInfo, 0)
+			backup.Status.ResourceCount = len(resourceInfos)
+			backup.Status.LargeResourceEnabled = true
+		}
 		// Store the new status
 		err = a.client.Update(context.TODO(), backup)
 		if err != nil {
