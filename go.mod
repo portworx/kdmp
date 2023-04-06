@@ -8,13 +8,13 @@ require (
 	github.com/hashicorp/go-version v1.6.0
 	github.com/kubernetes-csi/external-snapshotter/client/v4 v4.0.0
 	github.com/kubernetes-incubator/external-storage v0.20.4-openstorage-rc7
-	github.com/libopenstorage/stork v1.4.1-0.20230310131740-6799188e7fac
+	github.com/libopenstorage/stork v1.4.1-0.20230406052032-4da60c7d3a83
 	github.com/portworx/pxc v0.33.0
 	github.com/portworx/sched-ops v1.20.4-rc1.0.20230302072046-553cc8ef572b
 	github.com/sirupsen/logrus v1.9.0
 	github.com/spf13/cobra v1.6.1
 	github.com/spf13/pflag v1.0.5
-	github.com/stretchr/testify v1.8.1
+	github.com/stretchr/testify v1.8.2
 	github.com/urfave/cli v1.22.2
 	gocloud.dev v0.20.0
 	k8s.io/api v0.25.4
@@ -107,7 +107,7 @@ require (
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/kubernetes-sigs/aws-ebs-csi-driver v0.9.0 // indirect
 	github.com/libopenstorage/gossip v0.0.0-20220309192431-44c895e0923e // indirect
-	github.com/libopenstorage/openstorage v9.4.46+incompatible // indirect
+	github.com/libopenstorage/openstorage v9.4.47+incompatible // indirect
 	github.com/libopenstorage/openstorage-sdk-clients v0.109.0 // indirect
 	github.com/libopenstorage/secrets v0.0.0-20220413195519-57d1c446c5e9 // indirect
 	github.com/liggitt/tabwriter v0.0.0-20181228230101-89fcab3d43de // indirect
