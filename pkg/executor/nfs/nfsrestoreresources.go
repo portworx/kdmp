@@ -533,7 +533,8 @@ func applyResources(
 	if restore.Spec.ReplacePolicy == storkapi.ApplicationRestoreReplacePolicyDelete {
 		err = resourceCollector.DeleteResources(
 			dynamicInterface,
-			objects)
+			objects,
+                        nil)
 		if err != nil {
 			return err
 		}
