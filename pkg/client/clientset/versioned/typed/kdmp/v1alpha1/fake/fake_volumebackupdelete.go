@@ -107,7 +107,7 @@ func (c *FakeVolumeBackupDeletes) UpdateStatus(ctx context.Context, volumeBackup
 // Delete takes name of the volumeBackupDelete and deletes it. Returns an error if one occurs.
 func (c *FakeVolumeBackupDeletes) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(volumebackupdeletesResource, c.ns, name), &v1alpha1.VolumeBackupDelete{})
+		Invokes(testing.NewDeleteActionWithOptions(volumebackupdeletesResource, c.ns, name, opts), &v1alpha1.VolumeBackupDelete{})
 
 	return err
 }
