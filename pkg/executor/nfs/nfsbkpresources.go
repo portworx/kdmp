@@ -218,7 +218,7 @@ func uploadResource(
 		objects, _, err := rc.GetResources(
 			batch,
 			backup.Spec.Selectors,
-                        nil,
+			nil,
 			dummyObjects,
 			optionalBackupResources,
 			true,

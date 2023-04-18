@@ -107,7 +107,7 @@ func (c *FakeBackupLocationMaintenances) UpdateStatus(ctx context.Context, backu
 // Delete takes name of the backupLocationMaintenance and deletes it. Returns an error if one occurs.
 func (c *FakeBackupLocationMaintenances) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(backuplocationmaintenancesResource, c.ns, name), &v1alpha1.BackupLocationMaintenance{})
+		Invokes(testing.NewDeleteActionWithOptions(backuplocationmaintenancesResource, c.ns, name, opts), &v1alpha1.BackupLocationMaintenance{})
 
 	return err
 }

@@ -285,7 +285,7 @@ func restoreVolResourcesAndApply(
 			err = rc.DeleteResources(
 				dynamicInterface,
 				tempObjects,
-                                nil)
+				nil)
 			if err != nil {
 				return err
 			}

@@ -534,7 +534,7 @@ func applyResources(
 		err = resourceCollector.DeleteResources(
 			dynamicInterface,
 			objects,
-                        nil)
+			nil)
 		if err != nil {
 			return err
 		}
