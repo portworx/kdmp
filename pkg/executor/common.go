@@ -50,7 +50,9 @@ const (
 	// DefaultTimeout Max time a command will be retired before failing
 	DefaultTimeout = 1 * time.Minute
 	// BackupUID backup UID annotation
-	BackupUID = "portworx.io/backup-uid"
+	BackupUID  = "portworx.io/backup-uid"
+	retrySleep = 10 * time.Second
+	maxRetry   = 10
 )
 
 // BackupTool backup tool
@@ -305,7 +307,7 @@ func ParseCloudCred() (*Repository, error) {
 	}
 	if storkapi.BackupLocationType(blType) == storkapi.BackupLocationNFS {
 		// For NFS this path need to be absolute path not just a bucket name anymore.
-		repository.Path = drivers.NfsMount + repository.NfsConfig.SubPath + "/"
+		repository.Path = drivers.NfsMount + string(bucket) + "/"
 	} else {
 		repository.Path = string(bucket)
 	}
@@ -378,7 +380,7 @@ func parseNfsCreds() (*Repository, error) {
 		logrus.Errorf("%v", errMsg)
 		return nil, fmt.Errorf(errMsg)
 	}
-	subPath, err := os.ReadFile(subPath)
+	bucket, err := os.ReadFile(bucketPath)
 	if err != nil {
 		errMsg := fmt.Sprintf("failed reading data from file %s : %s", subPath, err)
 		logrus.Errorf("%v", errMsg)
@@ -386,7 +388,7 @@ func parseNfsCreds() (*Repository, error) {
 	}
 
 	repository.NfsConfig.ServerAddr = string(sa)
-	repository.NfsConfig.SubPath = string(subPath)
+	repository.NfsConfig.SubPath = string(bucket)
 	return repository, nil
 }
 
@@ -489,6 +491,35 @@ func WriteVolumeBackupStatus(
 	if _, err = kdmpops.Instance().UpdateVolumeBackup(context.Background(), vb); err != nil {
 		return fmt.Errorf("update %s/%s VolumeBackup: %v", volumeBackupName, namespace, err)
 	}
+	return nil
+}
+
+// UpdateStatusInResourceBackup -- Updating resourceBackup status
+func UpdateStatusInResourceBackup(
+	status kdmpapi.ResourceBackupStatus,
+	reason string,
+	progress float64,
+	rbName string,
+	rbNamespace string,
+) error {
+	for i := 0; i < maxRetry; i++ {
+		rb, err := kdmpschedops.Instance().GetResourceBackup(rbName, rbNamespace)
+		if err != nil {
+			errMsg := fmt.Sprintf("error reading ResourceBackup CR[%v/%v]: %v", rbNamespace, rbName, err)
+			time.Sleep(retrySleep)
+			return fmt.Errorf(errMsg)
+		}
+		rb.Status.Status = status
+		rb.Status.Reason = reason
+		rb.Status.ProgressPercentage = progress
+		_, err = kdmpschedops.Instance().UpdateResourceBackup(rb)
+		if err != nil {
+			errMsg := fmt.Sprintf("error updating ResourceBackup CR[%v/%v]: %v", rbNamespace, rbName, err)
+			time.Sleep(retrySleep)
+			return fmt.Errorf(errMsg)
+		}
+	}
+
 	return nil
 }
 
