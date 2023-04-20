@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"path/filepath"
+	"strings"
 
 	"github.com/libopenstorage/stork/drivers/volume"
 	"github.com/libopenstorage/stork/drivers/volume/kdmp"
@@ -33,6 +34,47 @@ import (
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/rest"
 )
+
+func downloadStorageClass(
+	backup *storkapi.ApplicationBackup,
+	backupLocation string,
+	namespace string,
+) ([]byte, error) {
+	funct := "downloadResources"
+	repo, err := executor.ParseCloudCred()
+	if err != nil {
+		logrus.Errorf("%s: error parsing cloud cred: %v", funct, err)
+		return nil, err
+	}
+	bkpDir := filepath.Join(repo.Path, backup.Status.BackupPath)
+
+	restoreLocation, err := storkops.Instance().GetBackupLocation(backup.Spec.BackupLocation, namespace)
+	if err != nil {
+		return nil, err
+	}
+	data, err := executor.DownloadObject(bkpDir, "storageclass.json", restoreLocation.Location.EncryptionV2Key)
+	if err != nil {
+		return nil, fmt.Errorf("error downloading storageclass: %v", err)
+	}
+	return data, nil
+}
+
+func getRancherProjectMapping(restore *storkapi.ApplicationRestore) map[string]string {
+	rancherProjectMapping := map[string]string{}
+	if restore.Spec.RancherProjectMapping != nil {
+		for key, value := range restore.Spec.RancherProjectMapping {
+			rancherProjectMapping[key] = value
+			dataKey := strings.Split(key, ":")
+			dataVal := strings.Split(value, ":")
+			if len(dataKey) == 2 && len(dataVal) == 2 {
+				rancherProjectMapping[dataKey[1]] = dataVal[1]
+			} else if len(dataKey) == 1 && len(dataVal) == 2 {
+				rancherProjectMapping[dataKey[0]] = dataVal[1]
+			}
+		}
+	}
+	return rancherProjectMapping
+}
 
 func newRestoreResourcesCommand() *cobra.Command {
 	restoreCommand := &cobra.Command{
@@ -133,7 +175,7 @@ func restoreResources(
 		return err
 	}
 
-	if err := applyResources(restore, rb, objects, nil); err != nil {
+	if err := applyResources(restore, rb, objects); err != nil {
 		return err
 	}
 	return nil
@@ -487,7 +529,6 @@ func applyResources(
 	restore *storkapi.ApplicationRestore,
 	rb *kdmpapi.ResourceBackup,
 	objects []runtime.Unstructured,
-	opts *resourcecollector.Options,
 ) error {
 	resourceCollector := initResourceCollector()
 	dynamicInterface, err := getDynamicInterface()
@@ -500,8 +541,13 @@ func applyResources(
 	}
 	objectMap := storkapi.CreateObjectsMap(restore.Spec.IncludeResources)
 	tempObjects := make([]runtime.Unstructured, 0)
-	// TODO: When NFS restore starts to support Rancher the last argument sent as Nil need to be populated accordingly.
-	// It is not taken care in this PR yet.
+	var opts resourcecollector.Options
+	if len(restore.Spec.RancherProjectMapping) != 0 {
+		rancherProjectMapping := getRancherProjectMapping(restore)
+		opts = resourcecollector.Options{
+			RancherProjectMappings: rancherProjectMapping,
+		}
+	}
 	for _, o := range objects {
 		skip, err := resourceCollector.PrepareResourceForApply(
 			o,
@@ -512,7 +558,7 @@ func applyResources(
 			pvNameMappings,
 			restore.Spec.IncludeOptionalResourceTypes,
 			restore.Status.Volumes,
-			nil,
+			&opts,
 		)
 		if err != nil {
 			return err
@@ -555,7 +601,8 @@ func applyResources(
 
 		err = resourceCollector.ApplyResource(
 			dynamicInterface,
-			o, nil)
+			o, &opts)
+		logrus.Infof("sivakumar --- resourceCollector.ApplyResource -------> %v", err)
 		if err != nil && errors.IsAlreadyExists(err) {
 			switch restore.Spec.ReplacePolicy {
 			case storkapi.ApplicationRestoreReplacePolicyDelete:
@@ -593,8 +640,8 @@ func applyResources(
 			}
 		}
 	}
-	rb.Status.Reason = utils.ResourceUploadSuccessMsg
-	rb.Status.Status = kdmpapi.ResourceBackupStatusSuccessful
+	// rb.Status.Reason = utils.ResourceUploadSuccessMsg
+	// rb.Status.Status = kdmpapi.ResourceBackupStatusSuccessful
 	_, err = kdmpschedops.Instance().UpdateResourceBackup(rb)
 	if err != nil {
 		errMsg := fmt.Sprintf("applyResources: error updating ResourceBackup CR[%v/%v]: %v", rb.Namespace, rb.Name, err)
