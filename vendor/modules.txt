@@ -390,7 +390,7 @@ github.com/libopenstorage/openstorage-sdk-clients/sdk/golang
 github.com/libopenstorage/secrets
 github.com/libopenstorage/secrets/aws/credentials
 github.com/libopenstorage/secrets/k8s
-# github.com/libopenstorage/stork v1.4.1-0.20230406052032-4da60c7d3a83
+# github.com/libopenstorage/stork v1.4.1-0.20230424175842-dc27ab228a6e
 ## explicit; go 1.19
 github.com/libopenstorage/stork/drivers
 github.com/libopenstorage/stork/drivers/volume
@@ -422,6 +422,7 @@ github.com/libopenstorage/stork/pkg/objectstore/google
 github.com/libopenstorage/stork/pkg/objectstore/nfs
 github.com/libopenstorage/stork/pkg/objectstore/s3
 github.com/libopenstorage/stork/pkg/platform/rancher
+github.com/libopenstorage/stork/pkg/pluralmap
 github.com/libopenstorage/stork/pkg/resourcecollector
 github.com/libopenstorage/stork/pkg/rule
 github.com/libopenstorage/stork/pkg/schedule

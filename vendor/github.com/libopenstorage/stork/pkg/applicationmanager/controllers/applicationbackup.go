@@ -47,6 +47,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/record"
+	coreapi "k8s.io/kubernetes/pkg/apis/core"
 	runtimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -1488,6 +1489,21 @@ func (a *ApplicationBackupController) backupResources(
 
 	// Don't modify resources if mentioned explicitly in specs
 	resourceCollectorOpts := resourcecollector.Options{}
+	resourceCollectorOpts.ResourceCountLimit = k8sutils.DefaultResourceCountLimit
+	// Read configMap for any user provided value. this will be used in to List call of getResource eventually.
+	resourceCountLimitString, err := k8sutils.GetConfigValue(k8sutils.StorkControllerConfigMapName, metav1.NamespaceSystem, k8sutils.ResourceCountLimitKeyName)
+	if err != nil {
+		logrus.Warnf("error in reading %v cm for the key %v, switching to default value passed to GetResource API: %v",
+			k8sutils.StorkControllerConfigMapName, k8sutils.ResourceCountLimitKeyName, err)
+	} else {
+		if len(resourceCountLimitString) != 0 {
+			resourceCollectorOpts.ResourceCountLimit, err = strconv.ParseInt(resourceCountLimitString, 10, 64)
+			if err != nil {
+				logrus.Warnf("error in conversion of resourceCountLimit: %v", err)
+				resourceCollectorOpts.ResourceCountLimit = k8sutils.DefaultResourceCountLimit
+			}
+		}
+	}
 	if backup.Spec.SkipServiceUpdate {
 		resourceCollectorOpts.SkipServices = true
 	}
@@ -1606,9 +1622,24 @@ func (a *ApplicationBackupController) backupResources(
 			log.ApplicationBackupLog(backup).Errorf("Failed to calculate size of resource info array for backup %v", backup.GetName())
 			return err
 		}
-		if backupCrSize > oneMBSizeBytes {
-			logrus.Infof("The size of application backup CR obtained %v bytes", backupCrSize)
-			logrus.Infof("Stripping all the resource info from Application backup-cr %v in namespace %v", backup.GetName(), backup.GetNamespace())
+		var largeResourceSizeLimit int64
+		largeResourceSizeLimit = k8sutils.LargeResourceSizeLimitDefault
+		configData, err := core.Instance().GetConfigMap(k8sutils.StorkControllerConfigMapName, coreapi.NamespaceSystem)
+		if err != nil {
+			log.ApplicationBackupLog(backup).Errorf("failed to read config map %v for large resource size limit", k8sutils.StorkControllerConfigMapName)
+		}
+		if configData.Data[k8sutils.LargeResourceSizeLimitName] != "" {
+			largeResourceSizeLimit, err = strconv.ParseInt(configData.Data[k8sutils.LargeResourceSizeLimitName], 0, 64)
+			if err != nil {
+				log.ApplicationBackupLog(backup).Errorf("failed to read config map %v's key %v, setting default value of 1MB", k8sutils.StorkControllerConfigMapName,
+					k8sutils.LargeResourceSizeLimitName)
+				largeResourceSizeLimit = k8sutils.LargeResourceSizeLimitDefault
+			}
+		}
+
+		log.ApplicationBackupLog(backup).Infof("The size of application backup CR obtained %v bytes", backupCrSize)
+		if backupCrSize > int(largeResourceSizeLimit) {
+			log.ApplicationBackupLog(backup).Infof("Stripping all the resource info from Application backup-cr %v in namespace %v", backup.GetName(), backup.GetNamespace())
 			// update the flag and resource-count.
 			// Strip off the resource info it contributes to bigger size of AB CR in case of large number of resource
 			backup.Status.Resources = make([]*stork_api.ApplicationBackupResourceInfo, 0)
@@ -1763,6 +1794,10 @@ func (a *ApplicationBackupController) backupResources(
 			case kdmpapi.ResourceExportStatusPending:
 			case kdmpapi.ResourceExportStatusInProgress:
 				backup.Status.LastUpdateTimestamp = metav1.Now()
+			}
+			err = a.client.Update(context.TODO(), backup)
+			if err != nil {
+				return err
 			}
 			return nil
 		}

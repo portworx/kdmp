@@ -1777,8 +1777,8 @@ github.com/libopenstorage/stork v1.4.1-0.20220323180113-0ea773109d05/go.mod h1:h
 github.com/libopenstorage/stork v1.4.1-0.20220414104250-3c18fd21ed95/go.mod h1:yE94X0xBFSBQ9LvvJ/zppc4+XeiCAXtsHfYHm15dlcA=
 github.com/libopenstorage/stork v1.4.1-0.20221103082056-65abc8cc4e80/go.mod h1:yX+IlCrUsZekC6zxL6zHE7sBPKIudubHB3EcImzeRbI=
 github.com/libopenstorage/stork v1.4.1-0.20230207013129-a31284f0e973/go.mod h1:/EFTTQyBxNzul96urrYPdjNEYeDzVgZzK88gRQjoVmk=
-github.com/libopenstorage/stork v1.4.1-0.20230406052032-4da60c7d3a83 h1:VMSbPASU4oiuaRZHOEZ+wdvU1GhJWz9tmYkz3c+e7Tc=
-github.com/libopenstorage/stork v1.4.1-0.20230406052032-4da60c7d3a83/go.mod h1:7Cn5ZeJ82WoJSNDMnX1t//Amzd5M/8h7Icx7Pf3IhW0=
+github.com/libopenstorage/stork v1.4.1-0.20230424175842-dc27ab228a6e h1:kd7ip1DbfeNF197yUR2i1iZscWueafEHLqu9sRqHlO0=
+github.com/libopenstorage/stork v1.4.1-0.20230424175842-dc27ab228a6e/go.mod h1:R8QFEl+G89q0eOJuMYObW6vSX1gI+BtV/oIzdWgwgz4=
 github.com/libopenstorage/systemutils v0.0.0-20160208220149-44ac83be3ce1/go.mod h1:xwNGC7xiz/BQ/wbMkvHujL8Gjgseg+x41xMek7sKRRQ=
 github.com/liggitt/tabwriter v0.0.0-20181228230101-89fcab3d43de h1:9TO3cAIGXtEhnIaL+V+BEER86oLrvS+kWobKpbJuye0=
 github.com/liggitt/tabwriter v0.0.0-20181228230101-89fcab3d43de/go.mod h1:zAbeS9B/r2mtpb6U+EI2rYA5OAXxsYw6wTamcNW+zcE=
