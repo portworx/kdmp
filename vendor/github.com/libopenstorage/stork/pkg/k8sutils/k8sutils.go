@@ -43,8 +43,31 @@ const (
 	ObjectLockIncrBackupCountKey = "object-lock-incr-backup-count"
 	// ObjectLockDefaultIncrementalCount defines default incremental backup count
 	ObjectLockDefaultIncrementalCount = 5
+	//LargeResourceSizeLimit defines the maximum size of CR beyond which the backup and restores will be treated as Large resource type.
+	LargeResourceSizeLimitName = "large-resource-size-limit"
+	//LargeResourceSizeLimitDefault defines the default size of CR beyond which the backup and restores will be treated as Large resource type.
+	LargeResourceSizeLimitDefault = 1 << (10 * 2)
 	//minProtectionPeriod defines minimum number of days, the backup are protected via object-lock feature
 	minProtectionPeriod = 1
+	// RestoreVolumeBatchCountKey - restore volume batch count value
+	RestoreVolumeBatchCountKey = "restore-volume-backup-count"
+	// DefaultRestoreVolumeBatchCount - default value for restore volume batch count
+	DefaultRestoreVolumeBatchCount = 25
+	// ResourceCountLimitKeyName defines the number of resources to be read via one List API call.
+	// It is assigned to Limit field of ListOption structure
+	ResourceCountLimitKeyName = "resource-count-limit"
+	// DefaultResourceCountLimit defines the default value for resource count for list api
+	DefaultResourceCountLimit = int64(500)
+	// DefaultRestoreVolumeBatchSleepInterval - restore volume batch sleep interval
+	DefaultRestoreVolumeBatchSleepInterval = "20s"
+	// RestoreVolumeBatchSleepIntervalKey - restore volume batch sleep interval key
+	RestoreVolumeBatchSleepIntervalKey = "restore-volume-sleep-interval"
+	// RestoreVolumeBatchSleepInterval - restore volume batch sleep interval
+	RestoreVolumeBatchSleepInterval = 20 * time.Second
+	// PxServiceEnvName - PX service ENV name
+	PxServiceEnvName = "PX_SERVICE_NAME"
+	// PxNamespaceEnvName - PX namespace ENV name
+	PxNamespaceEnvName = "PX_NAMESPACE"
 )
 
 // JSONPatchOp is a single json mutation done by a k8s mutating webhook
@@ -322,4 +345,22 @@ func IsValidBucketRetentionPeriod(bucketRetentionPeriod int64) (bool, int64, err
 	// user should set.
 	minRetentionDays := minProtectionPeriod + incrBkpCnt + 1
 	return (bucketRetentionPeriod >= minRetentionDays), minRetentionDays, nil
+}
+
+// GetPxNamespaceFromStorkDeploy - will return the px namespace env from stork deploy
+func GetPxNamespaceFromStorkDeploy(storkDeployName, storkDeployNamespace string) (string, string, error) {
+	deploy, err := apps.Instance().GetDeployment(storkDeployName, storkDeployNamespace)
+	if err != nil {
+		return "", "", err
+	}
+	var service, namespace string
+	for _, envVar := range deploy.Spec.Template.Spec.Containers[0].Env {
+		if envVar.Name == PxServiceEnvName {
+			service = envVar.Value
+		}
+		if envVar.Name == PxNamespaceEnvName {
+			namespace = envVar.Value
+		}
+	}
+	return namespace, service, nil
 }
