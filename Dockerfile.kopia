@@ -9,7 +9,7 @@ RUN rpm --import https://kopia.io/signing-key
 
 COPY kopia.repo /etc/yum.repos.d/kopia.repo
 
-RUN yum install -y kopia-0.9.4
+RUN yum install -y kopia-0.10.6
 WORKDIR /
 
 COPY ./bin/kopiaexecutor /
