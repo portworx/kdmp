@@ -307,7 +307,6 @@ func (c *Controller) sync(ctx context.Context, in *kdmpapi.DataExport) (bool, er
 			backupLocation.Location.NFSConfig.ServerAddr,
 			backupLocation.Location.NFSConfig.SubPath,
 			backupLocation.Location.NFSConfig.MountOptions,
-			backupLocation.Location.NFSConfig.SubPath,
 		)
 		if err != nil && err != utils.ErrJobAlreadyRunning && err != utils.ErrOutOfJobResources {
 			msg := fmt.Sprintf("failed to start a data transfer job, dataexport [%v]: %v", dataExport.Name, err)
@@ -1650,7 +1649,6 @@ func startTransferJob(
 	nfsServerAddr string,
 	nfsExportPath string,
 	nfsMountOption string,
-	nfsSubPath string,
 ) (string, error) {
 	if drv == nil {
 		return "", fmt.Errorf("data transfer driver is not set")
@@ -1702,7 +1700,6 @@ func startTransferJob(
 			drivers.WithNfsServer(nfsServerAddr),
 			drivers.WithNfsExportDir(nfsExportPath),
 			drivers.WithNfsMountOption(nfsMountOption),
-			drivers.WithNfsSubPath(nfsSubPath),
 		)
 	case drivers.KopiaRestore:
 		return drv.StartJob(
@@ -1721,7 +1718,6 @@ func startTransferJob(
 			drivers.WithJobConfigMapNs(jobConfigMapNs),
 			drivers.WithNfsServer(nfsServerAddr),
 			drivers.WithNfsExportDir(nfsExportPath),
-			drivers.WithNfsSubPath(nfsSubPath),
 		)
 	}
 

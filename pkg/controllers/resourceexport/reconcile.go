@@ -374,7 +374,7 @@ func startNfsResourceJob(
 			drivers.WithResoureBackupName(re.Name),
 			drivers.WithResoureBackupNamespace(re.Namespace),
 			drivers.WithNfsMountOption(bl.Location.NFSConfig.MountOptions),
-			drivers.WithNfsSubPath(bl.Location.NFSConfig.SubPath),
+			drivers.WithNfsExportDir(bl.Location.NFSConfig.SubPath),
 		)
 	case drivers.NFSRestore:
 		return drv.StartJob(
@@ -390,7 +390,7 @@ func startNfsResourceJob(
 			drivers.WithResoureBackupName(re.Name),
 			drivers.WithResoureBackupNamespace(re.Namespace),
 			drivers.WithNfsMountOption(bl.Location.NFSConfig.MountOptions),
-			drivers.WithNfsSubPath(bl.Location.NFSConfig.SubPath),
+			drivers.WithNfsExportDir(bl.Location.NFSConfig.SubPath),
 		)
 	}
 	return "", fmt.Errorf("unknown data transfer driver: %s", drv.Name())
