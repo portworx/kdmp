@@ -230,7 +230,7 @@ func jobForRestoreResource(
 		logrus.Errorf("failed to get the stork pod namespace: %v", err)
 		return nil, fmt.Errorf("failed to get the stork pod namespace: %v", err)
 	}
-	// Get the PX service account name and namespace
+	// Get the PX service name and namespace
 	pxServiceNamespace, pxServiceName, err := k8sutils.GetPxNamespaceFromStorkDeploy(k8sutils.StorkDeploymentName, storkPodNamespace)
 	if err != nil {
 		logrus.Infof("failed to get the px service name and namespace: %v", err)

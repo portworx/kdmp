@@ -40,7 +40,7 @@ func downloadStorageClass(
 	backupLocation string,
 	namespace string,
 ) ([]byte, error) {
-	funct := "downloadResources"
+	funct := "downloadStorageClass"
 	repo, err := executor.ParseCloudCred()
 	if err != nil {
 		logrus.Errorf("%s: error parsing cloud cred: %v", funct, err)
@@ -602,7 +602,6 @@ func applyResources(
 		err = resourceCollector.ApplyResource(
 			dynamicInterface,
 			o, &opts)
-		logrus.Infof("sivakumar --- resourceCollector.ApplyResource -------> %v", err)
 		if err != nil && errors.IsAlreadyExists(err) {
 			switch restore.Spec.ReplacePolicy {
 			case storkapi.ApplicationRestoreReplacePolicyDelete:

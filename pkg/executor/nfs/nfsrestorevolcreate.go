@@ -294,7 +294,6 @@ func restoreVolResourcesAndApply(
 				return sErr
 			}
 			time.Sleep(volumeBatchSleepInterval)
-			logrus.Infof("sErr ---> %v", sErr)
 			restoreCompleteList = append(restoreCompleteList, restoreVolumeInfos...)
 		}
 	}
@@ -305,12 +304,10 @@ func restoreVolResourcesAndApply(
 		errMsg := fmt.Sprintf("error reading ResourceBackup CR[%v/%v]: %v", rbCrNamespace, rbCrName, err)
 		return fmt.Errorf(errMsg)
 	}
-	// Updating vol info
-	if sErr == nil {
-		rb.Status.Status = kdmpapi.ResourceBackupStatusSuccessful
-		rb.Status.Reason = utils.PvcBoundSuccessMsg
-		rb.Status.ProgressPercentage = 100
-	}
+	// Update the success status to resource backup CR
+	rb.Status.Status = kdmpapi.ResourceBackupStatusSuccessful
+	rb.Status.Reason = utils.PvcBoundSuccessMsg
+	rb.Status.ProgressPercentage = 100
 	rb.RestoreCompleteList = restoreCompleteList
 
 	rb, err = kdmpschedops.Instance().UpdateResourceBackup(rb)
