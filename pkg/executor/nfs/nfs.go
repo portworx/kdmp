@@ -15,6 +15,8 @@ var (
 	bkpNamespace         string
 	rbCrName             string
 	rbCrNamespace        string
+	deCrName             string
+	deCrNamespace        string
 )
 
 // NewCommand returns a kopia command wrapper
@@ -29,6 +31,7 @@ func NewCommand() *cobra.Command {
 		newRestoreResourcesCommand(),
 		newDeleteResourcesCommand(),
 		newRestoreVolumeCommand(),
+		newCSIVolumeRestoreCommand(),
 	)
 
 	cmds.PersistentFlags().AddGoFlagSet(flag.CommandLine)

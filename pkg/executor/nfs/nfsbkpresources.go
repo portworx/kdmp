@@ -42,13 +42,14 @@ var (
 )
 
 const (
-	metadataObjectName        = "metadata.json"
-	namespacesFile            = "namespaces.json"
-	crdFile                   = "crds.json"
-	resourcesFile             = "resources.json"
-	storageClassFile          = "storageclass.json"
-	backupResourcesBatchCount = 15
-	volumeSnapShotCRDirectory = "csi-generic"
+	metadataObjectName           = "metadata.json"
+	namespacesFile               = "namespaces.json"
+	crdFile                      = "crds.json"
+	resourcesFile                = "resources.json"
+	storageClassFile             = "storageclass.json"
+	backupResourcesBatchCount    = 15
+	volumeSnapShotCRDirectory    = "csi-generic"
+	backupObjectUIDKeyInBackupCR = "portworx.io/backup-uid"
 )
 
 func newUploadBkpResourceCommand() *cobra.Command {
@@ -176,7 +177,6 @@ func uploadBkpResource(
 		logrus.Errorf(errMsg)
 		return fmt.Errorf(errMsg)
 	}
-
 	err = uploadCRDResources(resKinds, bkpDir, backup, encryptionKey)
 	if err != nil {
 		errMsg := fmt.Sprintf("%s: error uploading CRD resource %v", funct, err)
@@ -437,7 +437,7 @@ func uploadCSISnapshotInfoForPVCs(
 	encryptionKey string,
 ) error {
 	funct := "uploadCSISnapshotInfoForPVCs"
-	backupUID := string(backup.GetUID())
+	backupUID := getAnnotationValueFromApplicationBackup(backup, backupObjectUIDKeyInBackupCR)
 	for _, volInfo := range backup.Status.Volumes {
 		if volInfo.DriverName == storkvolume.KDMPDriverName {
 			volumeSnapshot := volInfo.VolumeSnapshot
@@ -448,6 +448,13 @@ func uploadCSISnapshotInfoForPVCs(
 				if err != nil {
 					logrus.Errorf("%s err: %v", funct, err)
 					return err
+				} else {
+					// If uploading of snapshot CRs is successful, cleanup the local vs/vsc CRs
+					err = deleteSnapshotObjects(volumeSnapshot, volInfo.Namespace)
+					if err != nil {
+						logrus.Errorf("%s err: %v", funct, err)
+						return err
+					}
 				}
 			}
 		}
@@ -573,6 +580,20 @@ func uploadSnapshotObjectsForPVC(
 		return err
 	}
 
+	return nil
+}
+
+func deleteSnapshotObjects(volumeSnapshotName, volumeSnapshotNamespace string) error {
+	snapshotter, err := snapshotter.NewCSIDriver()
+	if err != nil {
+		return err
+	}
+	err = snapshotter.DeleteSnapshot(volumeSnapshotName, volumeSnapshotNamespace, true)
+	msg := fmt.Sprintf("failed in removing local volume snapshot CRs for %s/%s: %v", volumeSnapshotName, volumeSnapshotNamespace, err)
+	if err != nil {
+		logrus.Errorf(msg)
+		return fmt.Errorf(msg)
+	}
 	return nil
 }
 
@@ -858,4 +879,12 @@ func getEncryptionKey(bkpNamespace string,
 	}
 
 	return uploadLocation.Location.EncryptionV2Key, nil
+}
+
+func getAnnotationValueFromApplicationBackup(backup *stork_api.ApplicationBackup, key string) string {
+	var val string
+	if _, ok := backup.Annotations[key]; ok {
+		val = backup.Annotations[key]
+	}
+	return val
 }
