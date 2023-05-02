@@ -14,6 +14,7 @@ import (
 	storkops "github.com/portworx/sched-ops/k8s/stork"
 	"github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/validation"
 )
@@ -30,10 +31,16 @@ const (
 	trimCRDGroupNameKey = "TRIM_CRD_GROUP_NAME"
 	// QuitRestoreCrTimestampUpdate is sent in the channel to informs the go routine to stop any further update
 	QuitRestoreCrTimestampUpdate = 13
-	// UpdateRestoreCrTimestamp is sent in channel to signify go routine to update the timestamp
-	UpdateRestoreCrTimestamp = 11
-	// duration in which the restore CR to be updated
-	FifteenMinuteWait = 15 * time.Minute
+	// UpdateRestoreCrTimestampInDeleteResourcePath is sent in channel to signify go routine to update the timestamp
+	UpdateRestoreCrTimestampInDeleteResourcePath = 11
+	// UpdateRestoreCrTimestampInPrepareResourcePath is sent in channel to signify go routine to update the timestamp
+	UpdateRestoreCrTimestampInPrepareResourcePath = 17
+	// UpdateRestoreCrTimestampInApplyResourcePath is sent in channel to signify go routine to update the timestamp
+	UpdateRestoreCrTimestampInApplyResourcePath = 19
+	// duration in which the restore CR to be updated with timestamp
+	TimeoutUpdateRestoreCrTimestamp = 15 * time.Minute
+	// duration in which the restore CR to be updated for resource Count progress
+	TimeoutUpdateRestoreCrProgress = 5 * time.Minute
 	// sleep interval for restore time stamp update go-routine to check channel for any data
 	SleepIntervalForCheckingChannel = 10 * time.Second
 	// RestoreCrChannelBufferSize is the count of maximum signals it can hold in restore CR update related channel
@@ -171,6 +178,19 @@ func GetSizeOfObject(object interface{}) (int, error) {
 		return 0, err
 	}
 	return buf.Len(), nil
+}
+
+// Get ObjectDetails returns name, namespace, kind of the given object
+func GetObjectDetails(o interface{}) (name, namespace, kind string, err error) {
+	metadata, err := meta.Accessor(o)
+	if err != nil {
+		return "", "", "", err
+	}
+	objType, err := meta.TypeAccessor(o)
+	if err != nil {
+		return "", "", "", err
+	}
+	return metadata.GetName(), metadata.GetNamespace(), objType.GetKind(), nil
 }
 
 // GetValidLabel - will validate the label to make sure the length is less 63 and contains valid label format.
