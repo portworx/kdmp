@@ -133,7 +133,8 @@ func restoreResources(
 		return err
 	}
 
-	if err := applyResources(restore, rb, objects, nil); err != nil {
+	var opts resourcecollector.Options
+	if err := applyResources(restore, rb, objects, &opts); err != nil {
 		return err
 	}
 	return nil
