@@ -119,7 +119,7 @@ func (k *kdmp) Stop() error {
 	return nil
 }
 
-func (k *kdmp) OwnsPVCForBackup(coreOps core.Ops, pvc *v1.PersistentVolumeClaim, cmBackupType string, crBackupType string, blType storkapi.BackupLocationType) bool {
+func (k *kdmp) OwnsPVCForBackup(coreOps core.Ops, pvc *v1.PersistentVolumeClaim, cmBackupType string, crBackupType string) bool {
 	// KDMP can handle any PVC type. KDMP driver will always be a fallback
 	// option when none of the other supported drivers by stork own the PVC
 	return true
@@ -322,17 +322,7 @@ func (k *kdmp) StartBackup(backup *storkapi.ApplicationBackup,
 		}
 		snapshotClassRequired := isCSISnapshotClassRequired(&pvc)
 		if snapshotClassRequired {
-			// This is a temporary change, once CSI support enabled properly for NFS this check will be altered.
-			backupLocation, err := storkops.Instance().GetBackupLocation(backup.Spec.BackupLocation, backup.Namespace)
-			if err != nil {
-				return nil, err
-			}
-			if backupLocation.Location.Type != storkapi.BackupLocationNFS {
-				dataExport.Spec.SnapshotStorageClass = k.getSnapshotClassName(backup)
-			} else {
-				dataExport.Spec.SnapshotStorageClass = ""
-			}
-
+			dataExport.Spec.SnapshotStorageClass = k.getSnapshotClassName(backup)
 		}
 		_, err = kdmpShedOps.Instance().CreateDataExport(dataExport)
 		if err != nil {
@@ -580,6 +570,7 @@ func (k *kdmp) GetPreRestoreResources(
 	backup *storkapi.ApplicationBackup,
 	restore *storkapi.ApplicationRestore,
 	objects []runtime.Unstructured,
+	storageClassBytes []byte,
 ) ([]runtime.Unstructured, error) {
 	return k.getRestorePVCs(backup, restore, objects)
 }
