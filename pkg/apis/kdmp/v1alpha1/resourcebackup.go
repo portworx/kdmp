@@ -34,6 +34,20 @@ const (
 	ResourceBackupStatusPartialSuccess ResourceBackupStatus = "PartialSuccess"
 )
 
+// ResourceBackupStatus defines a status of ResourceBackup.
+type ResourceApplyPhase string
+
+const (
+	// ResourceApplyPhasePreparing signifies we are altering the resource
+	// as per target cluster before applying
+	ResourceApplyPhasePreparing ResourceApplyPhase = "Preparing"
+	// ResourceApplyPhaseDeleting when Resources are deleted before applying this
+	// applicable only when replace is opted during restore process.
+	ResourceApplyPhaseDeleting ResourceApplyPhase = "Deleting"
+	// ResourceApplyPhaseApplying when Resource is being applied as part of restore process
+	ResourceApplyPhaseApplying ResourceApplyPhase = "Applying"
+)
+
 // ResourceBackupProgressStatus overall resource backup/restore progress
 type ResourceBackupProgressStatus struct {
 	// ProgressPercentage is the progress of the command in percentage
@@ -44,6 +58,14 @@ type ResourceBackupProgressStatus struct {
 	Reason string `json:"reason,omitempty"`
 	// Resources status of each resource being restore
 	Resources []*ResourceRestoreResourceInfo `json:"resources"`
+	// Total Resource Count is the total number of resources being restored
+	TotalResourceCount int64
+	// Restored Resource count is the count of already applied resource count
+	RestoredResourceCount int64
+	// Resource apply phase signifies the current stage of resource restore
+	ResourceApplyStage ResourceApplyPhase
+	// LargeResourceEnabled signifies if it largeResource enabled or not
+	LargeResourceEnabled bool
 }
 
 // +genclient

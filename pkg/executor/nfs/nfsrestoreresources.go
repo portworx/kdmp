@@ -5,7 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"path/filepath"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/libopenstorage/stork/drivers/volume"
 	"github.com/libopenstorage/stork/drivers/volume/kdmp"
@@ -13,11 +15,14 @@ import (
 	"github.com/libopenstorage/stork/pkg/k8sutils"
 	"github.com/libopenstorage/stork/pkg/log"
 	"github.com/libopenstorage/stork/pkg/resourcecollector"
+	storkutils "github.com/libopenstorage/stork/pkg/utils"
 	kdmpapi "github.com/portworx/kdmp/pkg/apis/kdmp/v1alpha1"
 	"github.com/portworx/kdmp/pkg/drivers/utils"
 	"github.com/portworx/kdmp/pkg/executor"
+	coreapi "k8s.io/kubernetes/pkg/apis/core"
 
 	//"github.com/portworx/sched-ops/k8s/core"
+	"github.com/portworx/sched-ops/k8s/core"
 	kdmpschedops "github.com/portworx/sched-ops/k8s/kdmp"
 	storkops "github.com/portworx/sched-ops/k8s/stork"
 	"github.com/sirupsen/logrus"
@@ -33,6 +38,11 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/rest"
+)
+
+const (
+	// duration in which the restore CR to be updated for resource Count progress
+	TimeoutUpdateRestoreCrProgress = 5 * time.Minute
 )
 
 func downloadStorageClass(
@@ -488,13 +498,14 @@ func updateResourceStatus(
 	object runtime.Unstructured,
 	status kdmpapi.ResourceRestoreStatus,
 	reason string,
-) error {
+	tempResourceList []*kdmpapi.ResourceRestoreResourceInfo,
+) ([]*kdmpapi.ResourceRestoreResourceInfo, error) {
 	var updatedResource *kdmpapi.ResourceRestoreResourceInfo
 	gkv := object.GetObjectKind().GroupVersionKind()
 	metadata, err := meta.Accessor(object)
 	if err != nil {
 		logrus.Errorf("updateResourceStatus: error getting metadata for object %v %v", object, err)
-		return err
+		return nil, err
 	}
 	for _, resource := range resourceBackup.Status.Resources {
 		if resource.Name == metadata.GetName() &&
@@ -518,11 +529,15 @@ func updateResourceStatus(
 				},
 			},
 		}
-		resourceBackup.Status.Resources = append(resourceBackup.Status.Resources, updatedResource)
+		if tempResourceList != nil {
+			tempResourceList = append(tempResourceList, updatedResource)
+		} else {
+			resourceBackup.Status.Resources = append(resourceBackup.Status.Resources, updatedResource)
+		}
 	}
 	updatedResource.Status = status
 	updatedResource.Reason = reason
-	return nil
+	return tempResourceList, nil
 }
 
 func applyResources(
@@ -530,6 +545,7 @@ func applyResources(
 	rb *kdmpapi.ResourceBackup,
 	objects []runtime.Unstructured,
 ) error {
+	fn := "nfsExecutorApplyResource"
 	resourceCollector := initResourceCollector()
 	dynamicInterface, err := getDynamicInterface()
 	if err != nil {
@@ -547,6 +563,12 @@ func applyResources(
 		opts = resourcecollector.Options{
 			RancherProjectMappings: rancherProjectMapping,
 		}
+	}
+
+	rb.Status.ResourceApplyStage = kdmpapi.ResourceApplyPhasePreparing
+	rb, err = executor.UpdateStatusInResourceBackup(rb.Status, rb.Name, rb.Namespace)
+	if err != nil {
+		logrus.Errorf("failed to update resorucebackup[%v/%v] status after hitting error in create namespace : %v", rbCrNamespace, rbCrName, err)
 	}
 	for _, o := range objects {
 		skip, err := resourceCollector.PrepareResourceForApply(
@@ -577,6 +599,14 @@ func applyResources(
 	// First delete the existing objects if they exist and replace policy is set
 	// to Delete
 	if restore.Spec.ReplacePolicy == storkapi.ApplicationRestoreReplacePolicyDelete {
+		rb.Status.ResourceApplyStage = kdmpapi.ResourceApplyPhaseDeleting
+		rb, err = executor.UpdateStatusInResourceBackup(rb.Status, rb.Name, rb.Namespace)
+		if err != nil {
+			logrus.Errorf("failed to update resorucebackup[%v/%v] status after hitting error in create namespace : %v", rbCrNamespace, rbCrName, err)
+		}
+		// We don't need to update the RB or RE CRs timestamp when this function takes long time for Large resource based scenario
+		// because this runs in job and job stays alive till it actively doing something.
+		// Any job/pod genuinely hung need to be cleanedup & intimated externally
 		err = resourceCollector.DeleteResources(
 			dynamicInterface,
 			objects,
@@ -585,8 +615,26 @@ func applyResources(
 			return err
 		}
 	}
-
+	startTime := time.Now()
+	tempResourceList := make([]*kdmpapi.ResourceRestoreResourceInfo, 0)
 	for _, o := range objects {
+		// every five minutes once, we need to update the RB CR
+		// this is to prevent stale CR timeout to evict the restore CR
+		elapsedTime := time.Since(startTime)
+		if elapsedTime > TimeoutUpdateRestoreCrProgress {
+			rb.Status.ResourceApplyStage = kdmpapi.ResourceApplyPhaseApplying
+			rb.Status.TotalResourceCount = int64(len(objects))
+			rb.Status.RestoredResourceCount = int64(len(tempResourceList))
+			rb, err = executor.UpdateStatusInResourceBackup(rb.Status, rb.Name, rb.Namespace)
+			if err != nil {
+				logrus.Errorf("failed to update resorucebackup[%v/%v] status after hitting error in create namespace : %v", rbCrNamespace, rbCrName, err)
+			}
+			log.ApplicationRestoreLog(restore).Infof("%v: Total resource Count: %v, Applied Resource Count %v, Current Resource State: %v",
+				fn, restore.Status.ResourceCount,
+				len(tempResourceList),
+				restore.Status.ResourceRestoreState)
+			startTime = time.Now()
+		}
 		metadata, err := meta.Accessor(o)
 		if err != nil {
 			return err
@@ -614,33 +662,67 @@ func applyResources(
 		}
 
 		if err != nil {
-			if err := updateResourceStatus(
+			if tempResourceList, err = updateResourceStatus(
 				rb,
 				o,
 				kdmpapi.ResourceRestoreStatusFailed,
-				fmt.Sprintf("Error applying resource: %v", err)); err != nil {
+				fmt.Sprintf("Error applying resource: %v", err), tempResourceList,
+			); err != nil {
 				return err
 			}
 		} else if retained {
-			if err := updateResourceStatus(
+			if tempResourceList, err = updateResourceStatus(
 				rb,
 				o,
 				kdmpapi.ResourceRestoreStatusRetained,
-				"Resource restore skipped as it was already present and ReplacePolicy is set to Retain"); err != nil {
+				"Resource restore skipped as it was already present and ReplacePolicy is set to Retain", tempResourceList,
+			); err != nil {
 				return err
 			}
 		} else {
-			if err := updateResourceStatus(
+			if tempResourceList, err = updateResourceStatus(
 				rb,
 				o,
 				kdmpapi.ResourceRestoreStatusSuccessful,
-				"Resource restored successfully"); err != nil {
+				"Resource restored successfully", tempResourceList,
+			); err != nil {
 				return err
 			}
 		}
 	}
+	// append the temp slice to the final restore resouce list,
+	rb.Status.Resources = append(rb.Status.Resources, tempResourceList...)
+	rb.Status.RestoredResourceCount = int64(len(rb.Status.Resources))
 	// rb.Status.Reason = utils.ResourceUploadSuccessMsg
 	// rb.Status.Status = kdmpapi.ResourceBackupStatusSuccessful
+	// Need to strip the Resources array, large resource scenario can fail due to etcd size limit
+	rbCrSize, err := storkutils.GetSizeOfObject(rb)
+	if err != nil {
+		log.ApplicationRestoreLog(restore).Errorf("failed to obtain size of restore CR")
+		return err
+	}
+	var largeResourceSizeLimit int64
+	largeResourceSizeLimit = k8sutils.LargeResourceSizeLimitDefault
+	configData, err := core.Instance().GetConfigMap(k8sutils.StorkControllerConfigMapName, coreapi.NamespaceSystem)
+	if err != nil {
+		log.ApplicationRestoreLog(restore).Errorf("failed to read config map %v for large resource size limit", k8sutils.StorkControllerConfigMapName)
+	}
+	if configData.Data[k8sutils.LargeResourceSizeLimitName] != "" {
+		largeResourceSizeLimit, err = strconv.ParseInt(configData.Data[k8sutils.LargeResourceSizeLimitName], 0, 64)
+		if err != nil {
+			log.ApplicationRestoreLog(restore).Errorf("failed to read config map %v's key %v, setting default value of 1MB", k8sutils.StorkControllerConfigMapName,
+				k8sutils.LargeResourceSizeLimitName)
+		}
+	}
+
+	log.ApplicationRestoreLog(restore).Infof("The size of application restore CR obtained %v bytes", rbCrSize)
+	rb.Status.TotalResourceCount = int64(len(rb.Status.Resources))
+	if rbCrSize > int(largeResourceSizeLimit) {
+		log.ApplicationRestoreLog(restore).Infof("Stripping all the resource info from restore cr as it is a large resource based restore")
+		// Strip off the resource info it contributes to bigger size of application restore CR in case of large number of resource
+		rb.Status.Resources = make([]*kdmpapi.ResourceRestoreResourceInfo, 0)
+		rb.Status.LargeResourceEnabled = true
+	}
 	_, err = kdmpschedops.Instance().UpdateResourceBackup(rb)
 	if err != nil {
 		errMsg := fmt.Sprintf("applyResources: error updating ResourceBackup CR[%v/%v]: %v", rb.Namespace, rb.Name, err)

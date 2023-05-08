@@ -52,7 +52,12 @@ func newRestoreVolumeCommand() *cobra.Command {
 			err := restoreVolResourcesAndApply(appRestoreCRName, restoreNamespace, rbCrName, rbCrNamespace)
 			if err != nil {
 				// Update the resource backup status with error
-				err = executor.UpdateStatusInResourceBackup(kdmpapi.ResourceBackupStatusFailed, err.Error(), 0, rbCrName, rbCrNamespace)
+				rbStatus := kdmpapi.ResourceBackupProgressStatus{
+					Status:             kdmpapi.ResourceBackupStatusFailed,
+					Reason:             err.Error(),
+					ProgressPercentage: 0,
+				}
+				_, err = executor.UpdateStatusInResourceBackup(rbStatus, rbCrName, rbCrNamespace)
 				if err != nil {
 					logrus.Errorf("failed to update resorucebackup[%v/%v] status after hitting error in create namespace : %v", rbCrNamespace, rbCrName, err)
 				}
