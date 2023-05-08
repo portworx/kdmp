@@ -288,10 +288,31 @@ func restoreVolResourcesAndApply(
 			batchVolInfo := backupVolInfos[i:min(i+batchCount, len(backupVolInfos))]
 			restoreVolumeInfos, sErr = driver.StartRestore(restore, batchVolInfo, preRestoreObjects)
 			if sErr != nil {
+				if _, ok := sErr.(*volume.ErrStorageProviderBusy); ok {
+					msg := fmt.Sprintf("Volume restores are in progress. Restores are failing for some volumes"+
+						" since the storage provider is busy. Restore will be retried. Error: %v", err)
+					log.ApplicationRestoreLog(restore).Errorf(msg)
+					rb, err := kdmpschedops.Instance().GetResourceBackup(rbCrName, rbCrNamespace)
+					if err != nil {
+						errMsg := fmt.Sprintf("error reading ResourceBackup CR[%v/%v]: %v", rbCrNamespace, rbCrName, err)
+						return fmt.Errorf(errMsg)
+					}
+					// Update the success status to resource backup CR
+					rb.Status.Status = kdmpapi.ResourceBackupStatusInProgress
+					rb.Status.Reason = msg
+					rb.Status.ProgressPercentage = 0
+
+					rb, err = kdmpschedops.Instance().UpdateResourceBackup(rb)
+					if err != nil {
+						errMsg := fmt.Sprintf("error updating ResourceBackup CR[%v/%v]: %v", rbCrNamespace, rbCrName, err)
+						return fmt.Errorf(errMsg)
+					}
+					//TODO: Should we also update the RE export CR here ? Or keep trying instead of return.
+					return nil
+				}
 				message := fmt.Sprintf("Error starting Application Restore for volumes: %v", err)
 				log.ApplicationRestoreLog(restore).Errorf(message)
-				// TODO: Need to add the volume.ErrStorageProviderBusy retry logic
-				return sErr
+				return err
 			}
 			time.Sleep(volumeBatchSleepInterval)
 			restoreCompleteList = append(restoreCompleteList, restoreVolumeInfos...)
