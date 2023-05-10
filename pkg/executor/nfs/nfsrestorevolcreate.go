@@ -307,7 +307,7 @@ func restoreVolResourcesAndApply(
 					rb.Status.Reason = msg
 					rb.Status.ProgressPercentage = 0
 
-					rb, err = kdmpschedops.Instance().UpdateResourceBackup(rb)
+					_, err = kdmpschedops.Instance().UpdateResourceBackup(rb)
 					if err != nil {
 						errMsg := fmt.Sprintf("error updating ResourceBackup CR[%v/%v]: %v", rbCrNamespace, rbCrName, err)
 						return fmt.Errorf(errMsg)
