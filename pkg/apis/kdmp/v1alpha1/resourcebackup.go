@@ -34,7 +34,7 @@ const (
 	ResourceBackupStatusPartialSuccess ResourceBackupStatus = "PartialSuccess"
 )
 
-// ResourceBackupStatus defines a status of ResourceBackup.
+// ResourceApplyPhase defines a status of resource restoration phase.
 type ResourceApplyPhase string
 
 const (

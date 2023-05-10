@@ -83,7 +83,7 @@ const (
 	ResourceExportStageFinal ResourceExportStage = "Final"
 )
 
-// ResourceBackupStatus defines a status of ResourceBackup.
+// ResourceExportResourceApplyPhase defines a status of resource restore
 type ResourceExportResourceApplyPhase string
 
 const (
