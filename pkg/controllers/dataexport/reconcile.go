@@ -1158,7 +1158,7 @@ func (c *Controller) stageLocalSnapshotRestore(ctx context.Context, dataExport *
 			dataExport,
 			bl,
 		)
-		logrus.Tracef("started nfs csi restore job for dataexport id: %v", id, dataExport.Name)
+		logrus.Tracef("started nfs csi restore job for dataexport id: %v, name: %v", id, dataExport.Name)
 		if err != nil {
 			logrus.Errorf("nfs csi restore job failed err: %v", err)
 			msg := fmt.Sprintf("Restoring from local snapshot with nfs csi restore job failed for for volumebackup %s in namespace %s: %v",
