@@ -2183,16 +2183,6 @@ func getCSICRUploadDirectory(pvcUID string) string {
 	return filepath.Join(volumeSnapShotCRDirectory, pvcUID)
 }
 
-func getBackupLocationType(de *kdmpapi.DataExport) (storkapi.BackupLocationType, error) {
-	bl, err := checkBackupLocation(de.Spec.Destination)
-	if err != nil {
-		msg := fmt.Sprintf("backuplocation fetch error for %s: %v", de.Spec.Destination.Name, err)
-		logrus.Errorf(msg)
-		return "", fmt.Errorf(msg)
-	}
-	return bl.Location.Type, nil
-}
-
 func startNfsCSIRestoreVolumeJob(
 	drv drivers.Interface,
 	jobConfigMap string,
