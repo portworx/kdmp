@@ -11,7 +11,6 @@ import (
 	storkapi "github.com/libopenstorage/stork/pkg/apis/stork/v1alpha1"
 	"github.com/libopenstorage/stork/pkg/snapshotter"
 	kdmpapi "github.com/portworx/kdmp/pkg/apis/kdmp/v1alpha1"
-	"github.com/portworx/kdmp/pkg/drivers"
 	"github.com/portworx/kdmp/pkg/drivers/utils"
 	"github.com/portworx/kdmp/pkg/executor"
 	kdmpopts "github.com/portworx/kdmp/pkg/util/ops"
@@ -294,26 +293,6 @@ func createAzureSecret(secretName string, backupLocation *storkapi.BackupLocatio
 	err := utils.CreateJobSecret(secretName, namespace, credentialData, labels)
 
 	return err
-}
-
-func createCertificateSecret(secretName, namespace string, labels map[string]string) error {
-	drivers.CertFilePath = os.Getenv(drivers.CertDirPath)
-	if drivers.CertFilePath != "" {
-		certificateData, err := os.ReadFile(filepath.Join(drivers.CertFilePath, drivers.CertFileName))
-		if err != nil {
-			errMsg := fmt.Sprintf("failed reading data from file %s : %s", drivers.CertFilePath, err)
-			logrus.Errorf("%v", errMsg)
-			return fmt.Errorf(errMsg)
-		}
-
-		certData := make(map[string][]byte)
-		certData[drivers.CertFileName] = certificateData
-		err = utils.CreateJobSecret(secretName, namespace, certData, labels)
-
-		return err
-	}
-
-	return nil
 }
 
 func getAnnotationValue(de *kdmpapi.DataExport, key string) string {
