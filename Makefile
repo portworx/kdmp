@@ -1,4 +1,4 @@
-RELEASE_VER ?= 1.2.6-dev
+RELEASE_VER ?= nfs-dev
 BUILD_DATE  := $(shell date -u +'%Y-%m-%dT%H:%M:%SZ')
 BASE_DIR    := $(shell git rev-parse --show-toplevel)
 GIT_SHA     := $(shell git rev-parse --short HEAD)
@@ -6,7 +6,7 @@ BIN         := $(BASE_DIR)/bin
 
 DOCK_BUILD_CNT  := golang:1.19.1
 
-DOCKER_IMAGE_REPO?=portworx
+DOCKER_IMAGE_REPO?=pallavpx
 DOCKER_IMAGE_NAME?=kdmp
 DOCKER_IMAGE_TAG?=$(RELEASE_VER)
 
