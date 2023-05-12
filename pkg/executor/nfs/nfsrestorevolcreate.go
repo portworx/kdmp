@@ -312,7 +312,6 @@ func restoreVolResourcesAndApply(
 						errMsg := fmt.Sprintf("error updating ResourceBackup CR[%v/%v]: %v", rbCrNamespace, rbCrName, err)
 						return fmt.Errorf(errMsg)
 					}
-					//TODO: Should we also update the RE export CR here ? Or keep trying instead of return.
 					return nil
 				}
 				message := fmt.Sprintf("Error starting Application Restore for volumes: %v", err)

@@ -182,7 +182,7 @@ func (c *Controller) process(ctx context.Context, in *kdmpapi.ResourceExport) (b
 			if err != nil {
 				return true, c.updateStatus(resourceExport, updateData)
 			}
-			if rb.Status.ResourceApplyStage != kdmpapi.ResourceApplyPhase("") {
+			if rb.Status.ResourceApplyStage != kdmpapi.ResourceApplyStatus("") {
 				updateData.TotalResourceCount = rb.Status.TotalResourceCount
 				updateData.RestoredResourceCount = rb.Status.RestoredResourceCount
 				updateData.ResourceApplyStage = kdmpapi.ResourceExportResourceApplyPhase(rb.Status.ResourceApplyStage)
