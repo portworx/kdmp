@@ -693,8 +693,6 @@ func applyResources(
 	// append the temp slice to the final restore resouce list,
 	rb.Status.Resources = append(rb.Status.Resources, tempResourceList...)
 	rb.Status.RestoredResourceCount = int64(len(rb.Status.Resources))
-	// rb.Status.Reason = utils.ResourceUploadSuccessMsg
-	// rb.Status.Status = kdmpapi.ResourceBackupStatusSuccessful
 	// Need to strip the Resources array, large resource scenario can fail due to etcd size limit
 	rbCrSize, err := storkutils.GetSizeOfObject(rb)
 	if err != nil {
@@ -721,6 +719,7 @@ func applyResources(
 		log.ApplicationRestoreLog(restore).Infof("Stripping all the resource info from restore cr as it is a large resource based restore")
 		// Strip off the resource info it contributes to bigger size of application restore CR in case of large number of resource
 		rb.Status.Resources = make([]*kdmpapi.ResourceRestoreResourceInfo, 0)
+		rb.Status.Reason = "nfs restore resource job is successful. Stripping the resource info from RB cr for it is a large resource based restore"
 		rb.Status.LargeResourceEnabled = true
 	}
 	_, err = kdmpschedops.Instance().UpdateResourceBackup(rb)

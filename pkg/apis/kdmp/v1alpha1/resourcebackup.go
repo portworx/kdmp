@@ -35,17 +35,17 @@ const (
 )
 
 // ResourceApplyPhase defines a status of resource restoration phase.
-type ResourceApplyPhase string
+type ResourceApplyStatus string
 
 const (
 	// ResourceApplyPhasePreparing signifies we are altering the resource
 	// as per target cluster before applying
-	ResourceApplyPhasePreparing ResourceApplyPhase = "Preparing"
+	ResourceApplyPhasePreparing ResourceApplyStatus = "Preparing"
 	// ResourceApplyPhaseDeleting when Resources are deleted before applying this
 	// applicable only when replace is opted during restore process.
-	ResourceApplyPhaseDeleting ResourceApplyPhase = "Deleting"
+	ResourceApplyPhaseDeleting ResourceApplyStatus = "Deleting"
 	// ResourceApplyPhaseApplying when Resource is being applied as part of restore process
-	ResourceApplyPhaseApplying ResourceApplyPhase = "Applying"
+	ResourceApplyPhaseApplying ResourceApplyStatus = "Applying"
 )
 
 // ResourceBackupProgressStatus overall resource backup/restore progress
@@ -58,12 +58,12 @@ type ResourceBackupProgressStatus struct {
 	Reason string `json:"reason,omitempty"`
 	// Resources status of each resource being restore
 	Resources []*ResourceRestoreResourceInfo `json:"resources"`
-	// Total Resource Count is the total number of resources being restored
+	// TotalResourceCount is the total number of resources being restored
 	TotalResourceCount int64
-	// Restored Resource count is the count of already applied resource count
+	// RestoredResourceCount is the count of already applied resource count
 	RestoredResourceCount int64
-	// Resource apply phase signifies the current stage of resource restore
-	ResourceApplyStage ResourceApplyPhase
+	// ResourceApplyStage signifies the current stage of resource restore
+	ResourceApplyStage ResourceApplyStatus
 	// LargeResourceEnabled signifies if it largeResource enabled or not
 	LargeResourceEnabled bool
 }
