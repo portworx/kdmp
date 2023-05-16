@@ -192,7 +192,7 @@ func jobForRestoreCSISnapshot(
 
 	labels := addJobLabels(jobOption.Labels)
 
-	nfsExecutorImage, _, err := utils.GetExecutorImageAndSecret(drivers.NfsExecutorImage,
+	nfsExecutorImage, imageRegistrySecret, err := utils.GetExecutorImageAndSecret(drivers.NfsExecutorImage,
 		jobOption.NfsImageExecutorSource,
 		jobOption.NfsImageExecutorSourceNs,
 		jobOption.DataExportName,
@@ -224,7 +224,6 @@ func jobForRestoreCSISnapshot(
 				},
 				Spec: corev1.PodSpec{
 					RestartPolicy:      corev1.RestartPolicyOnFailure,
-					ImagePullSecrets:   utils.ToImagePullSecret(utils.GetImageSecretName(jobOption.DataExportName)),
 					ServiceAccountName: jobOption.DataExportName,
 					Containers: []corev1.Container{
 						{
@@ -261,6 +260,10 @@ func jobForRestoreCSISnapshot(
 				},
 			},
 		},
+	}
+	// Add the image secret in job spec only if it is present in the stork deployment.
+	if len(imageRegistrySecret) != 0 {
+		job.Spec.Template.Spec.ImagePullSecrets = utils.ToImagePullSecret(utils.GetImageSecretName(jobOption.DataExportName))
 	}
 	if len(jobOption.NfsServer) != 0 {
 		volumeMount := corev1.VolumeMount{
