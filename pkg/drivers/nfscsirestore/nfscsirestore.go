@@ -207,9 +207,12 @@ func jobForRestoreCSISnapshot(
 		logrus.Errorf("failed to get the toleration details: %v", err)
 		return nil, fmt.Errorf("failed to get the toleration details for job [%s/%s]", jobOption.Namespace, jobOption.DataExportName)
 	}
+
+	// changing job name to nfcsirestore-backupUID-volumeUID instead of deName for better identification
+	jobName := drivers.NFSCSIRestore + strings.SplitN(jobOption.DataExportName, "restore", 2)[1]
 	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      jobOption.DataExportName,
+			Name:      jobName,
 			Namespace: jobOption.Namespace,
 			Annotations: map[string]string{
 				utils.SkipResourceAnnotation: "true",
