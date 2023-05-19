@@ -1612,6 +1612,7 @@ func (a *ApplicationBackupController) backupResources(
 			resourceInfos = append(resourceInfos, resourceInfo)
 		}
 		backup.Status.Resources = resourceInfos
+		backup.Status.ResourceCount = len(resourceInfos)
 		backup.Status.LastUpdateTimestamp = metav1.Now()
 		backupCrSize, err := utils.GetSizeOfObject(backup)
 		if err != nil {
@@ -1639,7 +1640,6 @@ func (a *ApplicationBackupController) backupResources(
 			// update the flag and resource-count.
 			// Strip off the resource info it contributes to bigger size of AB CR in case of large number of resource
 			backup.Status.Resources = make([]*stork_api.ApplicationBackupResourceInfo, 0)
-			backup.Status.ResourceCount = len(resourceInfos)
 			backup.Status.LargeResourceEnabled = true
 		}
 		// Store the new status
@@ -1693,7 +1693,7 @@ func (a *ApplicationBackupController) backupResources(
 	if nfs {
 		// Check whether ResourceExport is present or not
 		crName := getResourceExportCRName(utils.PrefixNFSBackup, string(backup.UID), backup.Namespace)
-		resourceExport, err := kdmpShedOps.Instance().GetResourceExport(crName, a.backupAdminNamespace)
+		resourceExport, err := kdmpShedOps.Instance().GetResourceExport(crName, backup.Namespace)
 		if err != nil {
 			if k8s_errors.IsNotFound(err) {
 				// create resource export CR
@@ -1713,7 +1713,7 @@ func (a *ApplicationBackupController) backupResources(
 				resourceExport.Annotations = make(map[string]string)
 				resourceExport.Annotations[utils.SkipResourceAnnotation] = "true"
 				resourceExport.Name = getResourceExportCRName(utils.PrefixNFSBackup, string(backup.UID), backup.Namespace)
-				resourceExport.Namespace = a.backupAdminNamespace
+				resourceExport.Namespace = backup.Namespace
 				resourceExport.Spec.Type = kdmpapi.ResourceExportBackup
 				source := &kdmpapi.ResourceExportObjectReference{
 					APIVersion: backup.APIVersion,
@@ -2004,7 +2004,7 @@ func (a *ApplicationBackupController) cleanupResources(
 	// Directly calling DeleteResourceExport with out checking backuplocation type.
 	// For other backuplocation type, expecting Notfound
 	crName := getResourceExportCRName(utils.PrefixNFSBackup, string(backup.UID), backup.Namespace)
-	err := kdmpShedOps.Instance().DeleteResourceExport(crName, a.backupAdminNamespace)
+	err := kdmpShedOps.Instance().DeleteResourceExport(crName, backup.Namespace)
 	if err != nil && !k8s_errors.IsNotFound(err) {
 		errMsg := fmt.Sprintf("failed to delete data export CR [%v]: %v", crName, err)
 		log.ApplicationBackupLog(backup).Errorf("%v", errMsg)

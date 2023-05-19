@@ -1350,6 +1350,29 @@ func (a *ApplicationRestoreController) skipVolumesFromRestoreList(
 			}
 			return newVolInfos, existingInfos, fmt.Errorf("erorr getting pvc %s/%s: %v", ns, pvcObject.Name, err)
 		}
+		pvName := pvc.Spec.VolumeName
+		var zones []string
+		// If PVC is present, fetch the corresponding PV spec and get the zone information
+		if driver.String() == volume.GCEDriverName || driver.String() == volume.AWSDriverName {
+			pv, err := core.Instance().GetPersistentVolume(pvName)
+			if err != nil && !k8s_errors.IsNotFound(err) {
+				return newVolInfos, existingInfos, fmt.Errorf("erorr getting pv %s: %v", pvName, err)
+			}
+
+			if driver.String() == volume.GCEDriverName {
+				zones = volume.GetGCPZones(pv)
+			}
+			if driver.String() == volume.AWSDriverName {
+				zones, err = volume.GetAWSZones(pv)
+				if err != nil {
+					return newVolInfos, existingInfos, fmt.Errorf("erorr getting AWS zones : %v", err)
+				}
+			}
+			// if fetched zones are empty, assign it to the source zones
+			if len(zones) == 0 {
+				zones = bkupVolInfo.Zones
+			}
+		}
 
 		restoreVolInfo.PersistentVolumeClaim = bkupVolInfo.PersistentVolumeClaim
 		restoreVolInfo.PersistentVolumeClaimUID = bkupVolInfo.PersistentVolumeClaimUID
@@ -1359,6 +1382,7 @@ func (a *ApplicationRestoreController) skipVolumesFromRestoreList(
 		restoreVolInfo.Status = storkapi.ApplicationRestoreStatusRetained
 		restoreVolInfo.RestoreVolume = pvc.Spec.VolumeName
 		restoreVolInfo.TotalSize = bkupVolInfo.TotalSize
+		restoreVolInfo.Zones = zones
 		restoreVolInfo.Reason = fmt.Sprintf("Skipped from volume restore as policy is set to %s and pvc already exists", storkapi.ApplicationRestoreReplacePolicyRetain)
 		existingInfos = append(existingInfos, restoreVolInfo)
 	}
@@ -1585,7 +1609,7 @@ func (a *ApplicationRestoreController) applyResources(
 		// this is to prevent stale CR timeout to evict the restore CR
 		elapsedTime := time.Since(startTime)
 		if elapsedTime > utils.TimeoutUpdateRestoreCrProgress {
-			restore, err = a.updateRestoreCR(restore, namespacedName,
+			restore, err = a.UpdateRestoreCR(restore, namespacedName,
 				len(tempResourceList),
 				string(storkapi.ApplicationRestoreResourceApplying),
 				restore.Status.ResourceCount)
@@ -1666,10 +1690,10 @@ func (a *ApplicationRestoreController) applyResources(
 	return nil
 }
 
-// updateRestoreCR : it updates already applied restore count and total restore count
+// UpdateRestoreCR : it updates already applied restore count and total restore count
 // and new timestamp to the restore CR. this is needed for progress bar and preventing
 // px-backup in deleting the CR.
-func (a *ApplicationRestoreController) updateRestoreCR(
+func (a *ApplicationRestoreController) UpdateRestoreCR(
 	restore *storkapi.ApplicationRestore,
 	namespacedName types.NamespacedName,
 	restoredCount int,
@@ -1708,6 +1732,7 @@ func (a *ApplicationRestoreController) restoreResources(
 	restore *storkapi.ApplicationRestore,
 	updateCr chan int,
 ) error {
+	fn := "restoreResources"
 	backup, err := storkops.Instance().GetApplicationBackup(restore.Spec.BackupName, restore.Namespace)
 	if err != nil {
 		log.ApplicationRestoreLog(restore).Errorf("Error getting backup: %v", err)
@@ -1795,8 +1820,11 @@ func (a *ApplicationRestoreController) restoreResources(
 			// Will retry in the next cycle of reconciler.
 			return nil
 		} else {
+			namespacedName := types.NamespacedName{}
+			namespacedName.Namespace = restore.Namespace
+			namespacedName.Name = restore.Name
 			var message string
-			// Check the status of the resourceExport CR and update it to the applicationBackup CR
+			// Check the status of the resourceExport CR and update it to the application restore CR
 			logrus.Debugf("resource export: %s, status: %s", resourceExport.Name, resourceExport.Status.Status)
 			switch resourceExport.Status.Status {
 			case kdmpapi.ResourceExportStatusFailed:
@@ -1825,11 +1853,26 @@ func (a *ApplicationRestoreController) restoreResources(
 						resource.Status,
 						resource.Reason)
 				}
+				restore.Status.LargeResourceEnabled = resourceExport.Status.LargeResourceEnabled
 			case kdmpapi.ResourceExportStatusInitial:
 				doCleanup = false
 			case kdmpapi.ResourceExportStatusPending:
 				doCleanup = false
 			case kdmpapi.ResourceExportStatusInProgress:
+				// the restore CR update happens whenever there is a change observed in resourceExport CR
+				// else just update the timestamp. this is unlike every 5 min update that happens in resource backup CR
+				restore, err = a.UpdateRestoreCR(restore, namespacedName,
+					int(resourceExport.Status.RestoredResourceCount),
+					string(resourceExport.Status.ResourceExportResourceApplyStage),
+					int(resourceExport.Status.TotalResourceCount))
+				if err != nil {
+					// no need to return error lets wait for next turn to write timestamp.
+					log.ApplicationRestoreLog(restore).Errorf("%v: failed to update timestamp and restored resource count", fn)
+				}
+				log.ApplicationRestoreLog(restore).Infof("%v: Total resource Count: %v, Applied Resource Count %v, Current Resource State: %v",
+					fn, resourceExport.Status.TotalResourceCount,
+					resourceExport.Status.RestoredResourceCount,
+					string(resourceExport.Status.ResourceExportResourceApplyStage))
 				restore.Status.LastUpdateTimestamp = metav1.Now()
 				doCleanup = false
 			}
