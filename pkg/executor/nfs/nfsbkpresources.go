@@ -15,6 +15,7 @@ import (
 	"github.com/libopenstorage/stork/drivers/volume/csi"
 	stork_api "github.com/libopenstorage/stork/pkg/apis/stork/v1alpha1"
 	"github.com/libopenstorage/stork/pkg/crypto"
+	"github.com/libopenstorage/stork/pkg/k8sutils"
 	"github.com/libopenstorage/stork/pkg/resourcecollector"
 	"github.com/libopenstorage/stork/pkg/snapshotter"
 	"github.com/libopenstorage/stork/pkg/utils"
@@ -32,7 +33,6 @@ import (
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	k8s_errors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 )
@@ -149,14 +149,12 @@ func uploadBkpResource(
 		logrus.Errorf(errMsg)
 		return fmt.Errorf(errMsg)
 	}
-
 	err = uploadStorageClasses(bkpNamespace, backup, bkpDir, encryptionKey)
 	if err != nil {
 		errMsg := fmt.Sprintf("%s: error uploading storageclasses %v", funct, err)
 		logrus.Errorf(errMsg)
 		return fmt.Errorf(errMsg)
 	}
-
 	err = uploadCSISnapshots(bkpNamespace, backup, bkpDir, encryptionKey)
 	if err != nil {
 		errMsg := fmt.Sprintf("%s: error uploading CSI snapshot file %v", funct, err)
@@ -171,6 +169,7 @@ func uploadBkpResource(
 		logrus.Errorf(errMsg)
 		return fmt.Errorf(errMsg)
 	}
+
 	err = uploadCSISnapshotInfoForPVCs(bkpNamespace, backup, csiGenericBackupDirectory, encryptionKey)
 	if err != nil {
 		errMsg := fmt.Sprintf("%s: error uploading csi snapshot info for pvcs for generic backup %v", funct, err)
@@ -183,7 +182,6 @@ func uploadBkpResource(
 		logrus.Errorf(errMsg)
 		return fmt.Errorf(errMsg)
 	}
-
 	err = uploadMetadatResources(bkpNamespace, backup, bkpDir, encryptionKey)
 	if err != nil {
 		errMsg := fmt.Sprintf("%s: error uploading metadata resource %v", funct, err)
@@ -209,6 +207,21 @@ func uploadResource(
 	}
 	optionalBackupResources := []string{"Job"}
 	resourceCollectorOpts := resourcecollector.Options{}
+	resourceCollectorOpts.ResourceCountLimit = k8sutils.DefaultResourceCountLimit
+	// Read configMap for any user provided value. this will be used in to List call of getResource eventually.
+	resourceCountLimitString, err := k8sutils.GetConfigValue(k8sutils.StorkControllerConfigMapName, metav1.NamespaceSystem, k8sutils.ResourceCountLimitKeyName)
+	if err != nil {
+		logrus.Warnf("error in reading %v cm for the key %v, switching to default value passed to GetResource API: %v",
+			k8sutils.StorkControllerConfigMapName, k8sutils.ResourceCountLimitKeyName, err)
+	} else {
+		if len(resourceCountLimitString) != 0 {
+			resourceCollectorOpts.ResourceCountLimit, err = strconv.ParseInt(resourceCountLimitString, 10, 64)
+			if err != nil {
+				logrus.Warnf("error in conversion of resourceCountLimit: %v", err)
+				resourceCollectorOpts.ResourceCountLimit = k8sutils.DefaultResourceCountLimit
+			}
+		}
+	}
 
 	dummyObjects := stork_api.CreateObjectsMap(objInfo)
 	// If there are more number of namespaces, do it in batches
@@ -231,32 +244,20 @@ func uploadResource(
 
 		allObjects = append(allObjects, objects...)
 	}
-	// For DBG remove it later
-	for _, obj := range allObjects {
-		metadata, err := meta.Accessor(obj)
-		logrus.Infof("metadata: %+v", metadata)
-		gvk := obj.GetObjectKind().GroupVersionKind()
-		resKinds[gvk.Kind] = gvk.Version
-		if err != nil {
-			logrus.Infof("%s: %v", funct, err)
-			return err
-		}
-	}
 
 	// TODO: Need to create directory with UID GUID needed
 	// for nfs share
 	jsonBytes, err := json.MarshalIndent(allObjects, "", " ")
 	if err != nil {
-		logrus.Infof("%s: %v", funct, err)
+		logrus.Errorf("%s: Failing to json Marshal for resources in NFS path: %v", funct, err)
 		return err
 	}
 
 	err = uploadData(resourcePath, jsonBytes, resourcesFile, encryptionKey)
 	if err != nil {
-		logrus.Errorf("%s: %v", funct, err)
+		logrus.Errorf("%s: fail to write resource detail to backup location %v", funct, err)
 		return err
 	}
-
 	return nil
 }
 
@@ -877,7 +878,7 @@ func getEncryptionKey(bkpNamespace string,
 
 	if uploadLocation.Location.EncryptionV2Key == "" {
 		// Give it a Best effort to obtain the key, it can be inside BL CR named secret
-		logrus.Infof("Failed to get encryption detail from backuplocation CR, Attempting to obtain from k8s secret...")
+		logrus.Infof("Encryption detail are not present in backuplocation CR, Attempting to obtain from k8s secret...")
 		cloudCredSecret, err := core.Instance().GetSecret(uploadLocation.Name, bkpNamespace)
 		if err != nil {
 			return "", err
