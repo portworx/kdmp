@@ -179,7 +179,7 @@ func restoreVolResourcesAndApply(
 		backupVolInfos := bkpvInfo
 		// Skip pv/pvc if replacepolicy is set to retain to avoid creating
 		if restore.Spec.ReplacePolicy == storkapi.ApplicationRestoreReplacePolicyRetain {
-			backupVolInfos, existingRestoreVolInfos, err = skipVolumesFromRestoreList(restore, objects, driver, backup.Status.Volumes)
+			backupVolInfos, existingRestoreVolInfos, err = skipVolumesFromRestoreList(restore, objects, driver, backupVolInfos)
 			if err != nil {
 				log.ApplicationRestoreLog(restore).Errorf("Error while checking pvcs: %v", err)
 				return err
@@ -314,9 +314,9 @@ func restoreVolResourcesAndApply(
 					}
 					return nil
 				}
-				message := fmt.Sprintf("Error starting Application Restore for volumes: %v", err)
+				message := fmt.Sprintf("Error starting Application Restore for volumes: %v", sErr)
 				log.ApplicationRestoreLog(restore).Errorf(message)
-				return err
+				return sErr
 			}
 			time.Sleep(volumeBatchSleepInterval)
 			restoreCompleteList = append(restoreCompleteList, restoreVolumeInfos...)
