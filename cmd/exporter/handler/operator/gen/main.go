@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"os"
 	"path/filepath"
@@ -94,7 +93,7 @@ func runYamlReader() error {
 	if !fi.IsDir() {
 		return fmt.Errorf("source is not a directory")
 	}
-	files, err := ioutil.ReadDir(src)
+	files, err := os.ReadDir(src)
 	if err != nil {
 		return err
 	}
@@ -121,7 +120,7 @@ func runYamlReader() error {
 			return err
 		}
 
-		raw, err := ioutil.ReadFile(fpath)
+		raw, err := os.ReadFile(fpath)
 		if err != nil {
 			return err
 		}
