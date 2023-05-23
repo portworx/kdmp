@@ -3,7 +3,7 @@ package kopia
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"time"
 
 	storkv1 "github.com/libopenstorage/stork/pkg/apis/stork/v1alpha1"
@@ -113,7 +113,7 @@ func runBackup(sourcePath string) error {
 	// skipping the check and assuming the repo doesn't exist specifically for NFS.
 	// Read the BL type
 	fPath := drivers.KopiaCredSecretMount + "/" + "type"
-	blType, err := ioutil.ReadFile(fPath)
+	blType, err := os.ReadFile(fPath)
 	if err != nil {
 		errMsg := fmt.Sprintf("failed reading data from file %s : %s", fPath, err)
 		logrus.Errorf("%v", errMsg)

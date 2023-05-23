@@ -3,7 +3,7 @@ package copy
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"testing"
 
 	"github.com/portworx/kdmp/pkg/client/clientset/versioned/fake"
@@ -111,7 +111,7 @@ func TestCopyCmd(t *testing.T) {
 		err := cmd.RunE(cmd, tc.inputArgs)
 		require.Equalf(t, tc.expectedErr, err, tc.name)
 
-		outbytes, err := ioutil.ReadAll(stdout)
+		outbytes, err := io.ReadAll(stdout)
 		require.Nil(t, err, tc.name)
 		require.Equalf(t, tc.expectedOut, string(outbytes), tc.name)
 	}

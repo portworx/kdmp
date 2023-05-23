@@ -4,7 +4,6 @@
 package restic
 
 import (
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"testing"
@@ -191,7 +190,7 @@ func testTeardown(t *testing.T) {
 func testSetup(t *testing.T) {
 	testTeardown(t)
 
-	err := ioutil.WriteFile(testSecretFilePath, []byte("test123"), 0644)
+	err := os.WriteFile(testSecretFilePath, []byte("test123"), 0644)
 	require.NoError(t, err, "unexpected error on creating secret file")
 
 	cmd := exec.Command("restic", "-r", testRepoName, "-p", testSecretFilePath, "init")

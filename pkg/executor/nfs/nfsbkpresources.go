@@ -3,7 +3,6 @@ package nfs
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -439,7 +438,7 @@ func uploadData(
 		data = encryptedData
 	}
 	//TODO: Writing with 777 permision .. Any security implication ???
-	err = ioutil.WriteFile(filePath, data, 0777)
+	err = os.WriteFile(filePath, data, 0777)
 	if err != nil {
 		logrus.Errorf("%s err: %v", funct, err)
 		return err
