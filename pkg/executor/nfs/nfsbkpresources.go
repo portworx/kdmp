@@ -270,6 +270,10 @@ func uploadStorageClasses(
 	storageClassAdded := make(map[string]bool)
 	var storageClasses []*storagev1.StorageClass
 	for _, volume := range backup.Status.Volumes {
+		// Do not collect the storageclass, if driver is not CSI
+		if volume.DriverName != "csi" {
+			continue
+		}
 		// Get the pvc spec
 		pvc, err := core.Instance().GetPersistentVolumeClaim(volume.PersistentVolumeClaim, volume.Namespace)
 		if err != nil {
@@ -289,6 +293,9 @@ func uploadStorageClasses(
 			storageClassAdded[sc.Name] = true
 		}
 
+	}
+	if len(storageClasses) == 0 {
+		return nil
 	}
 	scJSONBytes, err := json.Marshal(storageClasses)
 	if err != nil {
