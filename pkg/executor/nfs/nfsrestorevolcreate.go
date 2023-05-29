@@ -108,11 +108,19 @@ func restoreVolResourcesAndApply(
 		log.ApplicationRestoreLog(restore).Errorf("Error downloading resources: %v", err)
 		return err
 	}
-
-	storageClassByte, err := downloadStorageClass(backup, restore.Spec.BackupLocation, restore.Namespace)
-	if err != nil {
-		log.ApplicationRestoreLog(restore).Errorf("Error downloading storageclass json file: %v", err)
-		return err
+	var isCsiDriver bool
+	for _, volume := range backup.Status.Volumes {
+		if volume.DriverName == "csi" {
+			isCsiDriver = true
+		}
+	}
+	var storageClassByte []byte
+	if isCsiDriver {
+		storageClassByte, err = downloadStorageClass(backup, restore.Spec.BackupLocation, restore.Namespace)
+		if err != nil {
+			log.ApplicationRestoreLog(restore).Errorf("Error downloading storageclass json file: %v", err)
+			return err
+		}
 	}
 	info := storkapi.ObjectInfo{
 		GroupVersionKind: metav1.GroupVersionKind{
