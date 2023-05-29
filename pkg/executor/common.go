@@ -420,7 +420,8 @@ func WriteVolumeBackupStatus(
 	vb.Status.TotalBytesProcessed = status.TotalBytesProcessed
 	vb.Status.SnapshotID = status.SnapshotID
 	if status.LastKnownError != nil {
-		vb.Status.LastKnownError = status.LastKnownError.Error()
+		logrus.Warnf("vb.Status.LastKnownError --------> %v", status.LastKnownError.Error())
+		vb.Status.LastKnownError = "Hit LastKnownError, please check job pod log for more details."
 	} else {
 		vb.Status.LastKnownError = ""
 	}
