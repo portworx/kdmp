@@ -668,6 +668,8 @@ func (a *ApplicationRestoreController) restoreVolumes(restore *storkapi.Applicat
 							restore.Spec.IncludeOptionalResourceTypes,
 							nil,
 							&opts,
+							restore.Spec.BackupLocation,
+							restore.Namespace,
 						)
 						if err != nil {
 							return err
@@ -1576,6 +1578,8 @@ func (a *ApplicationRestoreController) applyResources(
 			restore.Spec.IncludeOptionalResourceTypes,
 			restore.Status.Volumes,
 			&opts,
+			restore.Spec.BackupLocation,
+			restore.Namespace,
 		)
 		if err != nil {
 			return err
@@ -1854,6 +1858,10 @@ func (a *ApplicationRestoreController) restoreResources(
 						resource.Reason)
 				}
 				restore.Status.LargeResourceEnabled = resourceExport.Status.LargeResourceEnabled
+				restore.Status.ResourceCount = int(resourceExport.Status.TotalResourceCount)
+				restore.Status.RestoredResourceCount = int(resourceExport.Status.RestoredResourceCount)
+				log.ApplicationRestoreLog(restore).Tracef("%v: resource export CR successful with total resource count %v and restored resource count %v",
+					fn, restore.Status.ResourceCount, restore.Status.RestoredResourceCount)
 			case kdmpapi.ResourceExportStatusInitial:
 				doCleanup = false
 			case kdmpapi.ResourceExportStatusPending:
@@ -1875,6 +1883,11 @@ func (a *ApplicationRestoreController) restoreResources(
 					string(resourceExport.Status.ResourceExportResourceApplyStage))
 				restore.Status.LastUpdateTimestamp = metav1.Now()
 				doCleanup = false
+			default:
+				doCleanup = false
+				if len(resourceExport.Status.Status) != 0 {
+					log.ApplicationRestoreLog(restore).Errorf("%v: invalid status for resource export: %s, status: %s", fn, resourceExport.Name, resourceExport.Status.Status)
+				}
 			}
 			restore.Status.LastUpdateTimestamp = metav1.Now()
 			err = a.client.Update(context.TODO(), restore)
@@ -1898,6 +1911,14 @@ func (a *ApplicationRestoreController) restoreResources(
 	// so we need to get the new PV name after restore volumes finishes
 	if err := a.addCSIVolumeResources(restore); err != nil {
 		return err
+	}
+
+	if nfs && restore.Status.LargeResourceEnabled {
+		// For NFS & large Resource Enabled we would have got resource count from RE CR in success path
+		// just add PV & PVC count which is copied to restore CR in the addCSIVolumeResources() function.
+		restore.Status.ResourceCount += len(restore.Status.Resources)
+	} else {
+		restore.Status.ResourceCount = len(restore.Status.Resources)
 	}
 
 	restore.Status.Stage = storkapi.ApplicationRestoreStageFinal
@@ -2055,7 +2076,7 @@ func (a *ApplicationRestoreController) createCRD() error {
 		return err
 	}
 	if ok {
-		err := k8sutils.CreateCRD(resource)
+		err := k8sutils.CreateCRDV1(resource)
 		if err != nil && !k8s_errors.IsAlreadyExists(err) {
 			return err
 		}

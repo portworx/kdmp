@@ -581,6 +581,8 @@ func applyResources(
 			restore.Spec.IncludeOptionalResourceTypes,
 			restore.Status.Volumes,
 			&opts,
+			restore.Spec.BackupLocation,
+			restore.Namespace,
 		)
 		if err != nil {
 			return err
