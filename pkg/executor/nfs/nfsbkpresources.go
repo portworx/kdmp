@@ -228,21 +228,36 @@ func uploadResource(
 	allObjects := make([]runtime.Unstructured, 0)
 	for i := 0; i < len(backup.Spec.Namespaces); i += backupResourcesBatchCount {
 		batch := backup.Spec.Namespaces[i:min(i+backupResourcesBatchCount, len(backup.Spec.Namespaces))]
-		objects, _, err := rc.GetResources(
-			batch,
-			backup.Spec.Selectors,
-			nil,
-			dummyObjects,
-			optionalBackupResources,
-			true,
-			resourceCollectorOpts,
-		)
-		if err != nil {
-			logrus.Errorf("error getting resources: %v", err)
-			return err
+		var incResNsBatch []string
+		for _, ns := range batch {
+			// As we support both includeResource and ResourceType to be mentioned
+			// match out ns for which we want to take includeResource path and
+			// for which we want to take ResourceType path
+			if len(backup.Spec.ResourceTypes) != 0 {
+				if resourcecollector.IsNsPresentInIncludeResource(dummyObjects, ns) {
+					incResNsBatch = append(incResNsBatch, ns)
+				}
+			} else {
+				incResNsBatch = batch
+			}
 		}
+		if len(incResNsBatch) != 0 {
+			objects, _, err := rc.GetResources(
+				incResNsBatch,
+				backup.Spec.Selectors,
+				nil,
+				dummyObjects,
+				optionalBackupResources,
+				true,
+				resourceCollectorOpts,
+			)
+			if err != nil {
+				logrus.Errorf("error getting resources: %v", err)
+				return err
+			}
 
-		allObjects = append(allObjects, objects...)
+			allObjects = append(allObjects, objects...)
+		}
 	}
 
 	// TODO: Need to create directory with UID GUID needed
