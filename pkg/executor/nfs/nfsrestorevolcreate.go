@@ -235,6 +235,8 @@ func restoreVolResourcesAndApply(
 					restore.Spec.IncludeOptionalResourceTypes,
 					nil,
 					&opts,
+					restore.Spec.BackupLocation,
+					restore.Namespace,
 				)
 				if err != nil {
 					log.ApplicationRestoreLog(restore).Errorf("Error from PrepareResourceForApply: %v", err)
