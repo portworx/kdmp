@@ -136,16 +136,9 @@ func uploadBkpResource(
 		logrus.Errorf("%s err: %v", funct, err)
 		return err
 	}
-	err = uploadResource(bkpNamespace, backup, bkpDir, encryptionKey)
+	err = uploadCSISnapshots(bkpNamespace, backup, bkpDir, encryptionKey)
 	if err != nil {
-		errMsg := fmt.Sprintf("%s: error uploading resources: %v", funct, err)
-		logrus.Errorf(errMsg)
-		return fmt.Errorf(errMsg)
-	}
-
-	err = uploadNamespaces(bkpNamespace, backup, bkpDir, encryptionKey)
-	if err != nil {
-		errMsg := fmt.Sprintf("%s: error uploading namespace resource %v", funct, err)
+		errMsg := fmt.Sprintf("%s: error uploading CSI snapshot file %v", funct, err)
 		logrus.Errorf(errMsg)
 		return fmt.Errorf(errMsg)
 	}
@@ -155,9 +148,15 @@ func uploadBkpResource(
 		logrus.Errorf(errMsg)
 		return fmt.Errorf(errMsg)
 	}
-	err = uploadCSISnapshots(bkpNamespace, backup, bkpDir, encryptionKey)
+	err = uploadResource(bkpNamespace, backup, bkpDir, encryptionKey)
 	if err != nil {
-		errMsg := fmt.Sprintf("%s: error uploading CSI snapshot file %v", funct, err)
+		errMsg := fmt.Sprintf("%s: error uploading resources: %v", funct, err)
+		logrus.Errorf(errMsg)
+		return fmt.Errorf(errMsg)
+	}
+	err = uploadNamespaces(bkpNamespace, backup, bkpDir, encryptionKey)
+	if err != nil {
+		errMsg := fmt.Sprintf("%s: error uploading namespace resource %v", funct, err)
 		logrus.Errorf(errMsg)
 		return fmt.Errorf(errMsg)
 	}
