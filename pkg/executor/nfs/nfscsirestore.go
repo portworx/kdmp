@@ -14,6 +14,7 @@ import (
 	"github.com/portworx/kdmp/pkg/drivers/utils"
 	"github.com/portworx/kdmp/pkg/executor"
 	kdmpopts "github.com/portworx/kdmp/pkg/util/ops"
+	"github.com/portworx/kdmp/pkg/version"
 	kdmpschedops "github.com/portworx/sched-ops/k8s/kdmp"
 	"github.com/portworx/sched-ops/k8s/stork"
 
@@ -201,7 +202,15 @@ func getSnapshotDriverName(dataExport *kdmpapi.DataExport) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	_, err = cs.SnapshotV1beta1().VolumeSnapshotClasses().Get(context.TODO(), dataExport.Spec.SnapshotStorageClass, metav1.GetOptions{})
+	v1SnapshotRequired, err := version.RequiresV1VolumeSnapshot()
+	if err != nil {
+		return "", err
+	}
+	if v1SnapshotRequired {
+		_, err = cs.SnapshotV1().VolumeSnapshotClasses().Get(context.TODO(), dataExport.Spec.SnapshotStorageClass, metav1.GetOptions{})
+	} else {
+		_, err = cs.SnapshotV1beta1().VolumeSnapshotClasses().Get(context.TODO(), dataExport.Spec.SnapshotStorageClass, metav1.GetOptions{})
+	}
 	if err == nil {
 		return csiProvider, nil
 	}
