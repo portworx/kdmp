@@ -119,29 +119,6 @@ func restoreCSIVolume(
 		return fmt.Errorf(msg)
 	}
 
-	// This will create a unique secret per PVC being restored
-	// For restore create the secret in the ns where PVC is referenced
-	err = CreateCredentialsSecret(
-		dataExport.Name,
-		vb.Spec.BackupLocation.Name,
-		vb.Spec.BackupLocation.Namespace,
-		dataExport.Spec.Destination.Namespace,
-		dataExport.Labels,
-	)
-	if err != nil {
-		msg := fmt.Sprintf("failed to create cloud credential secret during local snapshot restore: %v", err)
-		logrus.Errorf("%s: %v", fn, msg)
-		status := &executor.Status{
-			LastKnownError: fmt.Errorf(msg),
-		}
-		if err = executor.WriteVolumeBackupStatus(status, volumeBackupName, deCrNamespace); err != nil {
-			errMsg := fmt.Sprintf("failed to write a VolumeBackup status after hitting error [%s]: %v", msg, err)
-			logrus.Errorf("%v", errMsg)
-			return fmt.Errorf(errMsg)
-		}
-		return fmt.Errorf(msg)
-	}
-
 	repo, rErr := executor.ParseCloudCred()
 	if rErr != nil {
 		errMsg := fmt.Sprintf("%s: error parsing cloud cred: %v", fn, rErr)
