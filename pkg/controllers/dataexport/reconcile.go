@@ -1435,6 +1435,16 @@ func (c *Controller) cleanUp(driver drivers.Interface, de *kdmpapi.DataExport) e
 		if err := core.Instance().DeletePersistentVolume(pvName); err != nil && !k8sErrors.IsNotFound(err) {
 			return fmt.Errorf("delete %s pv: %s", pvName, err)
 		}
+		if err := utils.CleanServiceAccount(jobName, namespace); err != nil {
+			errMsg := fmt.Sprintf("deletion of service account %s/%s failed: %v", namespace, jobName, err)
+			logrus.Errorf("%s: %v", "cleanUp", errMsg)
+			return fmt.Errorf(errMsg)
+		}
+		if err := core.Instance().DeleteSecret(utils.GetCredSecretName(jobName), namespace); err != nil && !k8sErrors.IsNotFound(err) {
+			errMsg := fmt.Sprintf("deletion of backup credential secret %s failed: %v", jobName, err)
+			logrus.Errorf(errMsg)
+			return fmt.Errorf(errMsg)
+		}
 	}
 
 	if err := core.Instance().DeleteSecret(utils.GetCredSecretName(de.Name), namespace); err != nil && !k8sErrors.IsNotFound(err) {
@@ -2190,7 +2200,8 @@ func startNfsCSIRestoreVolumeJob(
 	bl *storkapi.BackupLocation,
 ) (string, error) {
 
-	err := utils.CreateNfsSecret(utils.GetCredSecretName(de.Name), bl, de.Namespace, nil)
+	jobName := utils.GetCsiRestoreJobName(drivers.NFSCSIRestore, de.Name)
+	err := utils.CreateNfsSecret(utils.GetCredSecretName(jobName), bl, de.Namespace, nil)
 	if err != nil {
 		logrus.Errorf("failed to create NFS cred secret: %v", err)
 		return "", fmt.Errorf("failed to create NFS cred secret: %v", err)
