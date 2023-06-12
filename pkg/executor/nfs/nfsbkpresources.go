@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/go-openapi/inflect"
+	"github.com/libopenstorage/stork/pkg/log"
 	kSnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
 	kSnapshotv1beta1 "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1beta1"
 	storkvolume "github.com/libopenstorage/stork/drivers/volume"
@@ -35,6 +36,7 @@ import (
 	k8s_errors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"github.com/libopenstorage/stork/pkg/applicationmanager/controllers"
 )
 
 var (
@@ -175,12 +177,6 @@ func uploadBkpResource(
 		logrus.Errorf(errMsg)
 		return fmt.Errorf(errMsg)
 	}
-	err = uploadCRDResources(resKinds, bkpDir, backup, encryptionKey)
-	if err != nil {
-		errMsg := fmt.Sprintf("%s: error uploading CRD resource %v", funct, err)
-		logrus.Errorf(errMsg)
-		return fmt.Errorf(errMsg)
-	}
 	err = uploadMetadatResources(bkpNamespace, backup, bkpDir, encryptionKey)
 	if err != nil {
 		errMsg := fmt.Sprintf("%s: error uploading metadata resource %v", funct, err)
@@ -200,11 +196,20 @@ func uploadResource(
 	funct := "uploadResource"
 	rc := initResourceCollector()
 	resKinds = make(map[string]string)
-	objInfo := []stork_api.ObjectInfo{}
-	for _, val := range backup.Status.Resources {
-		objInfo = append(objInfo, val.ObjectInfo)
+	var resourceTypes []metav1.APIResource
+	var err error
+
+	// Listing all resource types
+	if len(backup.Spec.ResourceTypes) != 0 {
+		optionalResourceTypes := []string{}
+		resourceTypes, err = rc.GetResourceTypes(optionalResourceTypes, true)
+		if err != nil {
+			log.ApplicationBackupLog(backup).Errorf("Error getting resource types: %v", err)
+			return err
+		}
 	}
-	optionalBackupResources := []string{"Job"}
+
+	// Don't modify resources if mentioned explicitly in specs
 	resourceCollectorOpts := resourcecollector.Options{}
 	resourceCollectorOpts.ResourceCountLimit = k8sutils.DefaultResourceCountLimit
 	// Read configMap for any user provided value. this will be used in to List call of getResource eventually.
@@ -221,19 +226,31 @@ func uploadResource(
 			}
 		}
 	}
+	if backup.Spec.SkipServiceUpdate {
+		resourceCollectorOpts.SkipServices = true
+	}
 
-	dummyObjects := stork_api.CreateObjectsMap(objInfo)
-	// If there are more number of namespaces, do it in batches
+	// Always backup optional resources. When restorting they need to be
+	// explicitly added to the spec
+	objectMap := stork_api.CreateObjectsMap(backup.Spec.IncludeResources)
+	namespacelist := backup.Spec.Namespaces
+	// GetResources takes more time, if we have more number of namespaces
+	// So, submitting it in batches and in between each batch,
+	// updating the LastUpdateTimestamp to show that backup is progressing
 	allObjects := make([]runtime.Unstructured, 0)
-	for i := 0; i < len(backup.Spec.Namespaces); i += backupResourcesBatchCount {
-		batch := backup.Spec.Namespaces[i:min(i+backupResourcesBatchCount, len(backup.Spec.Namespaces))]
+	optionalBackupResources := []string{"Job"}
+	for i := 0; i < len(namespacelist); i += backupResourcesBatchCount {
+		batch := namespacelist[i:min(i+backupResourcesBatchCount, len(namespacelist))]
 		var incResNsBatch []string
+		var resourceTypeNsBatch []string
 		for _, ns := range batch {
 			// As we support both includeResource and ResourceType to be mentioned
 			// match out ns for which we want to take includeResource path and
 			// for which we want to take ResourceType path
 			if len(backup.Spec.ResourceTypes) != 0 {
-				if resourcecollector.IsNsPresentInIncludeResource(dummyObjects, ns) {
+				if !resourcecollector.IsNsPresentInIncludeResource(objectMap, ns) {
+					resourceTypeNsBatch = append(resourceTypeNsBatch, ns)
+				} else {
 					incResNsBatch = append(incResNsBatch, ns)
 				}
 			} else {
@@ -245,17 +262,39 @@ func uploadResource(
 				incResNsBatch,
 				backup.Spec.Selectors,
 				nil,
-				dummyObjects,
+				objectMap,
 				optionalBackupResources,
 				true,
 				resourceCollectorOpts,
 			)
 			if err != nil {
-				logrus.Errorf("error getting resources: %v", err)
+				log.ApplicationBackupLog(backup).Errorf("Error getting resources: %v", err)
 				return err
 			}
-
 			allObjects = append(allObjects, objects...)
+		}
+
+		if len(resourceTypeNsBatch) != 0 {
+			for _, backupResourceType := range backup.Spec.ResourceTypes {
+				for _, resource := range resourceTypes {
+					if resource.Kind == backupResourceType || (backupResourceType == "PersistentVolumeClaim" && resource.Kind == "PersistentVolume") {
+						log.ApplicationBackupLog(backup).Tracef("GetResourcesType for : %v", resource.Kind)
+						objects, _, err := rc.GetResourcesForType(resource, nil, resourceTypeNsBatch, backup.Spec.Selectors, nil, nil, true, resourceCollectorOpts)
+						if err != nil {
+							log.ApplicationBackupLog(backup).Errorf("Error getting resources: %v", err)
+							return err
+						}
+						allObjects = append(allObjects, objects.Items...)
+					}
+				}
+			}
+		}
+	}
+	// get and update rancher project details
+	if len(backup.Spec.PlatformCredential) != 0 {
+		if err = controllers.UpdateRancherProjectDetails(backup, allObjects); err != nil {
+			log.ApplicationBackupLog(backup).Errorf("error in updating the rancher project details - err: %v", err)
+			return err
 		}
 	}
 
@@ -270,6 +309,15 @@ func uploadResource(
 	err = uploadData(resourcePath, jsonBytes, resourcesFile, encryptionKey)
 	if err != nil {
 		logrus.Errorf("%s: fail to write resource detail to backup location %v", funct, err)
+		return err
+	}
+	for _, obj := range allObjects {
+		gvk := obj.GetObjectKind().GroupVersionKind()
+		resKinds[gvk.Kind] = gvk.Version
+	}
+	// upload CRD to backuplocation
+	err = uploadCRDResources(resKinds, resourcePath, backup, encryptionKey)
+	if err != nil {
 		return err
 	}
 	return nil

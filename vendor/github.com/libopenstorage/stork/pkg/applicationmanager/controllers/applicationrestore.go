@@ -537,7 +537,7 @@ func (a *ApplicationRestoreController) restoreVolumes(restore *storkapi.Applicat
 		namespacedName,
 		storkapi.ApplicationRestoreStatusInProgress,
 		storkapi.ApplicationRestoreStageVolumes,
-		"Volume or Resource(kdmp) restores are in progress",
+		"Volume or Resource restores are in progress",
 		nil,
 	)
 	if err != nil {
@@ -1920,6 +1920,9 @@ func (a *ApplicationRestoreController) restoreResources(
 	} else {
 		restore.Status.ResourceCount = len(restore.Status.Resources)
 	}
+
+	// Let's accomodate the PV-PVC counts in RestoredResourceCount, specifically for CSI & kdmp case.
+	restore.Status.RestoredResourceCount = restore.Status.ResourceCount
 
 	restore.Status.Stage = storkapi.ApplicationRestoreStageFinal
 	restore.Status.FinishTimestamp = metav1.Now()
