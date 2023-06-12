@@ -1472,27 +1472,30 @@ func (c *Controller) cleanupLocalRestoredSnapshotResources(de *kdmpapi.DataExpor
 			return nil, false, fmt.Errorf("failed to get snapshot driver for %v: %v", snapshotDriverName, cleanupErr)
 		}
 
-		pvcSpec := &corev1.PersistentVolumeClaim{}
+		// Get the Restore pvc spec.
+                rpvc, err := core.Instance().GetPersistentVolumeClaim(de.Status.RestorePVC.Name, de.Namespace)
+                if err != nil {
+                        if k8sErrors.IsNotFound(err) {
+                                return nil, false, nil;
+                        }
+                        logrus.Errorf("cleanupLocalRestoredSnapshotResources: failed to get restore pvc [%v] err: %v", de.Status.RestorePVC.Name, err)
+                        return nil, false, err
+                }
+                err = snapshotDriver.DeleteSnapshot(rpvc.Spec.DataSource.Name, de.Namespace, true)
+                if err != nil {
+                        logrus.Errorf("cleanupLocalRestoredSnapshotResources: snapshotDriver.DeleteSnapshot failed with err: %v", err)
+                        return nil, false, err
+                }
 
 		if !ignorePVC {
-			pvcSpec = de.Status.RestorePVC
+			pvcSpec := de.Status.RestorePVC
 			if err := cleanupJobBoundResources(pvcSpec.Name, de.Namespace); err != nil {
 				return nil, false, fmt.Errorf("cleaning up of bound job resources failed: %v", err)
 			}
-		}
-
-		if de.Status.SnapshotPVCName != "" && de.Status.SnapshotPVCNamespace != "" {
 			if err := core.Instance().DeletePersistentVolumeClaim(pvcSpec.Name, de.Namespace); err != nil && !k8sErrors.IsNotFound(err) {
 				return nil, false, fmt.Errorf("delete %s/%s pvc: %s", de.Namespace, pvcSpec.Name, err)
 			}
-			err := snapshotDriver.DeleteSnapshot(de.Status.VolumeSnapshot, de.Status.SnapshotPVCNamespace, true)
-			msg := fmt.Sprintf("failed in removing local volume snapshot CRs for %s/%s: %v", de.Status.VolumeSnapshot, de.Status.SnapshotPVCName, err)
-			if err != nil {
-				logrus.Errorf(msg)
-				return nil, false, fmt.Errorf(msg)
-			}
 		}
-
 		return nil, false, nil
 	}
 
