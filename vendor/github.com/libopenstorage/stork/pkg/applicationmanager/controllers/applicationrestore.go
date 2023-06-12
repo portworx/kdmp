@@ -759,7 +759,6 @@ func (a *ApplicationRestoreController) restoreVolumes(restore *storkapi.Applicat
 						_, err = a.updateRestoreCRInVolumeStage(namespacedName, storkapi.ApplicationRestoreStatusFailed, storkapi.ApplicationRestoreStageFinal, message, nil)
 						return err
 					}
-					time.Sleep(k8sutils.RestoreVolumeBatchSleepInterval)
 					restore, err = a.updateRestoreCRInVolumeStage(
 						namespacedName,
 						storkapi.ApplicationRestoreStatusInProgress,
