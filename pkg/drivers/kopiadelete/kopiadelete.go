@@ -45,6 +45,13 @@ func (d Driver) StartJob(opts ...drivers.JobOption) (id string, err error) {
 			}
 		}
 	}
+	jobName := toJobName(o.JobName, o.SnapshotID)
+
+	present := jobratelimit.IsJobAlreadyPresent(jobName, o.JobNamespace)
+	if present {
+		return utils.NamespacedName(o.JobNamespace, jobName), nil
+	}
+
 	// Check whether there is slot to schedule delete job.
 	driverType := d.Name()
 	available, err := jobratelimit.CanJobBeScheduled(driverType)
@@ -77,7 +84,7 @@ func (d Driver) StartJob(opts ...drivers.JobOption) (id string, err error) {
 		logrus.Errorf("%s %v", fn, errMsg)
 		return "", fmt.Errorf("%v", errMsg)
 	}
-	jobName := toJobName(o.JobName, o.SnapshotID)
+
 	job, err := buildJob(jobName, o)
 	if err != nil {
 		errMsg := fmt.Sprintf("building backup snapshot delete job [%s] failed: %v", jobName, err)
