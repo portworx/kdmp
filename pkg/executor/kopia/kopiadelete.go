@@ -2,8 +2,11 @@ package kopia
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"time"
 
+	storkv1 "github.com/libopenstorage/stork/pkg/apis/stork/v1alpha1"
 	kdmpapi "github.com/portworx/kdmp/pkg/apis/kdmp/v1alpha1"
 	"github.com/portworx/kdmp/pkg/executor"
 	"github.com/portworx/kdmp/pkg/kopia"
@@ -34,6 +37,17 @@ func newDeleteCommand() *cobra.Command {
 	return deleteCommand
 }
 
+func isNfsKopiaRepositoryFileExists(repo *executor.Repository) bool {
+	repoBaseDir := repo.Path + genericBackupDir + "/"
+	kopiaRepoFile := filepath.Join(repoBaseDir, repo.Name, kopiaNFSRepositoryFile)
+	_, err := os.Stat(kopiaRepoFile)
+	if err != nil && os.IsNotExist(err) {
+		logrus.Debugf("kopia repository file %v does not exist", kopiaRepoFile)
+		return false
+	}
+	return true
+}
+
 func runDelete(snapshotID, volumeBackupDeleteName, volumeBackupDeleteNamespace string) error {
 	// Parse using the mounted secrets
 	fn := "runDelete:"
@@ -50,6 +64,13 @@ func runDelete(snapshotID, volumeBackupDeleteName, volumeBackupDeleteNamespace s
 	}
 
 	repo.Name = frameBackupPath()
+
+	if repo.Type == storkv1.BackupLocationNFS {
+		if !isNfsKopiaRepositoryFileExists(repo) {
+			logrus.Info("kopia repository file is not found in the NFS backuplocation and nothing to process for deletion")
+			return nil
+		}
+	}
 
 	if err := runKopiaRepositoryConnect(repo); err != nil {
 		errMsg := fmt.Sprintf("repository [%v] connect failed: %v", repo.Name, err)
