@@ -8,7 +8,7 @@ require (
 	github.com/hashicorp/go-version v1.6.0
 	github.com/kubernetes-csi/external-snapshotter/client/v4 v4.0.0
 	github.com/kubernetes-incubator/external-storage v0.20.4-openstorage-rc7
-	github.com/libopenstorage/stork v1.4.1-0.20230612155541-faeeb29a4cf7
+	github.com/libopenstorage/stork v1.4.1-0.20230623121725-6af6ed81b14b
 	github.com/portworx/pxc v0.33.0
 	github.com/portworx/sched-ops v1.20.4-rc1.0.20230426231724-8d9f2c104721
 	github.com/sirupsen/logrus v1.9.0
@@ -69,7 +69,7 @@ require (
 	github.com/evanphx/json-patch v5.6.0+incompatible // indirect
 	github.com/evanphx/json-patch/v5 v5.6.0 // indirect
 	github.com/exponent-io/jsonpath v0.0.0-20151013193312-d6023ce2651d // indirect
-	github.com/fsnotify/fsnotify v1.5.4 // indirect
+	github.com/fsnotify/fsnotify v1.6.0 // indirect
 	github.com/ghodss/yaml v1.0.1-0.20190212211648-25d852aebe32 // indirect
 	github.com/go-errors/errors v1.0.1 // indirect
 	github.com/go-logr/logr v1.2.3 // indirect
@@ -127,7 +127,7 @@ require (
 	github.com/peterbourgon/diskv v2.0.1+incompatible // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
-	github.com/portworx/kvdb v0.0.0-20200929023115-b312c7519467 // indirect
+	github.com/portworx/kvdb v0.0.0-20230326003017-21a38cf82d4b // indirect
 	github.com/pquerna/cachecontrol v0.1.0 // indirect
 	github.com/prometheus/client_golang v1.14.0 // indirect
 	github.com/prometheus/client_model v0.3.0 // indirect

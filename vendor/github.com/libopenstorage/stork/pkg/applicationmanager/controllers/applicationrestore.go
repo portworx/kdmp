@@ -212,8 +212,11 @@ func (a *ApplicationRestoreController) createNamespaces(backup *storkapi.Applica
 						if annotations == nil {
 							annotations = make(map[string]string)
 						}
+						// Add all annotations from Namespace.json except project annotations when not found in the namespace which is not created by px-backup.
+						// With retain policy, project annotations should not be applied to the namespace with no projects. Applies to a scenario where project association
+						// is removed by the user after taking the backup with project on a namespace
 						for k, v := range ns.GetAnnotations() {
-							if _, ok := annotations[k]; !ok && !strings.Contains(k, utils.CattleProjectPrefix) {
+							if _, ok := annotations[k]; !ok && (!strings.Contains(k, utils.CattleProjectPrefix) || annotations[utils.PxbackupAnnotationCreateByKey] != "") {
 								annotations[k] = v
 							}
 						}
@@ -221,14 +224,19 @@ func (a *ApplicationRestoreController) createNamespaces(backup *storkapi.Applica
 						if labels == nil {
 							labels = make(map[string]string)
 						}
+						// Add all labels from Namespace.json except project labels when not found in the namespace which is not created by px-backup.
+						// With retain policy, project labels should not be applied to the namespace with no projects. Applies to a scenario where project association
+						// is removed by the user after taking the backup with project on a namespace
 						for k, v := range ns.GetLabels() {
-							if _, ok := labels[k]; !ok && !strings.Contains(k, utils.CattleProjectPrefix) {
+							if _, ok := labels[k]; !ok && (!strings.Contains(k, utils.CattleProjectPrefix) || annotations[utils.PxbackupAnnotationCreateByKey] != "") {
 								labels[k] = v
 							}
 						}
 						utils.ParseRancherProjectMapping(annotations, rancherProjectMapping)
 						utils.ParseRancherProjectMapping(labels, rancherProjectMapping)
 					}
+					// delete the px backup CreateByKey Annotation
+					delete(annotations, utils.PxbackupAnnotationCreateByKey)
 					log.ApplicationRestoreLog(restore).Tracef("Namespace already exists, updating dest namespace %v", ns.Name)
 					_, err = core.Instance().UpdateNamespace(&v1.Namespace{
 						ObjectMeta: metav1.ObjectMeta{
@@ -724,6 +732,22 @@ func (a *ApplicationRestoreController) restoreVolumes(restore *storkapi.Applicat
 						}
 					}
 				}
+				// Get restore volume batch sleep interval
+				volumeBatchSleepInterval, err := time.ParseDuration(k8sutils.DefaultRestoreVolumeBatchSleepInterval)
+				if err != nil {
+					logrus.Infof("error in parsing default restore volume sleep interval %s", k8sutils.DefaultRestoreVolumeBatchSleepInterval)
+				}
+				RestoreVolumeBatchSleepInterval, err := k8sutils.GetConfigValue(k8sutils.StorkControllerConfigMapName, metav1.NamespaceSystem, k8sutils.RestoreVolumeBatchSleepIntervalKey)
+				if err != nil {
+					logrus.Infof("error in reading %v cm, switching to default restore volume sleep interval", k8sutils.StorkControllerConfigMapName)
+				} else {
+					if len(RestoreVolumeBatchSleepInterval) != 0 {
+						volumeBatchSleepInterval, err = time.ParseDuration(RestoreVolumeBatchSleepInterval)
+						if err != nil {
+							logrus.Infof("error in conversion of volumeBatchSleepInterval: %v", err)
+						}
+					}
+				}
 				for i := 0; i < len(backupVolInfos); i += batchCount {
 					batchVolInfo := backupVolInfos[i:min(i+batchCount, len(backupVolInfos))]
 					restoreVolumeInfos, err := driver.StartRestore(restore, batchVolInfo, preRestoreObjects)
@@ -759,6 +783,7 @@ func (a *ApplicationRestoreController) restoreVolumes(restore *storkapi.Applicat
 						_, err = a.updateRestoreCRInVolumeStage(namespacedName, storkapi.ApplicationRestoreStatusFailed, storkapi.ApplicationRestoreStageFinal, message, nil)
 						return err
 					}
+					time.Sleep(volumeBatchSleepInterval)
 					restore, err = a.updateRestoreCRInVolumeStage(
 						namespacedName,
 						storkapi.ApplicationRestoreStatusInProgress,
