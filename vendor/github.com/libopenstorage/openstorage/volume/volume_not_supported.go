@@ -112,6 +112,11 @@ func (s *statsNotSupported) VolumeUsageByNode(
 	return nil, ErrNotSupported
 }
 
+func (s *statsNotSupported)	VolumeBytesUsedByNode(nodeID string,
+	ids []uint64,
+) (*api.VolumeBytesUsedByNode, error) {
+	return nil, ErrNotSupported
+}
 func (v *statsNotSupported) RelaxedReclaimPurge(
 	nodeID string,
 ) (*api.RelaxedReclaimPurge, error) {
@@ -300,6 +305,12 @@ func (cl *filesystemTrimNotSupported) AutoFilesystemTrimUsage(request *api.SdkAu
 	return nil, ErrNotSupported
 }
 func (cl *filesystemTrimNotSupported) FilesystemTrimStop(request *api.SdkFilesystemTrimStopRequest) (*api.SdkFilesystemTrimStopResponse, error) {
+	return nil, ErrNotSupported
+}
+func (cl *filesystemTrimNotSupported) AutoFilesystemTrimPush(request *api.SdkAutoFSTrimPushRequest) (*api.SdkAutoFSTrimPushResponse, error) {
+	return nil, ErrNotSupported
+}
+func (cl *filesystemTrimNotSupported) AutoFilesystemTrimPop(request *api.SdkAutoFSTrimPopRequest) (*api.SdkAutoFSTrimPopResponse, error) {
 	return nil, ErrNotSupported
 }
 

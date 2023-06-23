@@ -165,9 +165,6 @@ github.com/cpuguy83/go-md2man/v2/md2man
 # github.com/davecgh/go-spew v1.1.1
 ## explicit
 github.com/davecgh/go-spew/spew
-# github.com/dgrijalva/jwt-go v3.2.1-0.20180719211823-0b96aaa70776+incompatible
-## explicit
-github.com/dgrijalva/jwt-go
 # github.com/dimchansky/utfbom v1.1.0
 ## explicit
 github.com/dimchansky/utfbom
@@ -346,8 +343,8 @@ github.com/kubernetes-sigs/aws-ebs-csi-driver/pkg/util
 # github.com/libopenstorage/gossip v0.0.0-20220309192431-44c895e0923e
 ## explicit
 github.com/libopenstorage/gossip/types
-# github.com/libopenstorage/openstorage v9.4.47+incompatible => github.com/libopenstorage/openstorage v1.0.1-0.20220804223926-812cb10d08c4
-## explicit; go 1.15
+# github.com/libopenstorage/openstorage v9.4.47+incompatible => github.com/libopenstorage/openstorage v0.0.0-20230511212757-41751b27d69f
+## explicit; go 1.17
 github.com/libopenstorage/openstorage/api
 github.com/libopenstorage/openstorage/api/client
 github.com/libopenstorage/openstorage/api/client/cluster
@@ -1516,7 +1513,7 @@ sigs.k8s.io/yaml
 # github.com/kubernetes-csi/external-snapshotter/v2 => github.com/kubernetes-csi/external-snapshotter/v2 v2.1.1
 # github.com/kubernetes-incubator/external-storage => github.com/libopenstorage/external-storage v0.20.4-openstorage-rc10
 # github.com/kubernetes-incubator/external-storage v0.20.4-openstorage-rc10 => github.com/libopenstorage/external-storage v0.20.4-openstorage-rc10
-# github.com/libopenstorage/openstorage => github.com/libopenstorage/openstorage v1.0.1-0.20220804223926-812cb10d08c4
+# github.com/libopenstorage/openstorage => github.com/libopenstorage/openstorage v0.0.0-20230511212757-41751b27d69f
 # github.com/portworx/sched-ops => github.com/portworx/sched-ops v1.20.4-rc1.0.20230302072046-553cc8ef572b
 # k8s.io/api => k8s.io/api v0.25.0
 # k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.25.0

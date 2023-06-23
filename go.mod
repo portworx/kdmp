@@ -63,7 +63,6 @@ require (
 	github.com/coreos/go-oidc v2.2.1+incompatible // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.2 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
-	github.com/dgrijalva/jwt-go v3.2.1-0.20180719211823-0b96aaa70776+incompatible // indirect
 	github.com/dimchansky/utfbom v1.1.0 // indirect
 	github.com/emicklei/go-restful/v3 v3.9.0 // indirect
 	github.com/evanphx/json-patch v5.6.0+incompatible // indirect
@@ -182,7 +181,7 @@ replace (
 	github.com/kubernetes-csi/external-snapshotter/v2 => github.com/kubernetes-csi/external-snapshotter/v2 v2.1.1
 	github.com/kubernetes-incubator/external-storage => github.com/libopenstorage/external-storage v0.20.4-openstorage-rc10
 	github.com/kubernetes-incubator/external-storage v0.20.4-openstorage-rc10 => github.com/libopenstorage/external-storage v0.20.4-openstorage-rc10
-	github.com/libopenstorage/openstorage => github.com/libopenstorage/openstorage v1.0.1-0.20220804223926-812cb10d08c4
+	github.com/libopenstorage/openstorage => github.com/libopenstorage/openstorage v0.0.0-20230511212757-41751b27d69f
 	github.com/portworx/sched-ops => github.com/portworx/sched-ops v1.20.4-rc1.0.20230302072046-553cc8ef572b
 	k8s.io/api => k8s.io/api v0.25.0
 	k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.25.0

@@ -150,6 +150,9 @@ type StatsDriver interface {
 	// RelaxedReclaimPurge triggers the purge of RelaxedReclaim queue for a
 	// given node
 	RelaxedReclaimPurge(nodeID string) (*api.RelaxedReclaimPurge, error)
+	// VolumeBytesUsedByNode returns currently used volume util of multiple volumes
+	// on a given node
+	VolumeBytesUsedByNode(nodeID string, ids []uint64) (*api.VolumeBytesUsedByNode, error)
 }
 
 type QuiesceDriver interface {
@@ -228,6 +231,10 @@ type FilesystemTrimDriver interface {
 	// FilesystemTrimStop stops a filesystem trim background operation on
 	// a specified volume, if any
 	FilesystemTrimStop(request *api.SdkFilesystemTrimStopRequest) (*api.SdkFilesystemTrimStopResponse, error)
+	// AutoFilesystemTrimPush pushes an autofstrim job to queue
+	AutoFilesystemTrimPush(request *api.SdkAutoFSTrimPushRequest) (*api.SdkAutoFSTrimPushResponse, error)
+	// AutoFilesystemTrimPop pops an autofstrim job from queue
+	AutoFilesystemTrimPop(request *api.SdkAutoFSTrimPopRequest) (*api.SdkAutoFSTrimPopResponse, error)
 }
 
 // FilesystemCheckDriver interface exposes APIs to manage filesystem check
