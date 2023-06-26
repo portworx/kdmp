@@ -1977,6 +1977,10 @@ func getDriverType(de *kdmpapi.DataExport) (string, error) {
 	doBackup := false
 	doRestore := false
 
+	if de.Spec.Type == kdmpapi.DataExportRsync {
+		return string(de.Spec.Type), nil
+	}
+
 	switch {
 	case isPVCRef(src) || isAPIVersionKindNotSetRef(src):
 		if isBackupLocationRef(dst) {
@@ -1993,7 +1997,6 @@ func getDriverType(de *kdmpapi.DataExport) (string, error) {
 	}
 
 	switch de.Spec.Type {
-	case kdmpapi.DataExportRsync:
 	case kdmpapi.DataExportRestic:
 		if doBackup {
 			return drivers.ResticBackup, nil
