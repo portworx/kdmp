@@ -80,18 +80,18 @@ const (
 )
 
 type updateDataExportDetail struct {
-	stage                kdmpapi.DataExportStage
-	status               kdmpapi.DataExportStatus
-	transferID           string
-	reason               string
-	snapshotID           string
-	size                 uint64
-	progressPercentage   int
-	snapshotPVCName      string
-	snapshotPVCNamespace string
-	snapshotNamespace    string
-	removeFinalizer      bool
-	volumeSnapshot       string
+	stage                     kdmpapi.DataExportStage
+	status                    kdmpapi.DataExportStatus
+	transferID                string
+	reason                    string
+	snapshotID                string
+	size                      uint64
+	progressPercentage        int
+	snapshotPVCName           string
+	snapshotPVCNamespace      string
+	snapshotNamespace         string
+	removeFinalizer           bool
+	volumeSnapshot            string
 	resetLocalSnapshotRestore bool
 }
 
@@ -1044,9 +1044,9 @@ func (c *Controller) stageLocalSnapshotRestore(ctx context.Context, dataExport *
 		}
 		// Already done with max retries, so moving to kdmp restore anyway
 		data := updateDataExportDetail{
-			stage:  kdmpapi.DataExportStageTransferScheduled,
-			status: kdmpapi.DataExportStatusInitial,
-			reason: "switching to restore from objectstore bucket as restoring from local snapshot did not happen",
+			stage:                     kdmpapi.DataExportStageTransferScheduled,
+			status:                    kdmpapi.DataExportStatusInitial,
+			reason:                    "switching to restore from objectstore bucket as restoring from local snapshot did not happen",
 			resetLocalSnapshotRestore: true,
 		}
 		return false, c.updateStatus(dataExport, data)
@@ -1196,10 +1196,10 @@ func (c *Controller) stageLocalSnapshotRestoreInProgress(ctx context.Context, da
 			logrus.Errorf("cleaning up temporary resources for restoring from snapshot failed for data export %s/%s: %v", dataExport.Namespace, dataExport.Name, err)
 		}
 		data := updateDataExportDetail{
-			stage:      kdmpapi.DataExportStageTransferScheduled,
-			status:     kdmpapi.DataExportStatusInitial,
-			reason:     "",
-			transferID: "", // Resetting transfer id if it has been set with nfs backuplocation job
+			stage:                     kdmpapi.DataExportStageTransferScheduled,
+			status:                    kdmpapi.DataExportStatusInitial,
+			reason:                    "",
+			transferID:                "", // Resetting transfer id if it has been set with nfs backuplocation job
 			resetLocalSnapshotRestore: true,
 		}
 		return false, c.updateStatus(dataExport, data)
@@ -1486,14 +1486,14 @@ func (c *Controller) cleanupLocalRestoredSnapshotResources(de *kdmpapi.DataExpor
 		}
 
 		// Get the Restore pvc spec.
-                rpvc, err := core.Instance().GetPersistentVolumeClaim(de.Status.RestorePVC.Name, de.Namespace)
-                if err != nil {
-                        if k8sErrors.IsNotFound(err) {
-                                return nil, false, nil;
-                        }
-                        logrus.Errorf("cleanupLocalRestoredSnapshotResources: failed to get restore pvc [%v] err: %v", de.Status.RestorePVC.Name, err)
-                        return nil, false, err
-                }
+		rpvc, err := core.Instance().GetPersistentVolumeClaim(de.Status.RestorePVC.Name, de.Namespace)
+		if err != nil {
+			if k8sErrors.IsNotFound(err) {
+				return nil, false, nil
+			}
+			logrus.Errorf("cleanupLocalRestoredSnapshotResources: failed to get restore pvc [%v] err: %v", de.Status.RestorePVC.Name, err)
+			return nil, false, err
+		}
 		if rpvc.Spec.DataSource != nil {
 			err = snapshotDriver.DeleteSnapshot(rpvc.Spec.DataSource.Name, de.Namespace, true)
 			if err != nil {
@@ -1979,6 +1979,10 @@ func getDriverType(de *kdmpapi.DataExport) (string, error) {
 	doBackup := false
 	doRestore := false
 
+	if de.Spec.Type == kdmpapi.DataExportRsync {
+		return string(de.Spec.Type), nil
+	}
+
 	switch {
 	case isPVCRef(src) || isAPIVersionKindNotSetRef(src):
 		if isBackupLocationRef(dst) {
@@ -1995,7 +1999,6 @@ func getDriverType(de *kdmpapi.DataExport) (string, error) {
 	}
 
 	switch de.Spec.Type {
-	case kdmpapi.DataExportRsync:
 	case kdmpapi.DataExportRestic:
 		if doBackup {
 			return drivers.ResticBackup, nil
