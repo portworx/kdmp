@@ -1,0 +1,12 @@
+name: Security Scan CI
+
+on:
+  pull_request:
+  push:
+    branches:
+    - 'master'
+
+jobs:
+  security:
+    uses: portworx/devsecops-github-actions/.github/workflows/security-golang.yml@master
+    secrets: inherit
