@@ -7,6 +7,152 @@ on:
     - 'master'
 
 jobs:
-  security:
-    uses: portworx/devsecops-github-actions/.github/workflows/security-golang.yml@master
-    secrets: inherit
+  oss-scan:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          path: ${{ github.workspace }}/go/src/github.com/${{ github.repository }}
+      - name: Download Snyk CLI
+        run: |
+          curl https://static.snyk.io/cli/latest/snyk-linux -o ${{ github.workspace }}/snyk && chmod +x ${{ github.workspace }}/snyk
+        shell: bash
+      - name: Snyk Scan
+        continue-on-error: true
+        run: |
+          cd ${{ github.workspace }}/go/src/github.com/${{ github.repository }}
+          ${{ github.workspace }}/snyk --version
+          ${{ github.workspace }}/snyk test --json-file-output=scan_result.json --project-name=${{ github.event.repository.name }} --file=go.mod
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        shell: bash
+      - name: Parse File for OSS
+        shell: bash
+        continue-on-error: true
+        run: |
+          cd ${{ github.workspace }}/go/src/github.com/${{ github.repository }}
+          cat > parse-oss.py <<EOF
+          import json
+          def parse_snyk_oss_result():
+              json_file_path = 'scan_result.json'
+              with open(json_file_path) as json_file:
+                  data = json.load(json_file)
+              output_file_path = './oss-scan-result.txt'
+              results = []
+              vulnerabilities = data['vulnerabilities']
+              for vulnerability in vulnerabilities:
+                  if 'type' not in vulnerability or vulnerability['type'] != 'license':
+                      title = vulnerability['title']
+                      package_name = vulnerability['packageName']
+                      severity = vulnerability['severity']
+                      cve = vulnerability['identifiers']['CVE']
+                      fix_version = vulnerability['fixedIn']
+                      introduced = vulnerability['from']
+                      result = {
+                          'Title': title,
+                          'Severity': severity,
+                          'Package Name': package_name,
+                          'CVEs': cve,
+                          'Fix Version(s)': fix_version,
+                          'Introduced': introduced
+                      }
+                      results.append(result)
+              with open(output_file_path, 'w') as file:
+                file.write("|Title|Severity|Package Name|CVEs|Fix version|Introduced|\n")
+                file.write("|---|---|---|---|---|---|\n")
+                for result in results:
+                    file.write(f"{result['Title']} | ")
+                    file.write(f"{result['Severity']} | ")
+                    file.write(f"{result['Package Name']} | ")
+                    file.write(f"{result['CVEs']} | ")
+                    file.write(f"{result['Fix Version(s)']} | ")
+                    file.write(f"{result['Introduced']} |")
+                    file.write("\n")
+                file.write(f"\nTotal issues: {len(results)}")
+                file.close()
+          parse_snyk_oss_result()
+          EOF
+          python3 parse-oss.py
+      - name: Parse File for License
+        shell: bash
+        continue-on-error: true
+        run: |
+          cd ${{ github.workspace }}/go/src/github.com/${{ github.repository }}
+          cat > parse-license.py <<EOF
+          import json
+          def parse_snyk_license_result():
+            json_file_path = 'scan_result.json'
+            with open(json_file_path) as json_file:
+                data = json.load(json_file)
+            output_file_path = './license-scan-result.txt'
+            results = []
+            vulnerabilities = data['vulnerabilities']
+            for vulnerability in vulnerabilities:
+              if 'type' in vulnerability and vulnerability['type'] == 'license':
+                title = vulnerability['title']
+                package_name = vulnerability['name']
+                version = vulnerability['version']
+                severity = vulnerability['severity']
+                license = vulnerability['license']
+                introduced = vulnerability['from']
+                result = {
+                    'Title': title,
+                    'Package Name': package_name,
+                    'Package Version': version,
+                    'Severity': severity,
+                    'License Info': license,
+                    'Introduced': introduced
+                }
+                results.append(result)
+            with open(output_file_path, 'w') as file:
+              file.write("|Title|Package Name|Package Version|Severity|License Info|Introduced|\n")
+              file.write("|---|---|---|---|---|---|\n")
+              for result in results:
+                file.write(f"{result['Title']} | ")
+                file.write(f"{result['Package Name']} | ")
+                file.write(f"{result['Package Version']} | ")
+                file.write(f"{result['Severity']} | ")
+                file.write(f"{result['License Info']} | ")
+                file.write(f"{result['Introduced']} |")
+                file.write("\n")
+              file.write(f"\nTotal License Issues: {len(results)}")
+              file.close()
+          parse_snyk_license_result()
+          EOF
+          python3 parse-license.py
+      - name: Create OSS comment on PR
+        if: always() && !cancelled() && !contains(needs.*.result, 'failure') && github.event_name == 'pull_request' && (github.event.action == 'opened' || github.event.action == 'synchronize')
+        uses: actions/github-script@v6
+        continue-on-error: true
+        with:
+          script: |
+            const fs = require('fs');
+            const filePath = '${{ github.workspace }}/go/src/github.com/${{ github.repository }}/oss-scan-result.txt';
+            const content = fs.readFileSync(filePath, 'utf8');
+            const body = `**OSS Scan Results:**\n\n${content}`;
+            github.rest.issues.createComment({
+              issue_number: context.payload.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: body
+            });
+      - name: Create License comment on PR
+        if: always() && !cancelled() && !contains(needs.*.result, 'failure') && github.event_name == 'pull_request' && (github.event.action == 'opened' || github.event.action == 'synchronize')
+        uses: actions/github-script@v6
+        continue-on-error: true
+        with:
+          script: |
+            const fs = require('fs');
+            const filePath = '${{ github.workspace }}/go/src/github.com/${{ github.repository }}/license-scan-result.txt';
+            const content = fs.readFileSync(filePath, 'utf8');
+            const body = `**License Evaluation Results:**\n\n${content}`;
+            github.rest.issues.createComment({
+              issue_number: context.payload.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: body
+            });
