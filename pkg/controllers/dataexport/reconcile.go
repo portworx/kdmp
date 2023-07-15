@@ -451,8 +451,10 @@ func (c *Controller) sync(ctx context.Context, in *kdmpapi.DataExport) (bool, er
 		return false, c.updateStatus(dataExport, data)
 	case kdmpapi.DataExportStageCleanup:
 		var cleanupErr error
+		// Need to retain the old reason present in the dataexport CR, so passing the reason again.
 		data := updateDataExportDetail{
 			stage: kdmpapi.DataExportStageFinal,
+			reason: dataExport.Status.Reason,
 		}
 		// Append the job-pod log to stork's pod log in case of failure
 		// it is best effort approach, hence errors are ignored.
@@ -778,9 +780,11 @@ func (c *Controller) stageSnapshotInProgress(ctx context.Context, dataExport *kd
 	}
 	if dataExport.Status.Status == kdmpapi.DataExportStatusFailed {
 		// set to the next stage
+		// Need to retain the old reason present in the dataexport CR, so passing the reason again.
 		data := updateDataExportDetail{
 			stage:  kdmpapi.DataExportStageCleanup,
 			status: dataExport.Status.Status,
+			reason: dataExport.Status.Reason,
 		}
 		return false, c.updateStatus(dataExport, data)
 	}
@@ -1379,16 +1383,22 @@ func (c *Controller) cleanUp(driver drivers.Interface, de *kdmpapi.DataExport) e
 			if err := core.Instance().DeletePersistentVolumeClaim(de.Status.SnapshotPVCName, de.Status.SnapshotPVCNamespace); err != nil && !k8sErrors.IsNotFound(err) {
 				return fmt.Errorf("delete %s/%s pvc: %s", de.Status.SnapshotPVCNamespace, de.Status.SnapshotPVCName, err)
 			}
-			bl, err := checkBackupLocation(de.Spec.Destination)
-			if err != nil {
-				msg := fmt.Sprintf("backuplocation fetch error for %s: %v", de.Spec.Destination.Name, err)
-				logrus.Errorf(msg)
-			}
-			if err == nil && bl.Location.Type == storkapi.BackupLocationNFS {
+		}
+		bl, err := checkBackupLocation(de.Spec.Destination)
+		if err != nil {
+			msg := fmt.Sprintf("backuplocation fetch error for %s: %v", de.Spec.Destination.Name, err)
+			logrus.Errorf(msg)
+		} else {
+			// In the case of NFS backuplocation, we will not delete vs and vsc after volumestage as
+			// we will need to upload the snapshot.json  during the resource stage and then we will delete it.
+			// But if the failure happens in the volume stage, we will not go to the resource stage.
+			// So in the case of failure, we will cleanup the vs and vsc in the case of NFS backuplocation in volume cleanupstage itself.
+			if bl.Location.Type == storkapi.BackupLocationNFS && de.Status.Status == kdmpapi.DataExportStatusSuccessful {
+				// In the case of success, we will delete the vs and vsc during resource stage.
 				logrus.Infof("not deleting the vs and vsc in volume stage")
 			} else {
-				err = snapshotDriver.DeleteSnapshot(de.Status.VolumeSnapshot, de.Status.SnapshotPVCNamespace, true)
-				msg := fmt.Sprintf("failed in removing local volume snapshot CRs for %s/%s: %v", de.Status.VolumeSnapshot, de.Status.SnapshotPVCName, err)
+				err = snapshotDriver.DeleteSnapshot(de.Status.VolumeSnapshot, de.Status.SnapshotNamespace, true)
+				msg := fmt.Sprintf("failed in removing local volume snapshot CRs for %s/%s: %v", de.Status.VolumeSnapshot, de.Status.SnapshotNamespace, err)
 				if err != nil {
 					logrus.Errorf(msg)
 					return fmt.Errorf(msg)
@@ -1535,6 +1545,8 @@ func (c *Controller) updateStatus(de *kdmpapi.DataExport, data updateDataExportD
 			logrus.Infof("%v", errMsg)
 			return "", true, fmt.Errorf("%v", errMsg)
 		}
+		// Need to set the reason with out any check as in the success case, we need to set the reason to empty.
+		de.Status.Reason = data.reason
 		if data.stage != "" {
 			de.Status.Stage = data.stage
 		}
@@ -1543,9 +1555,6 @@ func (c *Controller) updateStatus(de *kdmpapi.DataExport, data updateDataExportD
 		}
 		if data.transferID != "" {
 			de.Status.TransferID = data.transferID
-		}
-		if data.reason != "" {
-			de.Status.Reason = data.reason
 		}
 		if data.snapshotID != "" {
 			de.Status.SnapshotID = data.snapshotID
