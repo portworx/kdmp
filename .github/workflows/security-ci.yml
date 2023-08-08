@@ -100,18 +100,23 @@ jobs:
                 severity = vulnerability['severity']
                 license = vulnerability['license']
                 introduced = vulnerability['from']
+                if len(introduced) < 3:
+                  type = "Direct"
+                else:
+                  type = "Indirect"
                 result = {
                     'Title': title,
                     'Package Name': package_name,
                     'Package Version': version,
                     'Severity': severity,
                     'License Info': license,
-                    'Introduced': introduced
+                    'Introduced': introduced,
+                    'Dependency' : type
                 }
                 results.append(result)
             with open(output_file_path, 'w') as file:
-              file.write("|Title|Package Name|Package Version|Severity|License Info|Introduced|\n")
-              file.write("|---|---|---|---|---|---|\n")
+              file.write("|Title|Package Name|Package Version|Severity|License Info|Introduced|Dependency Type|\n")
+              file.write("|---|---|---|---|---|---|---|\n")
               for result in results:
                 file.write(f"{result['Title']} | ")
                 file.write(f"{result['Package Name']} | ")
@@ -119,6 +124,7 @@ jobs:
                 file.write(f"{result['Severity']} | ")
                 file.write(f"{result['License Info']} | ")
                 file.write(f"{result['Introduced']} |")
+                file.write(f"{result['Dependency']} |")
                 file.write("\n")
               file.write(f"\nTotal License Issues: {len(results)}")
               file.close()
