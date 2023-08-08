@@ -91,8 +91,9 @@ jobs:
             output_file_path = './license-scan-result.txt'
             results = []
             vulnerabilities = data['vulnerabilities']
+            flagged_license = ["GPL", "MPL", "AGPL", "OSL", "EUPL", "LGPL", "CDDL", "CC-BY"]
             for vulnerability in vulnerabilities:
-              if 'type' in vulnerability and vulnerability['type'] == 'license':
+              if 'type' in vulnerability and vulnerability['type'] == 'license' and any(map(vulnerability['license'].__contains__, flagged_license)):
                 title = vulnerability['title']
                 package_name = vulnerability['name']
                 version = vulnerability['version']
