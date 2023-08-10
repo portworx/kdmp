@@ -141,6 +141,8 @@ type Status struct {
 	TotalBytes uint64
 	// SnapshotID is the snapshot ID of the backup being handled
 	SnapshotID string
+	// SnapshotIDs is the list of Snapshot Ids existing in the repository
+	SnapshotIDs []string
 	// Done indicates if the operation has completed
 	Done bool
 	// LastKnownError is the last known error of the command
