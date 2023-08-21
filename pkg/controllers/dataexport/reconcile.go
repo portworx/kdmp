@@ -1053,6 +1053,7 @@ func (c *Controller) stageLocalSnapshotRestore(ctx context.Context, dataExport *
 			reason: "switching to restore from objectstore bucket as restoring from local snapshot did not happen",
 			resetLocalSnapshotRestore: true,
 		}
+		logrus.Infof("%v: In stageLocalSnapshotRestore stage, local snapshot restore failed, trying KDMP restore.", dataExport.Name)
 		return false, c.updateStatus(dataExport, data)
 	}
 
@@ -1199,6 +1200,7 @@ func (c *Controller) stageLocalSnapshotRestoreInProgress(ctx context.Context, da
 		if err != nil {
 			logrus.Errorf("cleaning up temporary resources for restoring from snapshot failed for data export %s/%s: %v", dataExport.Namespace, dataExport.Name, err)
 		}
+		logrus.Infof("%v: In stageLocalSnapshotRestoreInProgress stage, local snapshot restore failed, trying KDMP restore.", dataExport.Name)
 		data := updateDataExportDetail{
 			stage:      kdmpapi.DataExportStageTransferScheduled,
 			status:     kdmpapi.DataExportStatusInitial,
@@ -1584,6 +1586,8 @@ func (c *Controller) updateStatus(de *kdmpapi.DataExport, data updateDataExportD
 			de.Status.VolumeSnapshot = data.volumeSnapshot
 		}
 		if data.resetLocalSnapshotRestore {
+			// Resetting the SnapshotStorageClass to empty, when ever we try kopia restore, if localsnapshot restore fail.
+			de.Spec.SnapshotStorageClass = ""
 			de.Status.LocalSnapshotRestore = false
 		}
 
