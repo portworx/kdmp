@@ -127,7 +127,7 @@ build-kdmp:
 	@echo "Build kdmp"
 	docker run --rm -v $(shell pwd):/go/src/github.com/portworx/kdmp $(DOCK_BUILD_CNT) \
 		/bin/bash -c 'cd /go/src/github.com/portworx/kdmp/cmd/kdmp; \
-	GOOS=linux go build -ldflags="-s -w \
+	GOOS=linux go build -buildvcs=false -ldflags="-s -w \
 	-X github.com/portworx/kdmp/pkg/version.gitVersion=${RELEASE_VER} \
 	-X github.com/portworx/kdmp/pkg/version.gitCommit=${GIT_SHA} \
 	-X github.com/portworx/kdmp/pkg/version.buildDate=${BUILD_DATE} \
