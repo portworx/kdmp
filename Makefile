@@ -135,7 +135,7 @@ build-kdmp:
 	-X github.com/portworx/kdmp/pkg/version.minor=${MINOR_VERSION} \
 	-X github.com/portworx/kdmp/pkg/version.patch=${PATCH_VERSION}" \
 	-o /go/src/github.com/portworx/kdmp/bin/kdmp \
-	-a /go/src/github.com/portworx/kdmp/cmd/kdmp;' -buildvcs=false
+	-a /go/src/github.com/portworx/kdmp/cmd/kdmp;' 
 
 container-kdmp:
 	@echo "Build kdmp docker image"

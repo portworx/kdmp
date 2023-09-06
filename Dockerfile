@@ -2,6 +2,8 @@ FROM portworx/ubuntu:focal
 
 MAINTAINER Portworx Inc. <support@portworx.com>
 
+RUN git config --global --add safe.directory /go/src/github.com/portworx/kdmp
+
 RUN apt-get update \
     && apt-get dist-upgrade -y \
     && apt-get install -y --no-install-recommends \
