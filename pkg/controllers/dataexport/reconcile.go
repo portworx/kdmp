@@ -466,7 +466,7 @@ func (c *Controller) sync(ctx context.Context, in *kdmpapi.DataExport) (bool, er
 		var cleanupErr error
 		// Need to retain the old reason present in the dataexport CR, so passing the reason again.
 		data := updateDataExportDetail{
-			stage: kdmpapi.DataExportStageFinal,
+			stage:  kdmpapi.DataExportStageFinal,
 			reason: dataExport.Status.Reason,
 		}
 		// Append the job-pod log to stork's pod log in case of failure
