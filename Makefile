@@ -81,7 +81,7 @@ vet:
 staticcheck:
 	docker run --rm -v $(shell pwd):/go/src/github.com/portworx/kdmp $(DOCK_BUILD_CNT) \
 		/bin/bash -c "cd /go/src/github.com/portworx/kdmp; \
-	go install honnef.co/go/tools/cmd/staticcheck@v0.3.3; \
+	go install honnef.co/go/tools/cmd/staticcheck@v0.4.5; \
 	staticcheck $(PKGS); \
 	staticcheck -tags unittest $(PKGS)"
 
