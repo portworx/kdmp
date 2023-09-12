@@ -37,12 +37,6 @@ const (
 	volumeSteps           = 15
 )
 
-// var volumeAPICallBackoff = wait.Backoff{
-// 	Duration: volumeinitialDelay,
-// 	Factor:   volumeFactor,
-// 	Steps:    volumeSteps,
-// }
-
 func newRestoreVolumeCommand() *cobra.Command {
 	restoreCommand := &cobra.Command{
 		Use:   "restore-vol",
