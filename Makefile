@@ -4,7 +4,7 @@ BASE_DIR    := $(shell git rev-parse --show-toplevel)
 GIT_SHA     := $(shell git rev-parse --short HEAD)
 BIN         := $(BASE_DIR)/bin
 
-DOCK_BUILD_CNT  := golang:1.19.1
+DOCK_BUILD_CNT  := golang:1.20.5
 
 DOCKER_IMAGE_REPO?=portworx
 DOCKER_IMAGE_NAME?=kdmp
@@ -81,7 +81,7 @@ vet:
 staticcheck:
 	docker run --rm -v $(shell pwd):/go/src/github.com/portworx/kdmp $(DOCK_BUILD_CNT) \
 		/bin/bash -c "cd /go/src/github.com/portworx/kdmp; \
-	go install honnef.co/go/tools/cmd/staticcheck@v0.3.3; \
+	go install honnef.co/go/tools/cmd/staticcheck@v0.4.5; \
 	staticcheck $(PKGS); \
 	staticcheck -tags unittest $(PKGS)"
 
@@ -127,7 +127,7 @@ build-kdmp:
 	@echo "Build kdmp"
 	docker run --rm -v $(shell pwd):/go/src/github.com/portworx/kdmp $(DOCK_BUILD_CNT) \
 		/bin/bash -c 'cd /go/src/github.com/portworx/kdmp/cmd/kdmp; \
-	GOOS=linux go build -ldflags="-s -w \
+	GOOS=linux go build -buildvcs=false -ldflags="-s -w \
 	-X github.com/portworx/kdmp/pkg/version.gitVersion=${RELEASE_VER} \
 	-X github.com/portworx/kdmp/pkg/version.gitCommit=${GIT_SHA} \
 	-X github.com/portworx/kdmp/pkg/version.buildDate=${BUILD_DATE} \
@@ -135,7 +135,7 @@ build-kdmp:
 	-X github.com/portworx/kdmp/pkg/version.minor=${MINOR_VERSION} \
 	-X github.com/portworx/kdmp/pkg/version.patch=${PATCH_VERSION}" \
 	-o /go/src/github.com/portworx/kdmp/bin/kdmp \
-	-a /go/src/github.com/portworx/kdmp/cmd/kdmp;'
+	-a /go/src/github.com/portworx/kdmp/cmd/kdmp;' 
 
 container-kdmp:
 	@echo "Build kdmp docker image"
@@ -161,7 +161,7 @@ build-restic-executor:
 	@echo "Build restic-executor"
 	docker run --rm -v $(shell pwd):/go/src/github.com/portworx/kdmp $(DOCK_BUILD_CNT) \
 		/bin/bash -c 'cd /go/src/github.com/portworx/kdmp/cmd/executor/restic; \
-	CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w \
+	CGO_ENABLED=0 GOOS=linux go build -buildvcs=false -ldflags="-s -w \
 	-X github.com/portworx/kdmp/pkg/version.gitVersion=${RELEASE_VER} \
 	-X github.com/portworx/kdmp/pkg/version.gitCommit=${GIT_SHA} \
 	-X github.com/portworx/kdmp/pkg/version.buildDate=${BUILD_DATE}" \
@@ -172,7 +172,7 @@ build-kopia-executor:
 	@echo "Build kopia-executor"
 	docker run --rm -v $(shell pwd):/go/src/github.com/portworx/kdmp $(DOCK_BUILD_CNT) \
 		/bin/bash -c 'cd /go/src/github.com/portworx/kdmp/cmd/executor/kopia; \
-	CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w \
+	CGO_ENABLED=0 GOOS=linux go build -buildvcs=false -ldflags="-s -w \
 	-X github.com/portworx/kdmp/pkg/version.gitVersion=${RELEASE_VER} \
 	-X github.com/portworx/kdmp/pkg/version.gitCommit=${GIT_SHA} \
 	-X github.com/portworx/kdmp/pkg/version.buildDate=${BUILD_DATE}" \
@@ -183,7 +183,7 @@ build-nfs-executor:
 	@echo "Build nfs-executor"
 	docker run --rm -v $(shell pwd):/go/src/github.com/portworx/kdmp $(DOCK_BUILD_CNT) \
 		/bin/bash -c 'cd /go/src/github.com/portworx/kdmp/cmd/executor/nfs; \
-	CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w \
+	CGO_ENABLED=0 GOOS=linux go build -buildvcs=false -ldflags="-s -w \
 	-X github.com/portworx/kdmp/pkg/version.gitVersion=${RELEASE_VER} \
 	-X github.com/portworx/kdmp/pkg/version.gitCommit=${GIT_SHA} \
 	-X github.com/portworx/kdmp/pkg/version.buildDate=${BUILD_DATE}" \
@@ -219,7 +219,7 @@ build-pxc-exporter: gogenerate
 	@echo "Build kdmp"
 	docker run --rm -v $(shell pwd):/go/src/github.com/portworx/kdmp $(DOCK_BUILD_CNT) \
 		/bin/bash -c 'cd /go/src/github.com/portworx/kdmp/cmd/exporter; \
-	go build -ldflags="-s -w \
+	go build -buildvcs=false -ldflags="-s -w \
 	-X github.com/portworx/kdmp/pkg/version.gitVersion=${RELEASE_VER} \
 	-X github.com/portworx/kdmp/pkg/version.gitCommit=${GIT_SHA} \
 	-X github.com/portworx/kdmp/pkg/version.buildDate=${BUILD_DATE}" \
