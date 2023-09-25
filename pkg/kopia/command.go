@@ -412,6 +412,30 @@ func (c *Command) MaintenanceRunCmd() *exec.Cmd {
 	return cmd
 }
 
+// SnapshotListCmd returns os/exec.Cmd object for the kopia snapshot list Command
+func (c *Command) SnapshotListCmd() *exec.Cmd {
+	// Get all the flags
+	argsSlice := []string{
+		c.Name, // snapshot list command
+		"list",
+		"--show-identical",
+		"--all",
+		"--json",
+		"--config-file",
+		configFile,
+	}
+	argsSlice = append(argsSlice, c.Flags...)
+	// Get the cmd args
+	argsSlice = append(argsSlice, c.Args...)
+	cmd := exec.Command(baseCmd, argsSlice...)
+	if len(c.Env) > 0 {
+		cmd.Env = append(os.Environ(), c.Env...)
+	}
+	cmd.Dir = c.Dir
+
+	return cmd
+}
+
 // MaintenanceSetCmd returns os/exec.Cmd object for the kopia maintenance set Command
 func (c *Command) MaintenanceSetCmd() *exec.Cmd {
 	// Get all the flags
