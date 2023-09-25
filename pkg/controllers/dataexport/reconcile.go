@@ -80,18 +80,18 @@ const (
 )
 
 type updateDataExportDetail struct {
-	stage                kdmpapi.DataExportStage
-	status               kdmpapi.DataExportStatus
-	transferID           string
-	reason               string
-	snapshotID           string
-	size                 uint64
-	progressPercentage   int
-	snapshotPVCName      string
-	snapshotPVCNamespace string
-	snapshotNamespace    string
-	removeFinalizer      bool
-	volumeSnapshot       string
+	stage                     kdmpapi.DataExportStage
+	status                    kdmpapi.DataExportStatus
+	transferID                string
+	reason                    string
+	snapshotID                string
+	size                      uint64
+	progressPercentage        int
+	snapshotPVCName           string
+	snapshotPVCNamespace      string
+	snapshotNamespace         string
+	removeFinalizer           bool
+	volumeSnapshot            string
 	resetLocalSnapshotRestore bool
 }
 
@@ -492,7 +492,7 @@ func appendPodLogToStork(jobName string, namespace string) {
 	// Get job and check whether it has live pod attaced to it
 	job, err := batch.Instance().GetJob(jobName, namespace)
 	if err != nil && !k8sErrors.IsNotFound(err) {
-		logrus.Infof("failed in getting job %v/%v with err: %v", namespace, jobName, err)
+		logrus.Infof("failed in getting job %v/%v with err: %v reason: %v", namespace, jobName, err, job.Status.Conditions[0].Reason)
 	}
 	pods, err := core.Instance().GetPods(
 		job.Namespace,
@@ -508,6 +508,15 @@ func appendPodLogToStork(jobName string, namespace string) {
 		podLog, err := core.Instance().GetPodLog(pod.Name, pod.Namespace, &corev1.PodLogOptions{TailLines: &numLogLines})
 		if err != nil {
 			logrus.Infof("error fetching log of job-pod %s: %v", pod.Name, err)
+			podDescribe, errDescribe := core.Instance().GetPodByName(pod.Name, pod.Namespace)
+			if errDescribe != nil {
+				logrus.Infof("error fetching describe output of job-pod %s: %v", pod.Name, errDescribe)
+			} else {
+				logrus.Infof("start of job-pod [%s]'s description...", pod.Name)
+				logrus.Infof("describe...%s", podDescribe)
+				logrus.Infof("end of job-pod[%s]'s description...", pod.Name)
+			}
+
 		} else {
 			logrus.Infof("start of job-pod [%s]'s log...", pod.Name)
 			logrus.Infof(podLog)
@@ -1044,9 +1053,9 @@ func (c *Controller) stageLocalSnapshotRestore(ctx context.Context, dataExport *
 		}
 		// Already done with max retries, so moving to kdmp restore anyway
 		data := updateDataExportDetail{
-			stage:  kdmpapi.DataExportStageTransferScheduled,
-			status: kdmpapi.DataExportStatusInitial,
-			reason: "switching to restore from objectstore bucket as restoring from local snapshot did not happen",
+			stage:                     kdmpapi.DataExportStageTransferScheduled,
+			status:                    kdmpapi.DataExportStatusInitial,
+			reason:                    "switching to restore from objectstore bucket as restoring from local snapshot did not happen",
 			resetLocalSnapshotRestore: true,
 		}
 		return false, c.updateStatus(dataExport, data)
@@ -1196,10 +1205,10 @@ func (c *Controller) stageLocalSnapshotRestoreInProgress(ctx context.Context, da
 			logrus.Errorf("cleaning up temporary resources for restoring from snapshot failed for data export %s/%s: %v", dataExport.Namespace, dataExport.Name, err)
 		}
 		data := updateDataExportDetail{
-			stage:      kdmpapi.DataExportStageTransferScheduled,
-			status:     kdmpapi.DataExportStatusInitial,
-			reason:     "",
-			transferID: "", // Resetting transfer id if it has been set with nfs backuplocation job
+			stage:                     kdmpapi.DataExportStageTransferScheduled,
+			status:                    kdmpapi.DataExportStatusInitial,
+			reason:                    "",
+			transferID:                "", // Resetting transfer id if it has been set with nfs backuplocation job
 			resetLocalSnapshotRestore: true,
 		}
 		return false, c.updateStatus(dataExport, data)
@@ -1486,14 +1495,14 @@ func (c *Controller) cleanupLocalRestoredSnapshotResources(de *kdmpapi.DataExpor
 		}
 
 		// Get the Restore pvc spec.
-                rpvc, err := core.Instance().GetPersistentVolumeClaim(de.Status.RestorePVC.Name, de.Namespace)
-                if err != nil {
-                        if k8sErrors.IsNotFound(err) {
-                                return nil, false, nil;
-                        }
-                        logrus.Errorf("cleanupLocalRestoredSnapshotResources: failed to get restore pvc [%v] err: %v", de.Status.RestorePVC.Name, err)
-                        return nil, false, err
-                }
+		rpvc, err := core.Instance().GetPersistentVolumeClaim(de.Status.RestorePVC.Name, de.Namespace)
+		if err != nil {
+			if k8sErrors.IsNotFound(err) {
+				return nil, false, nil
+			}
+			logrus.Errorf("cleanupLocalRestoredSnapshotResources: failed to get restore pvc [%v] err: %v", de.Status.RestorePVC.Name, err)
+			return nil, false, err
+		}
 		if rpvc.Spec.DataSource != nil {
 			err = snapshotDriver.DeleteSnapshot(rpvc.Spec.DataSource.Name, de.Namespace, true)
 			if err != nil {
