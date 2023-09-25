@@ -37,6 +37,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/yaml"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	k8shelper "k8s.io/component-helpers/storage/volume"
 )
@@ -508,6 +509,7 @@ func appendPodLogToStork(jobName string, namespace string) {
 	job, err := batch.Instance().GetJob(jobName, namespace)
 	if err != nil && !k8sErrors.IsNotFound(err) {
 		logrus.Infof("failed in getting job %v/%v with err: %v", namespace, jobName, err)
+		logrus.Infof("Reason for failure of the job: %s\n", job.Status.Conditions[0].Reason)
 	}
 	pods, err := core.Instance().GetPods(
 		job.Namespace,
@@ -527,6 +529,25 @@ func appendPodLogToStork(jobName string, namespace string) {
 			logrus.Infof("start of job-pod [%s]'s log...", pod.Name)
 			logrus.Infof(podLog)
 			logrus.Infof("end of job-pod [%s]'s log...", pod.Name)
+		}
+
+		config, cerr := rest.InClusterConfig()
+		if cerr != nil {
+			panic(cerr.Error())
+		}
+
+		clientset, cserr := kubernetes.NewForConfig(config)
+		if cserr != nil {
+			panic(cserr.Error())
+		}
+
+		Despod, Derr := clientset.CoreV1().Pods(pod.Namespace).Get(context.TODO(), pod.Name, metav1.GetOptions{})
+		if Derr != nil {
+			panic(Derr.Error())
+		}
+
+		if Despod.Status.Phase != "Running" {
+			logrus.Infof("Pod Description by when Pod is not in running phase.....%s", Despod)
 		}
 	}
 }
