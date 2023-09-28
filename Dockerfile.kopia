@@ -1,17 +1,18 @@
-FROM registry.access.redhat.com/ubi8-minimal:latest
+FROM registry.access.redhat.com/ubi8/s2i-core:1-440
+FROM --platform=ppc64le registry.access.redhat.com/ubi9/ubi:9.2-755
 
 MAINTAINER Portworx Inc. <support@portworx.com>
 
-RUN microdnf install bash curl vim make wget gpg ca-certificates yum && \
-        microdnf clean all
+#RUN --platform=ppc64le dnf install -y bash curl vim make wget gpg ca-certificates yum && \
+#        dnf clean all
 
-RUN rpm --import https://kopia.io/signing-key
+#RUN rpm --import https://kopia.io/signing-key
 
-COPY kopia.repo /etc/yum.repos.d/kopia.repo
+#COPY kopia.repo /etc/yum.repos.d/kopia.repo
 
-RUN yum install -y kopia-0.10.6
 WORKDIR /
 
 COPY ./bin/kopiaexecutor /
+COPY ./kopia /usr/bin/
 
 ENTRYPOINT ["/kopiaexecutor"] 

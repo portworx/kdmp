@@ -54,6 +54,7 @@ func newBackupCommand() *cobra.Command {
 		Use:   "backup",
 		Short: "Start a kopia backup",
 		Run: func(c *cobra.Command, args []string) {
+			time.Sleep(300 * time.Second)
 			srcPath, err := executor.GetSourcePath(sourcePath, sourcePathGlob)
 			if err != nil {
 				util.CheckErr(err)
