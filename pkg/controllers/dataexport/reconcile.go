@@ -2120,6 +2120,7 @@ func createS3Secret(secretName string, backupLocation *storkapi.BackupLocation, 
 	credentialData["type"] = []byte(backupLocation.Location.Type)
 	credentialData["password"] = []byte(backupLocation.Location.RepositoryPassword)
 	credentialData["disablessl"] = []byte(strconv.FormatBool(backupLocation.Location.S3Config.DisableSSL))
+	credentialData["sse"] = []byte(backupLocation.Location.S3Config.SSE)
 	err := utils.CreateJobSecret(secretName, namespace, credentialData, labels)
 
 	return err

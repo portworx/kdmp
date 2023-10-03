@@ -7,10 +7,9 @@ RUN microdnf install -y bash vim make wget gpg ca-certificates yum && \
 
 RUN curl -LJO https://github.com/kopia/kopia/releases/download/v0.14.1/kopia-0.14.1.x86_64.rpm
 
-RUN yum install -y kopia-0.14.1.x86_64.rpm
-
 WORKDIR /
 
 COPY ./bin/kopiaexecutor /
+COPY ./bin/kopia /usr/bin/
 
 ENTRYPOINT ["/kopiaexecutor"] 
