@@ -5,9 +5,9 @@ MAINTAINER Portworx Inc. <support@portworx.com>
 RUN microdnf install -y bash vim make wget gpg ca-certificates yum && \
         microdnf clean all
 
-RUN curl -LJO https://github.com/kopia/kopia/releases/download/v0.10.6/kopia-0.10.6.x86_64.rpm
+RUN curl -LJO https://github.com/kopia/kopia/releases/download/v0.14.1/kopia-0.14.1.x86_64.rpm
 
-RUN yum install -y kopia-0.10.6.x86_64.rpm
+RUN yum install -y kopia-0.14.1.x86_64.rpm
 
 WORKDIR /
 
