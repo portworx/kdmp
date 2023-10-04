@@ -37,7 +37,7 @@ const (
 	secretAccessKeyPath   = "/etc/cred-secret/secretAccessKey"
 	bucketPath            = "/etc/cred-secret/path"
 	endpointPath          = "/etc/cred-secret/endpoint"
-	sseTypePath          = "/etc/cred-secret/sse"
+	sseTypePath           = "/etc/cred-secret/sse"
 	passwordPath          = "/etc/cred-secret/password"
 	regionPath            = "/etc/cred-secret/region"
 	disableSslPath        = "/etc/cred-secret/disablessl"
@@ -53,9 +53,9 @@ const (
 	// DefaultTimeout Max time a command will be retired before failing
 	DefaultTimeout = 1 * time.Minute
 	// BackupUID backup UID annotation
-	BackupUID  = "portworx.io/backup-uid"
-	retrySleep = 10 * time.Second
-	maxRetry   = 10
+	BackupUID         = "portworx.io/backup-uid"
+	retrySleep        = 10 * time.Second
+	maxRetry          = 10
 	lastKnownErrorLen = 1000
 )
 
@@ -91,7 +91,7 @@ type S3Config struct {
 	// Region will be defaulted to us-east-1 if not provided
 	Region     string
 	DisableSSL bool
-	SseType string
+	SseType    string
 }
 
 // AzureConfig specifies the config required to connect to Azure Blob Storage
