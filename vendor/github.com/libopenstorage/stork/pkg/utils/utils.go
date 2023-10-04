@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/gob"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -39,6 +40,8 @@ const (
 	UpdateRestoreCrTimestampInApplyResourcePath = 19
 	// duration in which the restore CR to be updated with timestamp
 	TimeoutUpdateRestoreCrTimestamp = 15 * time.Minute
+	// duration in which the backup CR to be updated with timestamp
+	TimeoutUpdateBackupCrTimestamp = 15 * time.Minute
 	// duration in which the restore CR to be updated for resource Count progress
 	TimeoutUpdateRestoreCrProgress = 5 * time.Minute
 	// sleep interval for restore time stamp update go-routine to check channel for any data
@@ -235,4 +238,27 @@ func GetUIDLastSection(uid types.UID) string {
 		uidLastSection = string(uid)
 	}
 	return uidLastSection
+}
+
+func CompareFiles(filePath1 string, filePath2 string) (bool, error) {
+	content1, err := os.ReadFile(filePath1)
+	if err != nil {
+		return false, err
+	}
+
+	content2, err := os.ReadFile(filePath2)
+	if err != nil {
+		return false, err
+	}
+
+	// Compare the byte content of the files
+	return string(content1) == string(content2), nil
+}
+
+func GetStashedConfigMapName(objKind string, group string, objName string) string {
+	cmName := fmt.Sprintf("%s-%s-%s", objKind, group, objName)
+	if len(cmName) > 253 {
+		cmName = cmName[:253]
+	}
+	return cmName
 }
