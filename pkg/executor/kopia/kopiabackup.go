@@ -181,11 +181,11 @@ func populateS3AccessDetails(initCmd *kopia.Command, repository *executor.Reposi
 	initCmd.AddArg(repository.S3Config.AccessKeyID)
 	initCmd.AddArg("--secret-access-key")
 	initCmd.AddArg(repository.S3Config.SecretAccessKey)
-	initCmd.AddArg("--sseType")
 	// At present the backuplocation CR was set with "AES256" value for SSE-S3.
 	// So need to do this conversion.
 	switch repository.S3Config.SseType {
 	case "AES256":
+		initCmd.AddArg("--sseType")
 		initCmd.AddArg("SSE-S3")
 	}
 
