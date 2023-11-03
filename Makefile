@@ -4,7 +4,7 @@ BASE_DIR    := $(shell git rev-parse --show-toplevel)
 GIT_SHA     := $(shell git rev-parse --short HEAD)
 BIN         := $(BASE_DIR)/bin
 
-DOCK_BUILD_CNT  := golang:1.20.5
+DOCK_BUILD_CNT  := golang:1.21.2
 
 DOCKER_IMAGE_REPO?=portworx
 DOCKER_IMAGE_NAME?=kdmp
@@ -82,6 +82,7 @@ staticcheck:
 	docker run --rm -v $(shell pwd):/go/src/github.com/portworx/kdmp $(DOCK_BUILD_CNT) \
 		/bin/bash -c "cd /go/src/github.com/portworx/kdmp; \
 	go install honnef.co/go/tools/cmd/staticcheck@v0.4.5; \
+	git config --global --add safe.directory /go/src/github.com/portworx/kdmp; \
 	staticcheck $(PKGS); \
 	staticcheck -tags unittest $(PKGS)"
 
@@ -90,6 +91,7 @@ errcheck:
 	docker run --rm -v $(shell pwd):/go/src/github.com/portworx/kdmp $(DOCK_BUILD_CNT) \
 		/bin/bash -c "cd /go/src/github.com/portworx/kdmp; \
 	GO111MODULE=off go get -u github.com/kisielk/errcheck; \
+	git config --global --add safe.directory /go/src/github.com/portworx/kdmp; \
 	errcheck -ignoregenerated -ignorepkg fmt -verbose -blank $(PKGS); \
 	errcheck -ignoregenerated -ignorepkg fmt -verbose -blank -tags unittest $(PKGS)"
 
