@@ -32,8 +32,9 @@ const (
 )
 
 var (
-	bkpNamespace string
-	compression  string
+	bkpNamespace    string
+	compression     string
+	excludeFileList string
 )
 
 var (
@@ -67,6 +68,7 @@ func newBackupCommand() *cobra.Command {
 	backupCommand.Flags().StringVar(&sourcePath, "source-path", "", "Source for kopia backup")
 	backupCommand.Flags().StringVar(&sourcePathGlob, "source-path-glob", "", "The regexp should match only one path that will be used for backup")
 	backupCommand.Flags().StringVar(&compression, "compression", "", "Compression type to be used")
+	backupCommand.Flags().StringVar(&excludeFileList, "exclude-file-list", "", " list of dir names that need to be exclude in the kopia snapshot")
 
 	return backupCommand
 }
@@ -159,6 +161,15 @@ func runBackup(sourcePath string) error {
 	if compression != "" {
 		if err = runKopiaCompression(repo, sourcePath); err != nil {
 			errMsg := fmt.Sprintf("compression failed for path %s: %v", sourcePath, err)
+			logrus.Errorf("%s: %v", fn, errMsg)
+			return fmt.Errorf(errMsg)
+		}
+	}
+
+	// if excludeFileList is not set in config map, it means no need to exclude any dir in the snapshot.
+	if excludeFileList != "" {
+		if err = runKopiaExcludeFileList(repo, sourcePath); err != nil {
+			errMsg := fmt.Sprintf("setting exclude file list failed for path %s: %v", sourcePath, err)
 			logrus.Errorf("%s: %v", fn, errMsg)
 			return fmt.Errorf(errMsg)
 		}
@@ -460,6 +471,52 @@ func setGlobalPolicy() error {
 	}
 	logrus.Infof("Global policy set successfully")
 
+	return nil
+}
+
+func runKopiaExcludeFileList(repository *executor.Repository, sourcePath string) error {
+	logrus.Infof("setting exclude file list for the snapshot")
+	excludeFileListCmd, err := kopia.GetExcludeFileListCommand(
+		sourcePath,
+		excludeFileList,
+	)
+	if err != nil {
+		return err
+	}
+	excludeFileListExecutor := kopia.NewExcludeFileListExecutor(excludeFileListCmd)
+	if err := excludeFileListExecutor.Run(); err != nil {
+		err = fmt.Errorf("failed to run exclude file list command: %v", err)
+		return err
+	}
+	t := func() (interface{}, bool, error) {
+		status, err := excludeFileListExecutor.Status()
+		if err != nil {
+			return "", true, err
+		}
+		if status.LastKnownError != nil {
+			if err = executor.WriteVolumeBackupStatus(
+				status,
+				volumeBackupName,
+				bkpNamespace,
+			); err != nil {
+				errMsg := fmt.Sprintf("failed to write a VolumeBackup status: %v", err)
+				logrus.Errorf("%v", errMsg)
+				return "", true, fmt.Errorf(errMsg)
+			}
+			return "", true, status.LastKnownError
+		}
+		if status.Done {
+			return "", false, nil
+		}
+
+		return "", true, fmt.Errorf("setting exclude file list for snapshot command status not available")
+	}
+	if _, err := task.DoRetryWithTimeout(t, executor.DefaultTimeout, progressCheckInterval); err != nil {
+		logrus.Errorf("failed setting snapshot exclude file list for path %v: %v", sourcePath, err)
+		return err
+	}
+
+	logrus.Infof("setting exclude file list is  successfully")
 	return nil
 }
 
