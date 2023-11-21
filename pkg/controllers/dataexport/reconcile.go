@@ -287,7 +287,7 @@ func (c *Controller) sync(ctx context.Context, in *kdmpapi.DataExport) (bool, er
 				blNamespace = vb.Spec.BackupLocation.Namespace
 			}
 
-			backupLocation, err := readBackupLocation(blName, blNamespace, "")
+			backupLocation, err = readBackupLocation(blName, blNamespace, "")
 			if err != nil {
 				msg := fmt.Sprintf("reading of backuplocation [%v/%v] failed: %v", blNamespace, blName, err)
 				logrus.Errorf(msg)
