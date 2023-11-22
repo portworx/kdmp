@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -12,6 +13,7 @@ import (
 	storkapi "github.com/libopenstorage/stork/pkg/apis/stork/v1alpha1"
 	"github.com/libopenstorage/stork/pkg/k8sutils"
 	"github.com/portworx/kdmp/pkg/drivers"
+	kdmpops "github.com/portworx/kdmp/pkg/util/ops"
 	"github.com/portworx/kdmp/pkg/version"
 	"github.com/portworx/sched-ops/k8s/apps"
 	"github.com/portworx/sched-ops/k8s/core"
@@ -63,6 +65,8 @@ const (
 	PvcBoundSuccessMsg = "pvc bounded successfully"
 	// PvcBoundFailedMsg pvc not bounded msg
 	PvcBoundFailedMsg = "pvc not bounded"
+	// KopiaDebugModeEnabled - debug level log messages are enabled for kopia
+	KopiaDebugModeEnabled = "kopia-debug-mode"
 )
 
 var (
@@ -875,4 +879,27 @@ func IsJobPodMountFailed(job *batchv1.Job, namespace string) bool {
 		}
 	}
 	return false
+}
+
+func IsKopiaDebugModeAnnotationsEnabled(jobOption drivers.JobOpts) bool {
+	dataExportCR, err := kdmpops.Instance().GetDataExport(context.Background(), jobOption.DataExportName, jobOption.Namespace)
+	if err != nil {
+		logrus.Tracef("error reading data export job: %v", err)
+		return false
+	}
+
+	if _, ok := dataExportCR.Annotations[KopiaDebugModeEnabled]; ok {
+		logrus.Infof("annotation %v found in the data export CR.", KopiaDebugModeEnabled)
+		return true
+	}
+	return false
+}
+
+func CheckAndAddKopiaDebugModeAnnotationsCommand(cmd string, jobOption drivers.JobOpts) string {
+	if IsKopiaDebugModeAnnotationsEnabled(jobOption) {
+		splitCmd := strings.Split(cmd, " ")
+		splitCmd = append(splitCmd, "--log-level", "debug")
+		cmd = strings.Join(splitCmd, " ")
+	}
+	return cmd
 }
