@@ -40,7 +40,6 @@ func newRestoreCommand() *cobra.Command {
 	restoreCommand.Flags().StringVar(&targetPath, "target-path", "", "Destination path for kopia restore")
 	restoreCommand.Flags().StringVar(&snapshotID, "snapshot-id", "", "Snapshot id of the restore")
 	restoreCommand.Flags().StringVar(&appRestoreCR, "app-restore-cr", "", "ApplicationRestore CR name")
-
 	return restoreCommand
 }
 
@@ -107,7 +106,8 @@ func runKopiaRestore(repository *executor.Repository, targetPath, snapshotID str
 	if err != nil {
 		return err
 	}
-
+	// Check and add debug level logs for kopia restore command
+	restoreCmd = addLogLevelDebugToCommand(restoreCmd, logLevelDebug)
 	initExecutor := kopia.NewRestoreExecutor(restoreCmd)
 	if err := initExecutor.Run(); err != nil {
 		err = fmt.Errorf("failed to run restore command: %v", err)

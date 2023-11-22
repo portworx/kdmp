@@ -133,6 +133,8 @@ func runKopiaDelete(repository *executor.Repository, snapshotID string) error {
 		logrus.Errorf("%s %v", fn, errMsg)
 		return fmt.Errorf(errMsg)
 	}
+	// Check and add debug level logs for kopia delete command
+	deleteCmd = addLogLevelDebugToCommand(deleteCmd, logLevelDebug)
 	initExecutor := kopia.NewDeleteExecutor(deleteCmd)
 	if err := initExecutor.Run(); err != nil {
 		errMsg := fmt.Sprintf("running delete backup snapshot command for snapshotID [%v] failed: %v", snapshotID, err)
@@ -163,11 +165,11 @@ func runKopiaSnapshotList(repository *executor.Repository) ([]string, error) {
 	var listCmd *kopia.Command
 	logrus.Infof("Executing kopia snapshot list command")
 	listCmd, err = kopia.GetListCommand()
-
 	if err != nil {
 		return nil, err
 	}
-
+	// Check and add bebug level logs for kopia snapshot list command
+	listCmd = addLogLevelDebugToCommand(listCmd, logLevelDebug)
 	listExecutor := kopia.NewListExecutor(listCmd)
 	if err := listExecutor.Run(); err != nil {
 		err = fmt.Errorf("failed to run snapshot list command: %v", err)
