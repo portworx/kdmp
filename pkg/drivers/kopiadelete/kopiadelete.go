@@ -201,6 +201,8 @@ func jobFor(
 		jobOption.VolumeBackupDeleteNamespace,
 	}, " ")
 
+	cmd = utils.CheckAndAddKopiaDebugModeAnnotationsCommand(cmd, jobOption)
+
 	kopiaExecutorImage, imageRegistrySecret, err := utils.GetExecutorImageAndSecret(drivers.KopiaExecutorImage,
 		jobOption.KopiaImageExecutorSource,
 		jobOption.KopiaImageExecutorSourceNs,

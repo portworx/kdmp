@@ -287,6 +287,8 @@ func jobFor(
 		"/data",
 	}, " ")
 
+	cmd = utils.CheckAndAddKopiaDebugModeAnnotationsCommand(cmd, jobOption)
+
 	if jobOption.Compression != "" {
 		splitCmd := strings.Split(cmd, " ")
 		splitCmd = append(splitCmd, "--compression", jobOption.Compression)
@@ -507,7 +509,7 @@ func roleFor(live bool) *rbacv1.Role {
 		Rules: []rbacv1.PolicyRule{
 			{
 				APIGroups: []string{"kdmp.portworx.com"},
-				Resources: []string{"volumebackups"},
+				Resources: []string{"volumebackups", "dataexports"},
 				Verbs:     []string{rbacv1.VerbAll},
 			},
 		},

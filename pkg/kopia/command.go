@@ -191,6 +191,7 @@ func (c *Command) BackupCmd() *exec.Cmd {
 		configFile,
 		"--json",
 	}
+
 	argsSlice = append(argsSlice, c.Flags...)
 	// Get the cmd args
 	argsSlice = append(argsSlice, c.Args...)
@@ -307,6 +308,7 @@ func (c *Command) RestoreCmd() *exec.Cmd {
 		"--config-file",
 		configFile,
 	}
+
 	argsSlice = append(argsSlice, c.Flags...)
 	// Get the cmd args
 	argsSlice = append(argsSlice, c.Args...)
@@ -330,6 +332,7 @@ func (c *Command) SetPolicyCmd() *exec.Cmd {
 		configFile,
 		"--global",
 	}
+
 	argsSlice = append(argsSlice, c.Flags...)
 	// Get the cmd args
 	argsSlice = append(argsSlice, c.Args...)
@@ -355,6 +358,7 @@ func (c *Command) DeleteCmd() *exec.Cmd {
 		configFile,
 		"--delete",
 	}
+
 	argsSlice = append(argsSlice, c.Flags...)
 	// Get the cmd args
 	argsSlice = append(argsSlice, c.Args...)
@@ -379,6 +383,7 @@ func (c *Command) QuickMaintenanceRunCmd() *exec.Cmd {
 		"--config-file",
 		configFile,
 	}
+
 	argsSlice = append(argsSlice, c.Flags...)
 	// Get the cmd args
 	argsSlice = append(argsSlice, c.Args...)
@@ -403,6 +408,7 @@ func (c *Command) MaintenanceRunCmd() *exec.Cmd {
 		configFile,
 		"--full",
 	}
+
 	argsSlice = append(argsSlice, c.Flags...)
 	// Get the cmd args
 	argsSlice = append(argsSlice, c.Args...)
@@ -427,6 +433,7 @@ func (c *Command) SnapshotListCmd() *exec.Cmd {
 		"--config-file",
 		configFile,
 	}
+
 	argsSlice = append(argsSlice, c.Flags...)
 	// Get the cmd args
 	argsSlice = append(argsSlice, c.Args...)
@@ -453,6 +460,7 @@ func (c *Command) MaintenanceSetCmd() *exec.Cmd {
 		"--config-file",
 		configFile,
 	}
+
 	argsSlice = append(argsSlice, c.Flags...)
 	// Get the cmd args
 	argsSlice = append(argsSlice, c.Args...)
@@ -479,6 +487,7 @@ func (c *Command) CompressionCmd() *exec.Cmd {
 		"--config-file",
 		configFile,
 	}
+
 	argsSlice = append(argsSlice, c.Flags...)
 	// Get the cmd args
 	argsSlice = append(argsSlice, c.Args...)
@@ -503,6 +512,7 @@ func (c *Command) ExcludeFileListCmd() *exec.Cmd {
 		"--config-file",
 		configFile,
 	}
+
 	commaSplit := strings.Split(c.ExcludeFileList, ",")
 	for _, file := range commaSplit {
 		argsSlice = append(argsSlice, "--add-ignore")
