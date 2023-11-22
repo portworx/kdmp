@@ -3,6 +3,7 @@ package kopia
 import (
 	"os"
 	"os/exec"
+	"strings"
 
 	cmdexec "github.com/portworx/kdmp/pkg/executor"
 	"github.com/sirupsen/logrus"
@@ -46,6 +47,8 @@ type Command struct {
 	DisableSsl bool
 	// Compression to be used for backup
 	Compression string
+	// ExcludeFileList to be used for backup
+	ExcludeFileList string
 	// Region for S3 object
 	Region string
 }
@@ -485,5 +488,34 @@ func (c *Command) CompressionCmd() *exec.Cmd {
 	}
 	cmd.Dir = c.Dir
 
+	return cmd
+}
+
+// ExcludeFileListCmd returns os/exec.Cmd object for the kopia policy set
+func (c *Command) ExcludeFileListCmd() *exec.Cmd {
+	// Get all the flags
+	argsSlice := []string{
+		c.Name, // compression command
+		"set",
+		c.Path,
+		"--log-dir",
+		logDir,
+		"--config-file",
+		configFile,
+	}
+	commaSplit := strings.Split(c.ExcludeFileList, ",")
+	for _, file := range commaSplit {
+		argsSlice = append(argsSlice, "--add-ignore")
+		argsSlice = append(argsSlice, file)
+	}
+	argsSlice = append(argsSlice, c.Flags...)
+	// Get the cmd args
+	argsSlice = append(argsSlice, c.Args...)
+	cmd := exec.Command(baseCmd, argsSlice...)
+	if len(c.Env) > 0 {
+		cmd.Env = append(os.Environ(), c.Env...)
+	}
+	cmd.Dir = c.Dir
+	logrus.Infof("ExcludeFileListCmd: %+v", cmd)
 	return cmd
 }
