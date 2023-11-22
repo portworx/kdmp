@@ -58,8 +58,8 @@ func NewMaintenanceSetExecutor(cmd *Command) Executor {
 	}
 }
 
-func (ms *maintenanceSetExecutor) Run() error {
-	ms.execCmd = ms.cmd.MaintenanceSetCmd()
+func (ms *maintenanceSetExecutor) Run(debugMode string) error {
+	ms.execCmd = ms.cmd.MaintenanceSetCmd(debugMode)
 	ms.execCmd.Stdout = ms.outBuf
 	ms.execCmd.Stderr = ms.errBuf
 

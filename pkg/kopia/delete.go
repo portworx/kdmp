@@ -37,8 +37,8 @@ func NewDeleteExecutor(cmd *Command) Executor {
 	}
 }
 
-func (d *deleteExecutor) Run() error {
-	d.execCmd = d.cmd.DeleteCmd()
+func (d *deleteExecutor) Run(debugMode string) error {
+	d.execCmd = d.cmd.DeleteCmd(debugMode)
 	d.execCmd.Stdout = d.outBuf
 	d.execCmd.Stderr = d.errBuf
 

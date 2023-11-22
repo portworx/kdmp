@@ -60,8 +60,8 @@ func NewCreateExecutor(cmd *Command) Executor {
 	}
 }
 
-func (b *createExecutor) Run() error {
-	b.execCmd = b.cmd.CreateCmd()
+func (b *createExecutor) Run(debugMode string) error {
+	b.execCmd = b.cmd.CreateCmd(debugMode)
 	b.execCmd.Stdout = b.outBuf
 	b.execCmd.Stderr = b.errBuf
 

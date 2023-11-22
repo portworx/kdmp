@@ -36,8 +36,8 @@ func NewQuickMaintenanceRunExecutor(cmd *Command) Executor {
 	}
 }
 
-func (qmr *quickMaintenanceRunExecutor) Run() error {
-	qmr.execCmd = qmr.cmd.QuickMaintenanceRunCmd()
+func (qmr *quickMaintenanceRunExecutor) Run(debugMode string) error {
+	qmr.execCmd = qmr.cmd.QuickMaintenanceRunCmd(debugMode)
 	qmr.execCmd.Stdout = qmr.outBuf
 	qmr.execCmd.Stderr = qmr.errBuf
 

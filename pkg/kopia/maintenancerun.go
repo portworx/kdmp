@@ -36,8 +36,8 @@ func NewMaintenanceRunExecutor(cmd *Command) Executor {
 	}
 }
 
-func (mr *maintenanceRunExecutor) Run() error {
-	mr.execCmd = mr.cmd.MaintenanceRunCmd()
+func (mr *maintenanceRunExecutor) Run(debugMode string) error {
+	mr.execCmd = mr.cmd.MaintenanceRunCmd(debugMode)
 	mr.execCmd.Stdout = mr.outBuf
 	mr.execCmd.Stderr = mr.errBuf
 

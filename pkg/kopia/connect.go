@@ -55,8 +55,8 @@ func NewConnectExecutor(cmd *Command) Executor {
 	}
 }
 
-func (b *connectExecutor) Run() error {
-	b.execCmd = b.cmd.ConnectCmd()
+func (b *connectExecutor) Run(debugMode string) error {
+	b.execCmd = b.cmd.ConnectCmd(debugMode)
 	b.execCmd.Stdout = b.outBuf
 	b.execCmd.Stderr = b.errBuf
 

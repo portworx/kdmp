@@ -9,10 +9,12 @@ import (
 )
 
 const (
-	baseCmd    = "kopia"
-	logDir     = "/tmp"
-	cacheDir   = "/tmp"
-	configFile = "/tmp/kopiaconfig"
+	baseCmd               = "kopia"
+	logDir                = "/tmp"
+	cacheDir              = "/tmp"
+	configFile            = "/tmp/kopiaconfig"
+	kopiaDebugModeEnabled = "KDMP_KOPIAEXECUTOR_ENABLE_DEBUG_MODE"
+	debug                 = "debug"
 )
 
 // Command defines the essential fields required to
@@ -56,7 +58,7 @@ type Command struct {
 type Executor interface {
 	// Run a long running command. Returns a unique CommandID that can be
 	// used for fetching the status of the command
-	Run() error
+	Run(string) error
 
 	// Status returns the status of
 	Status() (*cmdexec.Status, error)
@@ -81,7 +83,7 @@ func (c *Command) AddEnv(envs []string) *Command {
 }
 
 // CreateCmd returns os/exec.Cmd object for the kopia repo create Command
-func (c *Command) CreateCmd() *exec.Cmd {
+func (c *Command) CreateCmd(debugMode string) *exec.Cmd {
 	// Get all the flags
 	var argsSlice []string
 	switch c.Provider {
@@ -162,6 +164,15 @@ func (c *Command) CreateCmd() *exec.Cmd {
 			"--config-file",
 			configFile,
 		}
+	}
+
+	// check if debug mode in kopia is enabled
+	if debugMode != "" {
+		argsSliceForDebug := []string{
+			"--log-level",
+			debug,
+		}
+		argsSlice = append(argsSlice, argsSliceForDebug...)
 	}
 
 	argsSlice = append(argsSlice, c.Flags...)
@@ -176,7 +187,7 @@ func (c *Command) CreateCmd() *exec.Cmd {
 }
 
 // BackupCmd returns os/exec.Cmd object for the kopia create Command
-func (c *Command) BackupCmd() *exec.Cmd {
+func (c *Command) BackupCmd(debugMode string) *exec.Cmd {
 
 	// Get all the flags
 	argsSlice := []string{
@@ -188,6 +199,16 @@ func (c *Command) BackupCmd() *exec.Cmd {
 		configFile,
 		"--json",
 	}
+
+	// check if debug mode in kopia is enabled
+	if debugMode != "" {
+		argsSliceForDebug := []string{
+			"--log-level",
+			debug,
+		}
+		argsSlice = append(argsSlice, argsSliceForDebug...)
+	}
+
 	argsSlice = append(argsSlice, c.Flags...)
 	// Get the cmd args
 	argsSlice = append(argsSlice, c.Args...)
@@ -201,7 +222,7 @@ func (c *Command) BackupCmd() *exec.Cmd {
 }
 
 // ConnectCmd returns os/exec.Cmd object for the kopia connect Command
-func (c *Command) ConnectCmd() *exec.Cmd {
+func (c *Command) ConnectCmd(debugMode string) *exec.Cmd {
 	var argsSlice []string
 	switch c.Provider {
 	case "azure":
@@ -282,6 +303,15 @@ func (c *Command) ConnectCmd() *exec.Cmd {
 		}
 	}
 
+	// check if debug mode in kopia is enabled
+	if debugMode != "" {
+		argsSliceForDebug := []string{
+			"--log-level",
+			debug,
+		}
+		argsSlice = append(argsSlice, argsSliceForDebug...)
+	}
+
 	argsSlice = append(argsSlice, c.Flags...)
 	// Get the cmd args
 	argsSlice = append(argsSlice, c.Args...)
@@ -294,7 +324,7 @@ func (c *Command) ConnectCmd() *exec.Cmd {
 }
 
 // RestoreCmd returns os/exec.Cmd object for the kopia restore Command
-func (c *Command) RestoreCmd() *exec.Cmd {
+func (c *Command) RestoreCmd(debugMode string) *exec.Cmd {
 	// Get all the flags
 	argsSlice := []string{
 		"snapshot",
@@ -304,6 +334,16 @@ func (c *Command) RestoreCmd() *exec.Cmd {
 		"--config-file",
 		configFile,
 	}
+
+	// check if debug mode in kopia is enabled
+	if debugMode != "" {
+		argsSliceForDebug := []string{
+			"--log-level",
+			debug,
+		}
+		argsSlice = append(argsSlice, argsSliceForDebug...)
+	}
+
 	argsSlice = append(argsSlice, c.Flags...)
 	// Get the cmd args
 	argsSlice = append(argsSlice, c.Args...)
@@ -316,7 +356,7 @@ func (c *Command) RestoreCmd() *exec.Cmd {
 }
 
 // SetPolicyCmd returns os/exec.Cmd object for the kopia policy Command
-func (c *Command) SetPolicyCmd() *exec.Cmd {
+func (c *Command) SetPolicyCmd(debugMode string) *exec.Cmd {
 	// Get all the flags
 	argsSlice := []string{
 		"policy",
@@ -327,6 +367,16 @@ func (c *Command) SetPolicyCmd() *exec.Cmd {
 		configFile,
 		"--global",
 	}
+
+	// check if debug mode in kopia is enabled
+	if debugMode != "" {
+		argsSliceForDebug := []string{
+			"--log-level",
+			debug,
+		}
+		argsSlice = append(argsSlice, argsSliceForDebug...)
+	}
+
 	argsSlice = append(argsSlice, c.Flags...)
 	// Get the cmd args
 	argsSlice = append(argsSlice, c.Args...)
@@ -340,7 +390,7 @@ func (c *Command) SetPolicyCmd() *exec.Cmd {
 }
 
 // DeleteCmd returns os/exec.Cmd object for the kopia snapshot delete Command
-func (c *Command) DeleteCmd() *exec.Cmd {
+func (c *Command) DeleteCmd(debugMode string) *exec.Cmd {
 	// Get all the flags
 	argsSlice := []string{
 		"snapshot",
@@ -352,6 +402,16 @@ func (c *Command) DeleteCmd() *exec.Cmd {
 		configFile,
 		"--delete",
 	}
+
+	// check if debug mode in kopia is enabled
+	if debugMode != "" {
+		argsSliceForDebug := []string{
+			"--log-level",
+			debug,
+		}
+		argsSlice = append(argsSlice, argsSliceForDebug...)
+	}
+
 	argsSlice = append(argsSlice, c.Flags...)
 	// Get the cmd args
 	argsSlice = append(argsSlice, c.Args...)
@@ -366,7 +426,7 @@ func (c *Command) DeleteCmd() *exec.Cmd {
 
 // QuickMaintenanceRunCmd returns os/exec.Cmd object for the kopia quick maintenance run Command
 // For quick maintenance, we need not to give "--full" option.
-func (c *Command) QuickMaintenanceRunCmd() *exec.Cmd {
+func (c *Command) QuickMaintenanceRunCmd(debugMode string) *exec.Cmd {
 	// Get all the flags
 	argsSlice := []string{
 		c.Name, // maintenance command
@@ -376,6 +436,16 @@ func (c *Command) QuickMaintenanceRunCmd() *exec.Cmd {
 		"--config-file",
 		configFile,
 	}
+
+	// check if debug mode in kopia is enabled
+	if debugMode != "" {
+		argsSliceForDebug := []string{
+			"--log-level",
+			debug,
+		}
+		argsSlice = append(argsSlice, argsSliceForDebug...)
+	}
+
 	argsSlice = append(argsSlice, c.Flags...)
 	// Get the cmd args
 	argsSlice = append(argsSlice, c.Args...)
@@ -389,7 +459,7 @@ func (c *Command) QuickMaintenanceRunCmd() *exec.Cmd {
 }
 
 // MaintenanceRunCmd returns os/exec.Cmd object for the kopia maintenance run Command
-func (c *Command) MaintenanceRunCmd() *exec.Cmd {
+func (c *Command) MaintenanceRunCmd(debugMode string) *exec.Cmd {
 	// Get all the flags
 	argsSlice := []string{
 		c.Name, // maintenance command
@@ -400,6 +470,16 @@ func (c *Command) MaintenanceRunCmd() *exec.Cmd {
 		configFile,
 		"--full",
 	}
+
+	// check if debug mode in kopia is enabled
+	if debugMode != "" {
+		argsSliceForDebug := []string{
+			"--log-level",
+			debug,
+		}
+		argsSlice = append(argsSlice, argsSliceForDebug...)
+	}
+
 	argsSlice = append(argsSlice, c.Flags...)
 	// Get the cmd args
 	argsSlice = append(argsSlice, c.Args...)
@@ -413,7 +493,7 @@ func (c *Command) MaintenanceRunCmd() *exec.Cmd {
 }
 
 // SnapshotListCmd returns os/exec.Cmd object for the kopia snapshot list Command
-func (c *Command) SnapshotListCmd() *exec.Cmd {
+func (c *Command) SnapshotListCmd(debugMode string) *exec.Cmd {
 	// Get all the flags
 	argsSlice := []string{
 		c.Name, // snapshot list command
@@ -424,6 +504,16 @@ func (c *Command) SnapshotListCmd() *exec.Cmd {
 		"--config-file",
 		configFile,
 	}
+
+	// check if debug mode in kopia is enabled
+	if debugMode != "" {
+		argsSliceForDebug := []string{
+			"--log-level",
+			debug,
+		}
+		argsSlice = append(argsSlice, argsSliceForDebug...)
+	}
+
 	argsSlice = append(argsSlice, c.Flags...)
 	// Get the cmd args
 	argsSlice = append(argsSlice, c.Args...)
@@ -437,7 +527,7 @@ func (c *Command) SnapshotListCmd() *exec.Cmd {
 }
 
 // MaintenanceSetCmd returns os/exec.Cmd object for the kopia maintenance set Command
-func (c *Command) MaintenanceSetCmd() *exec.Cmd {
+func (c *Command) MaintenanceSetCmd(debugMode string) *exec.Cmd {
 	// Get all the flags
 
 	argsSlice := []string{
@@ -450,6 +540,16 @@ func (c *Command) MaintenanceSetCmd() *exec.Cmd {
 		"--config-file",
 		configFile,
 	}
+
+	// check if debug mode in kopia is enabled
+	if debugMode != "" {
+		argsSliceForDebug := []string{
+			"--log-level",
+			debug,
+		}
+		argsSlice = append(argsSlice, argsSliceForDebug...)
+	}
+
 	argsSlice = append(argsSlice, c.Flags...)
 	// Get the cmd args
 	argsSlice = append(argsSlice, c.Args...)
@@ -463,7 +563,7 @@ func (c *Command) MaintenanceSetCmd() *exec.Cmd {
 }
 
 // CompressionCmd returns os/exec.Cmd object for the kopia policy set
-func (c *Command) CompressionCmd() *exec.Cmd {
+func (c *Command) CompressionCmd(debugMode string) *exec.Cmd {
 	// Get all the flags
 	argsSlice := []string{
 		c.Name, // compression command
@@ -476,6 +576,16 @@ func (c *Command) CompressionCmd() *exec.Cmd {
 		"--config-file",
 		configFile,
 	}
+
+	// check if debug mode in kopia is enabled
+	if debugMode != "" {
+		argsSliceForDebug := []string{
+			"--log-level",
+			debug,
+		}
+		argsSlice = append(argsSlice, argsSliceForDebug...)
+	}
+
 	argsSlice = append(argsSlice, c.Flags...)
 	// Get the cmd args
 	argsSlice = append(argsSlice, c.Args...)

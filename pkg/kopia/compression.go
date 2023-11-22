@@ -41,8 +41,8 @@ func NewCompressionExecutor(cmd *Command) Executor {
 	}
 }
 
-func (c *compressionExecutor) Run() error {
-	c.execCmd = c.cmd.CompressionCmd()
+func (c *compressionExecutor) Run(debugMode string) error {
+	c.execCmd = c.cmd.CompressionCmd(debugMode)
 	c.execCmd.Stdout = c.outBuf
 	c.execCmd.Stderr = c.errBuf
 

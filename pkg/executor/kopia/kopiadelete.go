@@ -21,6 +21,7 @@ func newDeleteCommand() *cobra.Command {
 		credSecretNamespace         string
 		volumeBackupDeleteName      string
 		volumeBackupDeleteNamespace string
+		logLevel                    string
 	)
 	deleteCommand := &cobra.Command{
 		Use:   "delete",
@@ -34,6 +35,7 @@ func newDeleteCommand() *cobra.Command {
 	deleteCommand.Flags().StringVar(&credSecretNamespace, "cred-secret-namespace", "", "cred secret namespace for kopia backup snapshot that need to be deleted")
 	deleteCommand.Flags().StringVar(&volumeBackupDeleteName, "volume-backup-delete-name", "", "volumeBackupdelete CR name for kopia backup snapshot that need to be deleted")
 	deleteCommand.Flags().StringVar(&volumeBackupDeleteNamespace, "volume-backup-delete-namespace", "", "volumeBackupdelete CR namespace for kopia backup snapshot that need to be deleted")
+	deleteCommand.Flags().StringVar(&logLevel, "log-level", "", "If debug mode in kopia is to be used")
 	return deleteCommand
 }
 
@@ -134,7 +136,7 @@ func runKopiaDelete(repository *executor.Repository, snapshotID string) error {
 		return fmt.Errorf(errMsg)
 	}
 	initExecutor := kopia.NewDeleteExecutor(deleteCmd)
-	if err := initExecutor.Run(); err != nil {
+	if err := initExecutor.Run(logLevel); err != nil {
 		errMsg := fmt.Sprintf("running delete backup snapshot command for snapshotID [%v] failed: %v", snapshotID, err)
 		logrus.Errorf("%s %v", fn, errMsg)
 		return fmt.Errorf(errMsg)
@@ -169,7 +171,7 @@ func runKopiaSnapshotList(repository *executor.Repository) ([]string, error) {
 	}
 
 	listExecutor := kopia.NewListExecutor(listCmd)
-	if err := listExecutor.Run(); err != nil {
+	if err := listExecutor.Run(logLevel); err != nil {
 		err = fmt.Errorf("failed to run snapshot list command: %v", err)
 		return nil, err
 	}

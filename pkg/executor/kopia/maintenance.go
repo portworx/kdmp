@@ -38,6 +38,7 @@ func newMaintenanceCommand() *cobra.Command {
 		credSecretName      string
 		credSecretNamespace string
 		maintenanceType     string
+		logLevel            string
 	)
 	maintenanceCommand := &cobra.Command{
 		Use:   "maintenance",
@@ -51,6 +52,7 @@ func newMaintenanceCommand() *cobra.Command {
 	maintenanceCommand.Flags().StringVar(&maintenanceStatusName, "maintenance-status-name", "", "backuplocation maintenance status CR name, where repo maintenance status will be stored")
 	maintenanceCommand.Flags().StringVar(&maintenanceStatusNamespace, "maintenance-status-namespace", "", "backuplocation maintenance status CR namespace, where repo maintenance status will be stored")
 	maintenanceCommand.Flags().StringVar(&maintenanceType, "maintenance-type", "", "full - will run full maintenance and quick - will run quick maintenance")
+	maintenanceCommand.Flags().StringVar(&logLevel, "log-level", "", "If debug mode in kopia is to be used")
 	return maintenanceCommand
 }
 
@@ -282,7 +284,7 @@ func runKopiaQuickMaintenanceExecute(repository *executor.Repository) error {
 	}
 
 	initExecutor := kopia.NewMaintenanceRunExecutor(maintenanceRunCmd)
-	if err := initExecutor.Run(); err != nil {
+	if err := initExecutor.Run(logLevel); err != nil {
 		errMsg := fmt.Sprintf("running maintenance run command for [%v] failed: %v", repository.Name, err)
 		logrus.Errorf("%s %v", fn, errMsg)
 		return fmt.Errorf(errMsg)
@@ -313,7 +315,7 @@ func runKopiaMaintenanceExecute(repository *executor.Repository) error {
 		return fmt.Errorf(errMsg)
 	}
 	initExecutor := kopia.NewMaintenanceRunExecutor(maintenanceRunCmd)
-	if err := initExecutor.Run(); err != nil {
+	if err := initExecutor.Run(logLevel); err != nil {
 		errMsg := fmt.Sprintf("running maintenance run command for [%v] failed: %v", repository.Name, err)
 		logrus.Errorf("%s %v", fn, errMsg)
 		return fmt.Errorf(errMsg)
@@ -344,7 +346,7 @@ func runKopiaMaintenanceSet(repository *executor.Repository) error {
 		return fmt.Errorf(errMsg)
 	}
 	initExecutor := kopia.NewMaintenanceSetExecutor(maintenanceSetCmd)
-	if err := initExecutor.Run(); err != nil {
+	if err := initExecutor.Run(logLevel); err != nil {
 		errMsg := fmt.Sprintf("running maintenance set command for failed: %v", err)
 		logrus.Errorf("%s %v", fn, errMsg)
 		return fmt.Errorf(errMsg)

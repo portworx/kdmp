@@ -95,9 +95,9 @@ func NewRestoreExecutor(cmd *Command) Executor {
 	}
 }
 
-func (b *restoreExecutor) Run() error {
+func (b *restoreExecutor) Run(debugMode string) error {
 
-	b.execCmd = b.cmd.RestoreCmd()
+	b.execCmd = b.cmd.RestoreCmd(debugMode)
 	b.execCmd.Stdout = b.outBuf
 	b.execCmd.Stderr = b.errBuf
 

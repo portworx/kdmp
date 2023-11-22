@@ -42,8 +42,8 @@ func NewListExecutor(cmd *Command) Executor {
 	}
 }
 
-func (b *listExecutor) Run() error {
-	b.execCmd = b.cmd.SnapshotListCmd()
+func (b *listExecutor) Run(debugMode string) error {
+	b.execCmd = b.cmd.SnapshotListCmd(debugMode)
 	b.execCmd.Stdout = b.outBuf
 	b.execCmd.Stderr = b.errBuf
 

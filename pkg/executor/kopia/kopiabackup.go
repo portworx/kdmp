@@ -34,6 +34,7 @@ const (
 var (
 	bkpNamespace string
 	compression  string
+	logLevel     string
 )
 
 var (
@@ -67,6 +68,7 @@ func newBackupCommand() *cobra.Command {
 	backupCommand.Flags().StringVar(&sourcePath, "source-path", "", "Source for kopia backup")
 	backupCommand.Flags().StringVar(&sourcePathGlob, "source-path-glob", "", "The regexp should match only one path that will be used for backup")
 	backupCommand.Flags().StringVar(&compression, "compression", "", "Compression type to be used")
+	backupCommand.Flags().StringVar(&logLevel, "log-level", "", "If debug mode in kopia is to be used")
 
 	return backupCommand
 }
@@ -250,7 +252,7 @@ func runKopiaCreateRepo(repository *executor.Repository) error {
 	}
 
 	initExecutor := kopia.NewCreateExecutor(repoCreateCmd)
-	if err := initExecutor.Run(); err != nil {
+	if err := initExecutor.Run(logLevel); err != nil {
 		err = fmt.Errorf("failed to run repository create command: %v", err)
 		return err
 	}
@@ -316,7 +318,7 @@ func runKopiaBackup(repository *executor.Repository, sourcePath string) error {
 	// the pod got terminated. Now user triggers another backup, so we need to pass
 	// credentials for "snapshot create".
 	backupExecutor := kopia.NewBackupExecutor(backupCmd)
-	if err := backupExecutor.Run(); err != nil {
+	if err := backupExecutor.Run(logLevel); err != nil {
 		err = fmt.Errorf("failed to run backup command: %v", err)
 		return err
 	}
@@ -385,7 +387,7 @@ func runKopiaRepositoryConnect(repository *executor.Repository) error {
 		connectCmd = populateAzureccessDetails(connectCmd, repository)
 	}
 	connectExecutor := kopia.NewConnectExecutor(connectCmd)
-	if err := connectExecutor.Run(); err != nil {
+	if err := connectExecutor.Run(logLevel); err != nil {
 		err = fmt.Errorf("failed to run repository connect  command: %v", err)
 		return err
 	}
@@ -423,7 +425,7 @@ func setGlobalPolicy() error {
 	// for the repository, setting them to very high values
 	policyCmd = addPolicySetting(policyCmd)
 	policyExecutor := kopia.NewSetGlobalPolicyExecutor(policyCmd)
-	if err := policyExecutor.Run(); err != nil {
+	if err := policyExecutor.Run(logLevel); err != nil {
 		errMsg := fmt.Sprintf("failed to run setting global policy command: %v", err)
 		logrus.Errorf("%v", errMsg)
 		return fmt.Errorf(errMsg)
@@ -473,7 +475,7 @@ func runKopiaCompression(repository *executor.Repository, sourcePath string) err
 		return err
 	}
 	compressionExecutor := kopia.NewCompressionExecutor(compressionCmd)
-	if err := compressionExecutor.Run(); err != nil {
+	if err := compressionExecutor.Run(logLevel); err != nil {
 		err = fmt.Errorf("failed to run compression command: %v", err)
 		return err
 	}

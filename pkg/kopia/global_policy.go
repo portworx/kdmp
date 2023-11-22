@@ -35,8 +35,8 @@ func NewSetGlobalPolicyExecutor(cmd *Command) Executor {
 	}
 }
 
-func (b *globalPolicyExecutor) Run() error {
-	b.execCmd = b.cmd.SetPolicyCmd()
+func (b *globalPolicyExecutor) Run(debugMode string) error {
+	b.execCmd = b.cmd.SetPolicyCmd(debugMode)
 	b.execCmd.Stdout = b.outBuf
 	b.execCmd.Stderr = b.errBuf
 

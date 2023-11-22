@@ -101,8 +101,8 @@ func NewBackupExecutor(cmd *Command) Executor {
 	}
 }
 
-func (b *backupExecutor) Run() error {
-	b.execCmd = b.cmd.BackupCmd()
+func (b *backupExecutor) Run(debugMode string) error {
+	b.execCmd = b.cmd.BackupCmd(debugMode)
 	b.execCmd.Stdout = b.outBuf
 	b.execCmd.Stderr = b.errBuf
 
