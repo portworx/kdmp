@@ -14,6 +14,7 @@ var (
 	credentials             string
 	backupLocationName      string
 	backupLocationNamespace string
+	logLevelDebug           string
 )
 
 // NewCommand returns a kopia command wrapper
@@ -29,6 +30,7 @@ func NewCommand() *cobra.Command {
 	cmds.PersistentFlags().StringVar(&backupLocationName, "backup-location", "", "Name of the BackupLocation object, used for authentication")
 	cmds.PersistentFlags().StringVar(&backupLocationNamespace, "backup-location-namespace", "", "Namespace of BackupLocation object, used for authentication")
 	cmds.PersistentFlags().StringVar(&volumeBackupName, "volume-backup-name", "", "Provided VolumeBackup CRD will be updated with the latest backup progress details")
+	cmds.PersistentFlags().StringVar(&logLevelDebug, "log-level", "", "If debug mode in kopia is to be used")
 
 	cmds.AddCommand(
 		newBackupCommand(),

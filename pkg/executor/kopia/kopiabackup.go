@@ -69,7 +69,6 @@ func newBackupCommand() *cobra.Command {
 	backupCommand.Flags().StringVar(&sourcePathGlob, "source-path-glob", "", "The regexp should match only one path that will be used for backup")
 	backupCommand.Flags().StringVar(&compression, "compression", "", "Compression type to be used")
 	backupCommand.Flags().StringVar(&excludeFileList, "exclude-file-list", "", " list of dir names that need to be exclude in the kopia snapshot")
-
 	return backupCommand
 }
 
@@ -249,6 +248,9 @@ func runKopiaCreateRepo(repository *executor.Repository) error {
 	if err != nil {
 		return err
 	}
+	// Now check if debug log level is to be added in the command which got prepared above.
+	// check if debug level exists
+	repoCreateCmd = addLogLevelDebugToCommand(repoCreateCmd, logLevelDebug)
 	// NFS doesn't need any special treatment for repo create command
 	// hence no case exist for it.
 	switch repository.Type {
@@ -323,6 +325,8 @@ func runKopiaBackup(repository *executor.Repository, sourcePath string) error {
 	if err != nil {
 		return err
 	}
+	// Check and add debug level logs for kopia backup command
+	backupCmd = addLogLevelDebugToCommand(backupCmd, logLevelDebug)
 	// This is needed to handle case where after kopia repo create was successful and
 	// the pod got terminated. Now user triggers another backup, so we need to pass
 	// credentials for "snapshot create".
@@ -386,6 +390,8 @@ func runKopiaRepositoryConnect(repository *executor.Repository) error {
 	if err != nil {
 		return err
 	}
+	// Check and add debug level logs for kopia connect command
+	connectCmd = addLogLevelDebugToCommand(connectCmd, logLevelDebug)
 
 	switch repository.Type {
 	case storkv1.BackupLocationS3:
@@ -430,6 +436,7 @@ func setGlobalPolicy() error {
 	if err != nil {
 		return err
 	}
+	policyCmd = addLogLevelDebugToCommand(policyCmd, logLevelDebug)
 	// As we don't want kopia maintenance to kick in and trigger global policy on default values
 	// for the repository, setting them to very high values
 	policyCmd = addPolicySetting(policyCmd)
@@ -483,6 +490,8 @@ func runKopiaExcludeFileList(repository *executor.Repository, sourcePath string)
 	if err != nil {
 		return err
 	}
+	// Check and add debug level logs for kopia exclude file list command
+	excludeFileListCmd = addLogLevelDebugToCommand(excludeFileListCmd, logLevelDebug)
 	excludeFileListExecutor := kopia.NewExcludeFileListExecutor(excludeFileListCmd)
 	if err := excludeFileListExecutor.Run(); err != nil {
 		err = fmt.Errorf("failed to run exclude file list command: %v", err)
@@ -529,6 +538,8 @@ func runKopiaCompression(repository *executor.Repository, sourcePath string) err
 	if err != nil {
 		return err
 	}
+	// Check and add debug level logs for kopia compression command
+	compressionCmd = addLogLevelDebugToCommand(compressionCmd, logLevelDebug)
 	compressionExecutor := kopia.NewCompressionExecutor(compressionCmd)
 	if err := compressionExecutor.Run(); err != nil {
 		err = fmt.Errorf("failed to run compression command: %v", err)
@@ -676,4 +687,13 @@ func addPolicySetting(policyCmd *kopia.Command) *kopia.Command {
 	policyCmd.AddArg(annualSnapshots)
 
 	return policyCmd
+}
+
+func addLogLevelDebugToCommand(kopiaCommand *kopia.Command, logLevelDebug string) *kopia.Command {
+	if logLevelDebug != "" {
+		// Kopia command to be run with debug log levels now.
+		kopiaCommand.AddArg("--log-level")
+		kopiaCommand.AddArg("debug")
+	}
+	return kopiaCommand
 }

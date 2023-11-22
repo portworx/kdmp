@@ -280,7 +280,8 @@ func runKopiaQuickMaintenanceExecute(repository *executor.Repository) error {
 		logrus.Errorf("%s %v", fn, errMsg)
 		return fmt.Errorf(errMsg)
 	}
-
+	// Check and add debug log level for kopia maintenance command
+	maintenanceRunCmd = addLogLevelDebugToCommand(maintenanceRunCmd, logLevelDebug)
 	initExecutor := kopia.NewMaintenanceRunExecutor(maintenanceRunCmd)
 	if err := initExecutor.Run(); err != nil {
 		errMsg := fmt.Sprintf("running maintenance run command for [%v] failed: %v", repository.Name, err)
@@ -312,6 +313,8 @@ func runKopiaMaintenanceExecute(repository *executor.Repository) error {
 		logrus.Errorf("%s %v", fn, errMsg)
 		return fmt.Errorf(errMsg)
 	}
+	// Check and add debug log level for kopia maintenance command
+	maintenanceRunCmd = addLogLevelDebugToCommand(maintenanceRunCmd, logLevelDebug)
 	initExecutor := kopia.NewMaintenanceRunExecutor(maintenanceRunCmd)
 	if err := initExecutor.Run(); err != nil {
 		errMsg := fmt.Sprintf("running maintenance run command for [%v] failed: %v", repository.Name, err)
@@ -343,6 +346,8 @@ func runKopiaMaintenanceSet(repository *executor.Repository) error {
 		logrus.Errorf("%s %v", fn, errMsg)
 		return fmt.Errorf(errMsg)
 	}
+	// Check and add debug log level for kopia maintenance set command
+	maintenanceSetCmd = addLogLevelDebugToCommand(maintenanceSetCmd, logLevelDebug)
 	initExecutor := kopia.NewMaintenanceSetExecutor(maintenanceSetCmd)
 	if err := initExecutor.Run(); err != nil {
 		errMsg := fmt.Sprintf("running maintenance set command for failed: %v", err)
