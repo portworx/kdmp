@@ -288,9 +288,6 @@ func (c *Controller) sync(ctx context.Context, in *kdmpapi.DataExport) (bool, er
 				}
 			}
 			compressionType = kdmpData.Data[compressionKey]
-			if len(compressionType) == 0 {
-				compressionType = utils.DefaultCompresion
-			}
 			podDataPath = kdmpData.Data[backupPath]
 			if len(kdmpData.Data[excludeFileListKey]) != 0 {
 				excludeFileList, err = parseExcludeFileListKey(pvcStorageClass, kdmpData.Data[excludeFileListKey])
