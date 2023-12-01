@@ -69,8 +69,9 @@ const (
 	restoreObjectNameKey        = utils.KdmpAnnotationPrefix + "restoreobject-name"
 	restoreObjectUIDKey         = utils.KdmpAnnotationPrefix + "restoreobject-uid"
 
-	pvcNameKey = utils.KdmpAnnotationPrefix + "pvc-name"
-	pvcUIDKey  = utils.KdmpAnnotationPrefix + "pvc-uid"
+	pvcNameKey          = utils.KdmpAnnotationPrefix + "pvc-name"
+	pvcUIDKey           = utils.KdmpAnnotationPrefix + "pvc-uid"
+	kdmpStorageClassKey = utils.KdmpAnnotationPrefix + "storage-class"
 	// pvcProvisionerAnnotation is the annotation on PVC which has the
 	// provisioner name
 	pvcProvisionerAnnotation = "volume.beta.kubernetes.io/storage-provisioner"
@@ -83,6 +84,7 @@ const (
 	gkeNodeLabelKey          = "topology.gke.io/zone"
 	awsNodeLabelKey          = "alpha.eksctl.io/cluster-name"
 	ocpAWSNodeLabelKey       = "topology.ebs.csi.aws.com/zone"
+	kopiaDebugModeEnabled    = "KDMP_KOPIAEXECUTOR_ENABLE_DEBUG_MODE"
 )
 
 var volumeAPICallBackoff = wait.Backoff{
@@ -266,6 +268,7 @@ func (k *kdmp) StartBackup(backup *storkapi.ApplicationBackup,
 		labels[utils.ApplicationBackupCRUIDKey] = utils.GetValidLabel(utils.GetShortUID(string(backup.UID)))
 		labels[pvcNameKey] = utils.GetValidLabel(pvc.Name)
 		labels[pvcUIDKey] = utils.GetValidLabel(utils.GetShortUID(string(pvc.UID)))
+		labels[kdmpStorageClassKey] = volumeInfo.StorageClass
 		// If backup from px-backup, update the backup object details in the label
 		if val, ok := backup.Annotations[utils.PxbackupAnnotationCreateByKey]; ok {
 			if val == utils.PxbackupAnnotationCreateByValue {
@@ -285,6 +288,9 @@ func (k *kdmp) StartBackup(backup *storkapi.ApplicationBackup,
 		dataExport.Annotations = make(map[string]string)
 		dataExport.Annotations[utils.SkipResourceAnnotation] = "true"
 		dataExport.Annotations[utils.BackupObjectUIDKey] = string(backup.Annotations[utils.PxbackupObjectUIDKey])
+		if isKopiaExecutorDebugModeEnabled() {
+			dataExport.Annotations[utils.KopiaDebugModeEnabled] = "true"
+		}
 		dataExport.Annotations[pvcUIDKey] = string(pvc.UID)
 		dataExport.Name = getGenericCRName(utils.PrefixBackup, string(backup.UID), string(pvc.UID), pvc.Namespace)
 		dataExport.Namespace = pvc.Namespace
@@ -369,6 +375,21 @@ func (k *kdmp) GetBackupStatus(backup *storkapi.ApplicationBackup) ([]*storkapi.
 	}
 	return volumeInfos, nil
 }
+
+// Check whether to run kopia executor in debug mode
+func isKopiaExecutorDebugModeEnabled() bool {
+	kdmpData, err := core.Instance().GetConfigMap(stork_driver.KdmpConfigmapName, stork_driver.KdmpConfigmapNamespace)
+	if err != nil {
+		logrus.Warnf("unable to read config map: %v", stork_driver.KdmpConfigmapName)
+		return false
+	}
+	if enableKopiaDebugMode, ok := kdmpData.Data[kopiaDebugModeEnabled]; ok && enableKopiaDebugMode == "true" {
+		logrus.Infof("enableKopiaExecutorDebugMode found key: %v, value: %v", kopiaDebugModeEnabled, enableKopiaDebugMode)
+		return true
+	}
+	return false
+}
+
 func isDataExportActive(status kdmpapi.ExportStatus) bool {
 	if status.Stage == kdmpapi.DataExportStageTransferInProgress ||
 		status.Stage == kdmpapi.DataExportStageSnapshotInProgress ||
@@ -763,6 +784,9 @@ func (k *kdmp) StartRestore(
 		dataExport.Annotations[utils.SkipResourceAnnotation] = "true"
 		dataExport.Annotations[utils.BackupObjectUIDKey] = backupUID
 		dataExport.Annotations[pvcUIDKey] = bkpvInfo.PersistentVolumeClaimUID
+		if isKopiaExecutorDebugModeEnabled() {
+			dataExport.Annotations[utils.KopiaDebugModeEnabled] = "true"
+		}
 		dataExport.Name = getGenericCRName(prefixRestore, string(restore.UID), bkpvInfo.PersistentVolumeClaimUID, restoreNamespace)
 		dataExport.Namespace = restoreNamespace
 		dataExport.Status.TransferID = volBackup.Namespace + "/" + volBackup.Name
