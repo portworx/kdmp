@@ -1,4 +1,4 @@
-RELEASE_VER ?= master-latest
+RELEASE_VER ?= 1.2.11
 BUILD_DATE  := $(shell date -u +'%Y-%m-%dT%H:%M:%SZ')
 BASE_DIR    := $(shell git rev-parse --show-toplevel)
 GIT_SHA     := $(shell git rev-parse --short HEAD)
@@ -11,7 +11,7 @@ DOCKER_IMAGE_NAME?=kdmp
 DOCKER_IMAGE_TAG?=$(RELEASE_VER)
 
 DOCKER_KDMP_UNITTEST_IMAGE?=px-kdmp-unittest
-DOCKER_KDMP_TAG?=master-latest
+DOCKER_KDMP_TAG?=1.2.11
 
 DOCKER_IMAGE=$(DOCKER_IMAGE_REPO)/$(DOCKER_IMAGE_NAME):$(DOCKER_IMAGE_TAG)
 KDMP_UNITTEST_IMG=$(DOCKER_IMAGE_REPO)/$(DOCKER_KDMP_UNITTEST_IMAGE):$(DOCKER_KDMP_TAG)
@@ -30,7 +30,7 @@ export GOFLAGS = -mod=vendor
 
 MAJOR_VERSION := 1
 MINOR_VERSION := 2
-PATCH_VERSION := 6
+PATCH_VERSION := 11
 
 ifndef PKGS
 	PKGS := $(shell GOFLAGS=-mod=vendor go list ./... 2>&1 | grep -v 'go: ' | grep -v 'github.com/portworx/kdmp/vendor' | grep -v versioned | grep -v 'pkg/apis/v1')
