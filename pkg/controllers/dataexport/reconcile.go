@@ -626,18 +626,36 @@ func appendPodLogToStork(jobName string, namespace string) {
 		numLogLines := int64(50)
 		podDescribe, err := core.Instance().GetPodByName(pod.Name, pod.Namespace)
 		if err != nil {
-			logrus.Infof("Error fetching description of job-pod[%s] :%v", pod.Name, err)
+			logrus.Infof("error fetching description of job-pod[%s] :%v", pod.Name, err)
 		}
-		logrus.Infof("start of job-pod [%s]'s description", pod.Name)
-		logrus.Infof("Describe %v", podDescribe)
+		logrus.Infof("---")
+		logrus.Infof("pod describe of job [%s/%s] of namespace [%s]", pod.Name, jobName, pod.Namespace)
+		logrus.Infof("---")
+		logrus.Infof("%v", podDescribe)
 		logrus.Infof("end of job-pod [%s]'s description", pod.Name)
+		logrus.Infof("---")
+		logrus.Infof("pod events of  job  [%s/%s] of namespace [%s]", pod.Name, jobName, pod.Namespace)
+		logrus.Infof("---")
+		opts := metav1.ListOptions{
+			FieldSelector: "involvedObject.name=" + pod.Name,
+		}
+		events, err := core.Instance().ListEvents(namespace, opts)
+		if err != nil {
+			logrus.Infof("error to fetch events for pod[%s/%s]: %v", namespace, pod.Name, err)
+		} else {
+			logrus.Infof("%v", events)
+			logrus.Infof("---")
+		}
 		podLog, err := core.Instance().GetPodLog(pod.Name, pod.Namespace, &corev1.PodLogOptions{TailLines: &numLogLines})
 		if err != nil {
 			logrus.Infof("error fetching log of job-pod %s: %v", pod.Name, err)
 		} else {
-			logrus.Infof("start of job-pod [%s]'s log...", pod.Name)
+			logrus.Infof("---")
+			logrus.Infof("pod log of job [%s/%s]", pod.Name, jobName)
+			logrus.Infof("---")
 			logrus.Infof(podLog)
 			logrus.Infof("end of job-pod [%s]'s log...", pod.Name)
+			logrus.Infof("---")
 		}
 	}
 }
