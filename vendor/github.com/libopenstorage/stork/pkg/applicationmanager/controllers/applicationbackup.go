@@ -221,9 +221,17 @@ func (a *ApplicationBackupController) updateWithAllNamespaces(backup *stork_api.
 	if err != nil {
 		return fmt.Errorf("error updating with all namespaces for wildcard: %v", err)
 	}
+	pxNs, _ := utils.GetPortworxNamespace()
+	// Create a map to store the namespaces to be ignored for fast lookup
+	ignoreNamespaces := map[string]bool{
+		pxNs:              true,
+		"kube-system":     true,
+		"kube-public":     true,
+		"kube-node-lease": true,
+	}
 	namespacesToBackup := make([]string, 0)
 	for _, ns := range namespaces.Items {
-		if ns.Name != "kube-system" {
+		if _, found := ignoreNamespaces[ns.Name]; !found {
 			namespacesToBackup = append(namespacesToBackup, ns.Name)
 		}
 	}
@@ -284,6 +292,7 @@ func (a *ApplicationBackupController) handle(ctx context.Context, backup *stork_
 		return nil
 	}
 	if labelSelector := backup.Spec.NamespaceSelector; len(labelSelector) != 0 {
+		var pxNs string
 		namespaces, err := core.Instance().ListNamespacesV2(labelSelector)
 		if err != nil {
 			errMsg := fmt.Sprintf("error listing namespaces with label selectors: %v, error: %v", labelSelector, err)
@@ -295,8 +304,18 @@ func (a *ApplicationBackupController) handle(ctx context.Context, backup *stork_
 			return nil
 		}
 		var selectedNamespaces []string
+		if len(backup.Spec.Namespaces) == 0 {
+			pxNs, _ = utils.GetPortworxNamespace()
+		}
+		// Create a map to store the namespaces to be ignored for fast lookup
+		ignoreNamespaces := map[string]bool{
+			pxNs:              true,
+			"kube-system":     true,
+			"kube-public":     true,
+			"kube-node-lease": true,
+		}
 		for _, namespace := range namespaces.Items {
-			if namespace.Name != "kube-system" {
+			if _, found := ignoreNamespaces[namespace.Name]; !found {
 				selectedNamespaces = append(selectedNamespaces, namespace.Name)
 			}
 		}
@@ -641,7 +660,6 @@ func (a *ApplicationBackupController) backupVolumes(backup *stork_api.Applicatio
 		namespacedName.Namespace = backup.Namespace
 		namespacedName.Name = backup.Name
 		if len(backup.Status.Volumes) != pvcCount {
-
 			for driverName, pvcs := range pvcMappings {
 				var driver volume.Driver
 				driver, err = volume.Get(driverName)
@@ -707,44 +725,31 @@ func (a *ApplicationBackupController) backupVolumes(backup *stork_api.Applicatio
 					if err != nil {
 						return err
 					}
-					// In case Portworx if the snapshot ID is populated for every volume then the snapshot
-					// process is considered to be completed successfully.
-					// This ensures we don't execute the post-exec before all volume's snapshot is completed
-					if driverName == volume.PortworxDriverName {
-						startTime := time.Now()
-						for {
-							// In case below logic genuinely takes long time for many volumes
-							// the CR timestamp need to be updated. This prevents backup timeout error.
-							elapsedTime := time.Since(startTime)
-							if elapsedTime > utils.TimeoutUpdateBackupCrTimestamp {
-								backup, err = a.updateBackupCRInVolumeStage(
-									namespacedName,
-									stork_api.ApplicationBackupStatusInProgress,
-									backup.Status.Stage,
-									"Volume backups are in progress",
-									volumeInfos,
-								)
-								if err != nil {
-									return err
-								}
-								startTime = time.Now()
-							}
-							// Get fresh stock of the status for all volumes.
-							snapshotNotCompleted := false
-							volumeInfos, err = driver.GetBackupStatus(backup)
-							if err != nil {
-								log.ApplicationBackupLog(backup).Errorf("error getting backup status for driver %v: %v", driverName, err)
-								return fmt.Errorf("error getting backup status for driver %v: %v", driverName, err)
-							}
-							for _, volInfo := range volumeInfos {
-								if volInfo.BackupID == "" {
-									log.ApplicationBackupLog(backup).Tracef("Snapshot of volume %v is not done yet, need to loop till snapshot is done...", volInfo.PersistentVolumeClaim)
-									snapshotNotCompleted = true
-								}
-							}
-							if !snapshotNotCompleted {
-								break
-							}
+				}
+			}
+
+			// In case Portworx if the snapshot ID is populated for every volume then the snapshot
+			// process is considered to be completed successfully.
+			// This ensures we don't execute the post-exec before all volume's snapshot is completed
+			for driverName := range pvcMappings {
+				var driver volume.Driver
+				driver, err = volume.Get(driverName)
+				if err != nil {
+					return err
+				}
+				if driverName == volume.PortworxDriverName {
+					volumeInfos, err := driver.GetBackupStatus(backup)
+					if err != nil {
+						return fmt.Errorf("error getting backup status: %v", err)
+					}
+					for _, volInfo := range volumeInfos {
+						if volInfo.BackupID == "" {
+							log.ApplicationBackupLog(backup).Infof("Snapshot of volume [%v] hasn't completed yet, retry checking status", volInfo.PersistentVolumeClaim)
+							// Some portworx volume snapshot is not completed yet
+							// hence we will retry checking the status in the next reconciler iteration
+							// *stork_api.ApplicationBackupVolumeInfo.Status is not being checked here
+							// since backpID confirms if the snapshot is done or not already
+							return nil
 						}
 					}
 				}
