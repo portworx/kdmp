@@ -32,7 +32,6 @@ import (
 	k8serror "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/wait"
 	k8shelper "k8s.io/component-helpers/storage/volume"
 )
 
@@ -69,8 +68,9 @@ const (
 	restoreObjectNameKey        = utils.KdmpAnnotationPrefix + "restoreobject-name"
 	restoreObjectUIDKey         = utils.KdmpAnnotationPrefix + "restoreobject-uid"
 
-	pvcNameKey = utils.KdmpAnnotationPrefix + "pvc-name"
-	pvcUIDKey  = utils.KdmpAnnotationPrefix + "pvc-uid"
+	pvcNameKey          = utils.KdmpAnnotationPrefix + "pvc-name"
+	pvcUIDKey           = utils.KdmpAnnotationPrefix + "pvc-uid"
+	kdmpStorageClassKey = utils.KdmpAnnotationPrefix + "storage-class"
 	// pvcProvisionerAnnotation is the annotation on PVC which has the
 	// provisioner name
 	pvcProvisionerAnnotation = "volume.beta.kubernetes.io/storage-provisioner"
@@ -84,12 +84,6 @@ const (
 	awsNodeLabelKey          = "alpha.eksctl.io/cluster-name"
 	ocpAWSNodeLabelKey       = "topology.ebs.csi.aws.com/zone"
 )
-
-var volumeAPICallBackoff = wait.Backoff{
-	Duration: volumeinitialDelay,
-	Factor:   volumeFactor,
-	Steps:    volumeSteps,
-}
 
 var (
 	nonSupportedProvider = false
@@ -266,6 +260,7 @@ func (k *kdmp) StartBackup(backup *storkapi.ApplicationBackup,
 		labels[utils.ApplicationBackupCRUIDKey] = utils.GetValidLabel(utils.GetShortUID(string(backup.UID)))
 		labels[pvcNameKey] = utils.GetValidLabel(pvc.Name)
 		labels[pvcUIDKey] = utils.GetValidLabel(utils.GetShortUID(string(pvc.UID)))
+		labels[kdmpStorageClassKey] = volumeInfo.StorageClass
 		// If backup from px-backup, update the backup object details in the label
 		if val, ok := backup.Annotations[utils.PxbackupAnnotationCreateByKey]; ok {
 			if val == utils.PxbackupAnnotationCreateByValue {
