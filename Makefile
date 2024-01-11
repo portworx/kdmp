@@ -49,7 +49,7 @@ GO_FILES := $(shell find . -name '*.go' | grep -v 'vendor' | \
 all: do-fmt pretest test-container test build container
 
 test:
-	docker run --rm -it -v ${GOPATH}:/go: $(KDMP_UNITTEST_IMG) make unittest
+	docker run --rm -it -v ${GOPATH}:/go $(KDMP_UNITTEST_IMG) make unittest
 
 test-container:
 	@echo "Building container: docker build --tag $(KDMP_UNITTEST_IMG) -f Dockerfile.unittest ."
