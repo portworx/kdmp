@@ -5,7 +5,7 @@ env:
   global:
     - GO111MODULE=on
 go:
-  - 1.21.2
+  - 1.21.6
 script:
   - |
     if [ -n "${TRAVIS_TAG}" ]; then
