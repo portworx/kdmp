@@ -7,8 +7,8 @@ RUN yum -y install gzip git tar wget curl bash vim make gpg bzip2
 
 RUN git config --global --add safe.directory /go/src/github.com/portworx/kdmp
 
-RUN curl https://dl.google.com/go/go1.19.1.linux-amd64.tar.gz -o go1.19.1.linux-amd64.tar.gz
-RUN tar -xf go1.19.1.linux-amd64.tar.gz && mv go /usr/local/
+RUN curl https://dl.google.com/go/go1.21.6.linux-amd64.tar.gz -o go1.21.6.linux-amd64.tar.gz
+RUN tar -xf go1.21.6.linux-amd64.tar.gz && mv go /usr/local/
 ENV GOROOT /usr/local/go
 ENV PATH ${GOPATH}/bin:${GOROOT}/bin:${PATH}
 

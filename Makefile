@@ -4,7 +4,7 @@ BASE_DIR    := $(shell git rev-parse --show-toplevel)
 GIT_SHA     := $(shell git rev-parse --short HEAD)
 BIN         := $(BASE_DIR)/bin
 
-DOCK_BUILD_CNT  := golang:1.21.2
+DOCK_BUILD_CNT  := golang:1.21.6
 
 DOCKER_IMAGE_REPO?=portworx
 DOCKER_IMAGE_NAME?=kdmp
