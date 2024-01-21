@@ -617,32 +617,33 @@ func isRepositoryExists(repository *executor.Repository) (bool, error) {
 		return false, err
 	}
 	exists := false
+	var repoExistsError error
 	t := func() (interface{}, bool, error) {
-		bucket, err := objectstore.GetBucket(bl)
-		if err != nil {
+		bucket, repoExistsError := objectstore.GetBucket(bl)
+		if repoExistsError != nil {
 			status := &executor.Status{
-				LastKnownError: err,
+				LastKnownError: repoExistsError,
 			}
 			if err = executor.WriteVolumeBackupStatus(status, volumeBackupName, bkpNamespace); err != nil {
 				errMsg := fmt.Sprintf("failed to write a VolumeBackup status: %v", err)
 				logrus.Errorf("%v", errMsg)
 				return "", true, fmt.Errorf(errMsg)
 			}
-			return "", true, fmt.Errorf("repo check status not available")
+			return "", true, fmt.Errorf("repo check status not available while fetching repository location: %v", repoExistsError)
 		}
 
 		bucket = blob.PrefixedBucket(bucket, repository.Name)
-		exists, err = bucket.Exists(context.TODO(), kopiaRepositoryFile)
-		if err != nil {
+		exists, repoExistsError = bucket.Exists(context.TODO(), kopiaRepositoryFile)
+		if repoExistsError != nil {
 			status := &executor.Status{
-				LastKnownError: err,
+				LastKnownError: repoExistsError,
 			}
 			if err = executor.WriteVolumeBackupStatus(status, volumeBackupName, bkpNamespace); err != nil {
 				errMsg := fmt.Sprintf("failed to write a VolumeBackup status: %v", err)
 				logrus.Errorf("%v", errMsg)
 				return "", true, fmt.Errorf(errMsg)
 			}
-			return "", true, fmt.Errorf("repo check status not available")
+			return "", true, fmt.Errorf("repo check status not available while checking if repo exists: %v", repoExistsError)
 		}
 		if exists {
 			logrus.Infof("%s exists", kopiaRepositoryFile)
@@ -654,8 +655,8 @@ func isRepositoryExists(repository *executor.Repository) (bool, error) {
 	}
 
 	if _, err := task.DoRetryWithTimeout(t, executor.DefaultTimeout, progressCheckInterval); err != nil {
-		logrus.Errorf("repository %s exists check failed: %v", repository.Name, err)
-		return exists, err
+		logrus.Errorf("max retries done, repository %s exists check failed: %v", repository.Name, repoExistsError)
+		return exists, repoExistsError
 	}
 
 	return exists, nil
