@@ -63,6 +63,7 @@ const (
 	PvcBoundSuccessMsg = "pvc bounded successfully"
 	// PvcBoundFailedMsg pvc not bounded msg
 	PvcBoundFailedMsg = "pvc not bounded"
+	IstioInjectLabel  = "sidecar.istio.io/inject"
 )
 
 var (
@@ -875,4 +876,25 @@ func IsJobPodMountFailed(job *batchv1.Job, namespace string) bool {
 		}
 	}
 	return false
+}
+
+func GetDisableIstioConfig() bool {
+	kdmpData, err := core.Instance().GetConfigMap(KdmpConfigmapName, KdmpConfigmapNamespace)
+	if err != nil {
+		logrus.Tracef("error readig kdmp config map: %v", err)
+		return false
+	}
+	if disableIstioConfig, ok := kdmpData.Data[drivers.KdmpDisableIstioConfig]; ok && disableIstioConfig == "true" {
+		return true
+	}
+
+	return false
+}
+
+func SetDisableIstioLabel(labels map[string]string) map[string]string {
+	disableIstioConfig := GetDisableIstioConfig()
+	if disableIstioConfig {
+		labels[IstioInjectLabel] = "false"
+	}
+	return labels
 }
