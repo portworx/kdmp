@@ -356,6 +356,7 @@ func addJobLabels(labels map[string]string) map[string]string {
 	}
 
 	labels[drivers.DriverNameLabel] = drivers.KopiaRestore
+	labels = utils.SetDisableIstioLabel(labels)
 	return labels
 }
 

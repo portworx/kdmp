@@ -171,6 +171,7 @@ func addJobLabels(labels map[string]string) map[string]string {
 	}
 
 	labels[drivers.DriverNameLabel] = drivers.NFSRestore
+	labels = utils.SetDisableIstioLabel(labels)
 	return labels
 }
 
