@@ -878,10 +878,10 @@ func IsJobPodMountFailed(job *batchv1.Job, namespace string) bool {
 	return false
 }
 
-func GetDisableIstioConfig() bool {
-	kdmpData, err := core.Instance().GetConfigMap(KdmpConfigmapName, KdmpConfigmapNamespace)
+func GetDisableIstioConfig(jobOpts drivers.JobOpts) bool {
+	kdmpData, err := core.Instance().GetConfigMap(jobOpts.JobConfigMap, jobOpts.JobConfigMapNs)
 	if err != nil {
-		logrus.Tracef("error readig kdmp config map: %v", err)
+		logrus.Tracef("error reading kdmp config map: %v", err)
 		return false
 	}
 	if disableIstioConfig, ok := kdmpData.Data[drivers.KdmpDisableIstioConfig]; ok && disableIstioConfig == "true" {
@@ -891,8 +891,8 @@ func GetDisableIstioConfig() bool {
 	return false
 }
 
-func SetDisableIstioLabel(labels map[string]string) map[string]string {
-	disableIstioConfig := GetDisableIstioConfig()
+func SetDisableIstioLabel(labels map[string]string, jobOpts drivers.JobOpts) map[string]string {
+	disableIstioConfig := GetDisableIstioConfig(jobOpts)
 	if disableIstioConfig {
 		labels[IstioInjectLabel] = "false"
 	}
