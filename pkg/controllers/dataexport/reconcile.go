@@ -526,7 +526,7 @@ func (c *Controller) sync(ctx context.Context, in *kdmpapi.DataExport) (bool, er
 				if err != nil {
 					logrus.Infof("job-pod name and namespace extraction failed: %v", err)
 				}
-				appendPodLogToStork(name, namespace)
+				utils.DisplayJobpodLogandEvents(name, namespace)
 			}
 		}
 		cleanupTask := func() (interface{}, bool, error) {

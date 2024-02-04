@@ -119,6 +119,7 @@ func (d Driver) JobStatus(id string) (*drivers.JobStatus, error) {
 	// Check whether mount point failure
 	mountFailed := utils.IsJobPodMountFailed(job, namespace)
 	if mountFailed {
+		utils.DisplayJobpodLogandEvents(job.Name, job.Namespace)
 		errMsg := fmt.Sprintf("job [%v/%v] failed to mount pvc, please check job pod's description for more detail", namespace, name)
 		return utils.ToJobStatus(0, errMsg, batchv1.JobFailed), nil
 	}
@@ -140,6 +141,7 @@ func (d Driver) JobStatus(id string) (*drivers.JobStatus, error) {
 	}
 
 	if utils.IsJobFailed(job) {
+		utils.DisplayJobpodLogandEvents(job.Name, job.Namespace)
 		errMsg := fmt.Sprintf("check %s/%s job for details: %s", namespace, name, drivers.ErrJobFailed)
 		return utils.ToJobStatus(0, errMsg, jobStatus), nil
 	}

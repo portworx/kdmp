@@ -203,6 +203,15 @@ func (c *Controller) process(ctx context.Context, in *kdmpapi.ResourceExport) (b
 		}
 		switch progress.State {
 		case drivers.JobStateFailed:
+			if resourceExport.Status.Status == kdmpapi.ResourceExportStatusFailed {
+				if resourceExport.Status.TransferID != "" {
+					namespace, name, err := utils.ParseJobID(resourceExport.Status.TransferID)
+					if err != nil {
+						logrus.Infof("job-pod name and namespace extraction failed: %v", err)
+					}
+					utils.DisplayJobpodLogandEvents(name, namespace)
+				}
+			}
 			errMsg := fmt.Sprintf("%s transfer job failed: %s", resourceExport.Status.TransferID, progress.Reason)
 			// If a job has failed it means it has tried all possible retires and given up.
 			// In such a scenario we need to fail RE CR and move to clean up stage
