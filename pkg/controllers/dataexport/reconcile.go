@@ -520,13 +520,12 @@ func (c *Controller) sync(ctx context.Context, in *kdmpapi.DataExport) (bool, er
 		}
 		// Append the job-pod log to stork's pod log in case of failure
 		// it is best effort approach, hence errors are ignored.
-		if dataExport.Status.Status == kdmpapi.DataExportStatusFailed {
-			if dataExport.Status.TransferID != "" {
-				namespace, name, err := utils.ParseJobID(dataExport.Status.TransferID)
-				if err != nil {
-					logrus.Infof("job-pod name and namespace extraction failed: %v", err)
-				}
-				appendPodLogToStork(name, namespace)
+		if dataExport.Status.Status == kdmpapi.DataExportStatusFailed && dataExport.Status.TransferID != "" {
+			namespace, name, err := utils.ParseJobID(dataExport.Status.TransferID)
+			if err != nil {
+				logrus.Errorf("job name and namespace extraction failed: %v", err)
+			} else {
+				utils.DisplayJobpodLogandEvents(name, namespace)
 			}
 		}
 		cleanupTask := func() (interface{}, bool, error) {
