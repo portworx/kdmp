@@ -111,10 +111,6 @@ func (d Driver) JobStatus(id string) (*drivers.JobStatus, error) {
 		return utils.ToJobStatus(0, errMsg, jobStatus), nil
 	}
 
-	if utils.IsJobFailed(job) {
-		errMsg := fmt.Sprintf("check %s/%s job for details: %s", namespace, name, drivers.ErrJobFailed)
-		return utils.ToJobStatus(0, errMsg, jobStatus), nil
-	}
 	if utils.IsJobPending(job) {
 		logrus.Warnf("restore job %s is in pending state", job.Name)
 		return utils.ToJobStatus(0, "", jobStatus), nil
