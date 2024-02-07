@@ -134,11 +134,6 @@ func (d Driver) JobStatus(id string) (*drivers.JobStatus, error) {
 		jobStatus = job.Status.Conditions[0].Type
 
 	}
-	if err != nil {
-		errMsg := fmt.Sprintf("failed to get restart count for job  %s/%s job: %v", namespace, name, err)
-		logrus.Errorf("%s: %v", fn, errMsg)
-		return nil, fmt.Errorf(errMsg)
-	}
 
 	if utils.IsJobFailed(job) {
 		utils.DisplayJobpodLogandEvents(job.Name, job.Namespace)
