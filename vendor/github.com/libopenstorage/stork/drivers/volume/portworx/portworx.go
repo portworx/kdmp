@@ -518,12 +518,7 @@ func (p *portworx) inspectVolume(volDriver volume.VolumeDriver, volumeID string)
 		info.ParentID = vols[0].Source.Parent
 	}
 
-	if len(vols[0].Locator.GetVolumeLabels()) > 0 {
-		info.Labels = vols[0].Locator.GetVolumeLabels()
-	} else {
-		info.Labels = make(map[string]string)
-	}
-
+	info.Labels = make(map[string]string)
 	for k, v := range vols[0].Spec.GetVolumeLabels() {
 		info.Labels[k] = v
 	}
@@ -536,6 +531,8 @@ func (p *portworx) inspectVolume(volDriver volume.VolumeDriver, volumeID string)
 	info.WindowsVolume = p.volumePrefersWindowsNodes(info)
 
 	info.VolumeSourceRef = vols[0]
+
+	info.AttachedOn = vols[0].AttachedOn
 
 	return info, nil
 }
@@ -776,7 +773,7 @@ func (p *portworx) IsSupportedPVC(coreOps core.Ops, pvc *v1.PersistentVolumeClai
 		// Try to get info from the PV since storage class could be deleted
 		pv, err := coreOps.GetPersistentVolume(pvc.Spec.VolumeName)
 		if err != nil {
-			logrus.Warnf("Error getting pv %v for pvc %v: %v", pvc.Spec.VolumeName, pvc.Name, err)
+			logrus.Errorf("Error getting pv %v for pvc %v in namespace %s: %v", pvc.Spec.VolumeName, pvc.Name, pvc.Namespace, err)
 			return false
 		}
 		return p.OwnsPV(pv)
@@ -4254,6 +4251,11 @@ func (p *portworx) GetPodPatches(podNamespace string, pod *v1.Pod) ([]k8sutils.J
 // GetCSIPodPrefix returns prefix for the csi pod names in the deployment
 func (a *portworx) GetCSIPodPrefix() (string, error) {
 	return csiPodNamePrefix, nil
+}
+
+// IsVirtualMachineSupported returns true if the driver supports VM scheduling
+func (p *portworx) IsVirtualMachineSupported() bool {
+	return true
 }
 
 func (p *portworx) getVirtLauncherPatches(podNamespace string, pod *v1.Pod) ([]k8sutils.JSONPatchOp, error) {

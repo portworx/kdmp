@@ -8,9 +8,9 @@ require (
 	github.com/hashicorp/go-version v1.6.0
 	github.com/kubernetes-csi/external-snapshotter/client/v4 v4.2.0
 	github.com/kubernetes-incubator/external-storage v0.20.4-openstorage-rc7
-	github.com/libopenstorage/stork v1.4.1-0.20240109104912-636d43cc74ca
+	github.com/libopenstorage/stork v1.4.1-0.20240220121828-15cc00444a69
 	github.com/portworx/pxc v0.33.0
-	github.com/portworx/sched-ops v1.20.4-rc1.0.20231013094113-8ca7856dbe86
+	github.com/portworx/sched-ops v1.20.4-rc1.0.20240124012200-74280fbb6e27
 	github.com/sirupsen/logrus v1.9.0
 	github.com/spf13/cobra v1.6.1
 	github.com/spf13/pflag v1.0.5
@@ -61,6 +61,7 @@ require (
 	github.com/cheynewallace/tabby v1.1.1 // indirect
 	github.com/container-storage-interface/spec v1.7.0 // indirect
 	github.com/coreos/go-oidc v2.2.1+incompatible // indirect
+	github.com/coreos/prometheus-operator v0.38.0 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.2 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/dimchansky/utfbom v1.1.1 // indirect
@@ -71,6 +72,8 @@ require (
 	github.com/fsnotify/fsnotify v1.6.0 // indirect
 	github.com/ghodss/yaml v1.0.1-0.20190212211648-25d852aebe32 // indirect
 	github.com/go-errors/errors v1.4.1 // indirect
+	github.com/go-kit/kit v0.10.0 // indirect
+	github.com/go-logfmt/logfmt v0.5.1 // indirect
 	github.com/go-logr/logr v1.2.4 // indirect
 	github.com/go-openapi/jsonpointer v0.19.6 // indirect
 	github.com/go-openapi/jsonreference v0.20.1 // indirect
@@ -79,6 +82,7 @@ require (
 	github.com/golang-jwt/jwt/v4 v4.3.0 // indirect
 	github.com/golang/glog v1.1.2 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
+	github.com/golang/mock v1.6.0 // indirect
 	github.com/golang/protobuf v1.5.3 // indirect
 	github.com/google/btree v1.0.1 // indirect
 	github.com/google/gnostic v0.6.9 // indirect
@@ -104,6 +108,8 @@ require (
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
+	github.com/k8snetworkplumbingwg/network-attachment-definition-client v0.0.0-20191119172530-79f836b90111 // indirect
+	github.com/kubernetes-csi/external-snapshotter/client/v6 v6.2.0 // indirect
 	github.com/kubernetes-sigs/aws-ebs-csi-driver v0.9.0 // indirect
 	github.com/libopenstorage/gossip v0.0.0-20220309192431-44c895e0923e // indirect
 	github.com/libopenstorage/openstorage v9.4.47+incompatible // indirect
@@ -123,6 +129,9 @@ require (
 	github.com/mohae/deepcopy v0.0.0-20170929034955-c48cc78d4826 // indirect
 	github.com/monochromegane/go-gitignore v0.0.0-20200626010858-205db1a8cc00 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
+	github.com/openshift/api v0.0.0-20230503133300-8bbcb7ca7183 // indirect
+	github.com/openshift/client-go v0.0.0-20210112165513-ebc401615f47 // indirect
+	github.com/openshift/custom-resource-status v1.1.2 // indirect
 	github.com/pborman/uuid v1.2.1 // indirect
 	github.com/peterbourgon/diskv v2.0.1+incompatible // indirect
 	github.com/pkg/errors v0.9.1 // indirect
@@ -171,6 +180,10 @@ require (
 	k8s.io/klog v1.0.0 // indirect
 	k8s.io/klog/v2 v2.90.1 // indirect
 	k8s.io/kube-openapi v0.0.0-20230308215209-15aac26d736a // indirect
+	kubevirt.io/api v1.0.0 // indirect
+	kubevirt.io/client-go v0.59.2 // indirect
+	kubevirt.io/containerized-data-importer-api v1.57.0-alpha1 // indirect
+	kubevirt.io/controller-lifecycle-operator-sdk/api v0.0.0-20220329064328-f3cc58c6ed90 // indirect
 	sigs.k8s.io/gcp-compute-persistent-disk-csi-driver v0.7.0 // indirect
 	sigs.k8s.io/json v0.0.0-20221116044647-bc3834ca7abd // indirect
 	sigs.k8s.io/kustomize/api v0.12.1 // indirect
@@ -188,7 +201,7 @@ replace (
 	github.com/kubernetes-incubator/external-storage v0.20.4-openstorage-rc10 => github.com/libopenstorage/external-storage v0.20.4-openstorage-rc10
 	github.com/libopenstorage/openstorage => github.com/libopenstorage/openstorage v0.0.0-20230511212757-41751b27d69f
 	github.com/libopenstorage/secrets => github.com/libopenstorage/secrets v0.0.0-20220413195519-57d1c446c5e9
-	github.com/portworx/sched-ops => github.com/portworx/sched-ops v1.20.4-rc1.0.20230302072046-553cc8ef572b
+	github.com/portworx/sched-ops => github.com/portworx/sched-ops v1.20.4-rc1.0.20240124012200-74280fbb6e27
 	golang.org/x/net => golang.org/x/net v0.20.0
 	google.golang.org/grpc => google.golang.org/grpc v1.60.0
 	k8s.io/api => k8s.io/api v0.25.0
@@ -220,5 +233,6 @@ replace (
 	k8s.io/sample-apiserver => k8s.io/sample-apiserver v0.25.0
 	k8s.io/sample-cli-plugin => k8s.io/sample-cli-plugin v0.25.0
 	k8s.io/sample-controller => k8s.io/sample-controller v0.25.0
+	kubevirt.io/containerized-data-importer-api v1.57.0-alpha1 => kubevirt.io/containerized-data-importer-api v1.56.1
 	sigs.k8s.io/controller-runtime => sigs.k8s.io/controller-runtime v0.13.0
 )
