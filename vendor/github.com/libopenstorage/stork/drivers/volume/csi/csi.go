@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -47,9 +48,6 @@ const (
 	SnapshotBackupPrefix = "backup"
 	// snapshotRestorePrefix is appended to CSI restore snapshot
 	snapshotRestorePrefix = "restore"
-	// snapshotClassNamePrefix is the prefix for snapshot classes per CSI driver
-	snapshotClassNamePrefix = "stork-csi-snapshot-class-"
-
 	// SnapshotObjectName is the object stored for the volumesnapshot
 	SnapshotObjectName = "snapshots.json"
 	// StorageClassesObjectName is the object stored for storageclasses
@@ -59,14 +57,15 @@ const (
 
 	// optCSIDriverName is an option for storing which CSI Driver a volumesnapshot was created with
 	optCSIDriverName = "csi-driver-name"
-	// optCSISnapshotClassName is an option for providing a snapshot class name
-	optCSISnapshotClassName = "stork.libopenstorage.org/csi-snapshot-class-name"
 	// optVolumeSnapshotContentName is used for recording which vsc to check has been deleted
 	optVolumeSnapshotContentName = "volumesnapshotcontent-name"
 
 	annPVBindCompleted     = "pv.kubernetes.io/bind-completed"
 	annPVBoundByController = "pv.kubernetes.io/bound-by-controller"
 	restoreUIDLabel        = "restoreUID"
+	createDefaultVSEnv     = "CREATE_DEFAULT_VOLUMESNAPSHOTCLASS"
+	// snapshotClassNamePrefix is the prefix for snapshot classes per CSI driver
+	snapshotClassNamePrefix = "stork-csi-snapshot-class-"
 )
 
 // CsiBackupObject represents a backup of a series of CSI objects
@@ -194,108 +193,18 @@ func (c *csi) Init(_ interface{}) error {
 		return err
 	}
 
-	err = c.createDefaultSnapshotClasses()
-	if err != nil {
-		return err
+	// If this env var exist then only create volumeSnapshotClass for all csi drivers present in cluster, if not.
+	isCreationNeeded := os.Getenv(createDefaultVSEnv)
+	if isCreationNeeded == "true" || isCreationNeeded == "True" {
+		err = c.createDefaultSnapshotClasses()
+		if err != nil {
+			return err
+		}
 	}
 
 	c.snapshotter, err = snapshotter.NewCSIDriver()
 	if err != nil {
 		return err
-	}
-
-	return nil
-}
-
-func (c *csi) createDefaultSnapshotClasses() error {
-	var existingSnapshotClassesDriverList []string
-	if c.v1SnapshotRequired {
-		existingSnapshotClasses, err := c.snapshotClient.SnapshotV1().VolumeSnapshotClasses().List(context.TODO(), metav1.ListOptions{})
-		if err != nil {
-			logrus.Infof("CSI v1 VolumeSnapshotClass CRD does not exist, skipping default SnapshotClass creation - error:  %v", err)
-			return nil
-		}
-		for _, existingSnapClass := range existingSnapshotClasses.Items {
-			logrus.Infof("Driver name %s", existingSnapClass.Driver)
-			existingSnapshotClassesDriverList = append(existingSnapshotClassesDriverList, existingSnapClass.Driver)
-		}
-	} else {
-		existingSnapshotClasses, err := c.snapshotClient.SnapshotV1beta1().VolumeSnapshotClasses().List(context.TODO(), metav1.ListOptions{})
-		if err != nil {
-			logrus.Infof("CSI v1beta1 VolumeSnapshotClass CRD does not exist, skipping default SnapshotClass creation - error: %v", err)
-			return nil
-		}
-		for _, existingSnapClass := range existingSnapshotClasses.Items {
-			logrus.Infof("Driver name %s", existingSnapClass.Driver)
-			existingSnapshotClassesDriverList = append(existingSnapshotClassesDriverList, existingSnapClass.Driver)
-		}
-	}
-
-	logrus.Infof("Creating default CSI SnapshotClasses")
-	config, err := rest.InClusterConfig()
-	if err != nil {
-		return fmt.Errorf("failed to get config for creating default CSI snapshot classes: %v", err)
-	}
-
-	k8sClient, err := clientset.NewForConfig(config)
-	if err != nil {
-		return fmt.Errorf("failed to get client for creating default CSI snapshot classes: %v", err)
-	}
-
-	ok, err := version.RequiresV1CSIdriver()
-	if err != nil {
-		return err
-	}
-	var csiDriverNameList []string
-	if ok {
-		// Get all drivers
-		driverList, err := k8sClient.StorageV1().CSIDrivers().List(context.TODO(), metav1.ListOptions{})
-		if err != nil {
-			return fmt.Errorf("failed to list all CSI drivers(V1): %v", err)
-		}
-		// Fill the driver names from CSIDrivers to list
-		for _, driver := range driverList.Items {
-			csiDriverNameList = append(csiDriverNameList, driver.Name)
-		}
-	} else {
-
-		// Get all drivers
-		driverList, err := k8sClient.StorageV1beta1().CSIDrivers().List(context.TODO(), metav1.ListOptions{})
-		if err != nil {
-			return fmt.Errorf("failed to list all CSI drivers(V1beta1): %v", err)
-		}
-		// Fill the driver names from CSIDrivers to list
-		for _, driver := range driverList.Items {
-			csiDriverNameList = append(csiDriverNameList, driver.Name)
-		}
-	}
-
-	// Create VolumeSnapshotClass for each driver
-	for _, driverName := range csiDriverNameList {
-		// skip drivers with native supports
-		if c.HasNativeVolumeDriverSupport(driverName) {
-			logrus.Infof("CSI driver %s has native support, skipping default snapshotclass creation", driverName)
-			continue
-		}
-
-		foundSnapClass := false
-		for _, existingSnapClassDriverName := range existingSnapshotClassesDriverList {
-			if driverName == existingSnapClassDriverName {
-				logrus.Infof("CSI VolumeSnapshotClass exists for driver %v. Skipping creation of snapshotclass", driverName)
-				foundSnapClass = true
-				break
-			}
-		}
-		if foundSnapClass {
-			continue
-		}
-		snapshotClassName := c.getDefaultSnapshotClassName(driverName)
-		_, err := c.createVolumeSnapshotClass(snapshotClassName, driverName)
-		if err != nil && !k8s_errors.IsAlreadyExists(err) {
-			return fmt.Errorf("failed to create default snapshotclass %s: %v", snapshotClassName, err)
-		} else if k8s_errors.IsAlreadyExists(err) {
-			logrus.Infof("VolumeSnapshotClass %s already exists, skipping default snapshotclass creation", snapshotClassName)
-		}
 	}
 
 	return nil
@@ -316,7 +225,7 @@ func (c *csi) OwnsPVCForBackup(
 	crBackupType string,
 ) bool {
 	if cmBackupType == storkapi.ApplicationBackupGeneric || crBackupType == storkapi.ApplicationBackupGeneric {
-		// If user has forced the backupType in config map or applicationbackup CR, default to generic always
+		// If user has forced the backupType in config map or applicationBackup CR, default to generic always
 		return false
 	}
 	return c.OwnsPVC(coreOps, pvc)
@@ -332,48 +241,22 @@ func (c *csi) OwnsPVC(coreOps core.Ops, pvc *v1.PersistentVolumeClaim) bool {
 	return c.OwnsPV(pv)
 }
 
-func (c *csi) HasNativeVolumeDriverSupport(driverName string) bool {
-	return driverName == snapv1.PortworxCsiProvisionerName ||
-		driverName == snapv1.PortworxCsiDeprecatedProvisionerName ||
-		driverName == "pd.csi.storage.gke.io" ||
-		driverName == "ebs.csi.aws.com" ||
-		driverName == "disk.csi.azure.com"
-}
-
 func (c *csi) OwnsPV(pv *v1.PersistentVolume) bool {
 	// check if CSI volume
 	if pv.Spec.CSI != nil {
-		// We support certain CSI drivers natively
-		if c.HasNativeVolumeDriverSupport(pv.Spec.CSI.Driver) {
-			return false
-		}
-		// If the CSI driver does not support snapshot feature, we will return false,
-		// It will default to kdmp generic backup.
-		if storkvolume.IsCSIDriverWithoutSnapshotSupport(pv) {
-			return false
-		}
-
 		log.PVLog(pv).Tracef("CSI Owns PV: %s", pv.Name)
 		return true
 	}
-
 	log.PVLog(pv).Tracef("CSI does not own PV: %s", pv.Name)
 	return false
-}
-
-func (c *csi) getDefaultSnapshotClassName(driverName string) string {
-	return snapshotClassNamePrefix + driverName
 }
 
 func (c *csi) getSnapshotClassName(
 	backup *storkapi.ApplicationBackup,
 	driverName string,
 ) string {
-	if snapshotClassName, ok := backup.Spec.Options[optCSISnapshotClassName]; ok {
+	if snapshotClassName, ok := backup.Spec.CSISnapshotClassMap[driverName]; ok {
 		return snapshotClassName
-	}
-	if driverName != "" {
-		return c.getDefaultSnapshotClassName(driverName)
 	}
 	return ""
 }
@@ -510,7 +393,7 @@ func (c *csi) StartBackup(
 			snapshotter.Name(vsName),
 			snapshotter.PVCName(pvc.Name),
 			snapshotter.PVCNamespace(pvc.Namespace),
-			snapshotter.SnapshotClassName(c.getSnapshotClassName(backup, "")),
+			snapshotter.CSISnapshotMapping(backup.Spec.CSISnapshotClassMap),
 		)
 		if err != nil {
 			c.cancelBackupDuringStartFailure(backup, volumeInfos)
@@ -1972,7 +1855,7 @@ func (c *csi) CleanupBackupResources(backup *storkapi.ApplicationBackup) error {
 	return nil
 }
 
-// CleanupBackupResources for specified restore
+// CleanupRestoreResources for specified restore
 func (c *csi) CleanupRestoreResources(restore *storkapi.ApplicationRestore) error {
 	err := c.cleanupSnapshotsForRestore(restore, true)
 	if err != nil {
@@ -1987,8 +1870,100 @@ func (c *csi) GetPodPatches(podNamespace string, pod *v1.Pod) ([]k8sutils.JSONPa
 }
 
 // GetCSIPodPrefix returns prefix for the csi pod names in the deployment
-func (a *csi) GetCSIPodPrefix() (string, error) {
+func (c *csi) GetCSIPodPrefix() (string, error) {
 	return "", &errors.ErrNotSupported{}
+}
+
+// IsVirtualMachineSupported returns true if the driver supports VM scheduling
+func (c *csi) IsVirtualMachineSupported() bool {
+	return false
+}
+func (c *csi) createDefaultSnapshotClasses() error {
+	var existingSnapshotClassesDriverList []string
+	if c.v1SnapshotRequired {
+		existingSnapshotClasses, err := c.snapshotClient.SnapshotV1().VolumeSnapshotClasses().List(context.TODO(), metav1.ListOptions{})
+		if err != nil {
+			logrus.Infof("CSI v1 VolumeSnapshotClass CRD does not exist, skipping default SnapshotClass creation - error:  %v", err)
+			return nil
+		}
+		for _, existingSnapClass := range existingSnapshotClasses.Items {
+			logrus.Infof("Driver name %s", existingSnapClass.Driver)
+			existingSnapshotClassesDriverList = append(existingSnapshotClassesDriverList, existingSnapClass.Driver)
+		}
+	} else {
+		existingSnapshotClasses, err := c.snapshotClient.SnapshotV1beta1().VolumeSnapshotClasses().List(context.TODO(), metav1.ListOptions{})
+		if err != nil {
+			logrus.Infof("CSI v1beta1 VolumeSnapshotClass CRD does not exist, skipping default SnapshotClass creation - error: %v", err)
+			return nil
+		}
+		for _, existingSnapClass := range existingSnapshotClasses.Items {
+			logrus.Infof("Driver name %s", existingSnapClass.Driver)
+			existingSnapshotClassesDriverList = append(existingSnapshotClassesDriverList, existingSnapClass.Driver)
+		}
+	}
+
+	logrus.Infof("Creating default CSI SnapshotClasses")
+	config, err := rest.InClusterConfig()
+	if err != nil {
+		return fmt.Errorf("failed to get config for creating default CSI snapshot classes: %v", err)
+	}
+
+	k8sClient, err := clientset.NewForConfig(config)
+	if err != nil {
+		return fmt.Errorf("failed to get client for creating default CSI snapshot classes: %v", err)
+	}
+
+	ok, err := version.RequiresV1CSIdriver()
+	if err != nil {
+		return err
+	}
+	var csiDriverNameList []string
+	if ok {
+		// Get all drivers
+		driverList, err := k8sClient.StorageV1().CSIDrivers().List(context.TODO(), metav1.ListOptions{})
+		if err != nil {
+			return fmt.Errorf("failed to list all CSI drivers(V1): %v", err)
+		}
+		// Fill the driver names from CSIDrivers to list
+		for _, driver := range driverList.Items {
+			csiDriverNameList = append(csiDriverNameList, driver.Name)
+		}
+	} else {
+
+		// Get all drivers
+		driverList, err := k8sClient.StorageV1beta1().CSIDrivers().List(context.TODO(), metav1.ListOptions{})
+		if err != nil {
+			return fmt.Errorf("failed to list all CSI drivers(V1beta1): %v", err)
+		}
+		// Fill the driver names from CSIDrivers to list
+		for _, driver := range driverList.Items {
+			csiDriverNameList = append(csiDriverNameList, driver.Name)
+		}
+	}
+
+	// Create VolumeSnapshotClass for each driver
+	for _, driverName := range csiDriverNameList {
+		foundSnapClass := false
+		for _, existingSnapClassDriverName := range existingSnapshotClassesDriverList {
+			if driverName == existingSnapClassDriverName {
+				logrus.Infof("CSI VolumeSnapshotClass exists for driver %v. Skipping creation of snapshotclass", driverName)
+				foundSnapClass = true
+				break
+			}
+		}
+		if foundSnapClass {
+			continue
+		}
+		snapshotClassName := snapshotClassNamePrefix + driverName
+		_, err := c.createVolumeSnapshotClass(snapshotClassName, driverName)
+		if err != nil && !k8s_errors.IsAlreadyExists(err) {
+			return fmt.Errorf("failed to create default snapshotclass %s: %v", snapshotClassName, err)
+		} else if k8s_errors.IsAlreadyExists(err) {
+			logrus.Infof("VolumeSnapshotClass %s already exists, skipping default snapshotclass creation", snapshotClassName)
+		}
+	}
+
+	return nil
 }
 
 func init() {

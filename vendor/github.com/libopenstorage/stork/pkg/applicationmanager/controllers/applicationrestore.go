@@ -408,6 +408,32 @@ func (a *ApplicationRestoreController) handle(ctx context.Context, restore *stor
 	case storkapi.ApplicationRestoreStageInitial:
 		// Make sure the namespaces exist
 		fallthrough
+	case storkapi.ApplicationRestoreStageIncludeResources:
+		if restore.Spec.BackupObjectType == resourcecollector.PxBackupObjectType_virtualMachine {
+			// The backuObjectType is VirtualMachine. We need to map resources such as PVC,
+			// configMap and secrets of VirtualMachines inlucded in restore and include only
+			// these resources for restore.
+			logrus.Infof("It is restore of  VirtualMachine  Backup Object type. Processing VirtualMachine resources for restore")
+			includeObjects, err := a.processVMResourcesForVMRestore(restore)
+			if err != nil {
+				message := fmt.Sprintf("error processing VirtualMachine restore : %v", err)
+				log.ApplicationRestoreLog(restore).Errorf(message)
+				a.recorder.Event(restore,
+					v1.EventTypeWarning,
+					string(storkapi.ApplicationRestoreStatusFailed),
+					message)
+				return nil
+			}
+			if len(includeObjects) != 0 {
+				restore.Spec.IncludeResources = append(restore.Spec.IncludeResources, includeObjects...)
+				restore.Status.Stage = storkapi.ApplicationRestoreStageVolumes
+				err = a.client.Update(context.TODO(), restore)
+				if err != nil {
+					return err
+				}
+			}
+		}
+		fallthrough
 	case storkapi.ApplicationRestoreStageVolumes:
 		err := a.restoreVolumes(restore, updateCr)
 		if err != nil {
@@ -589,7 +615,6 @@ func (a *ApplicationRestoreController) restoreVolumes(restore *storkapi.Applicat
 					continue
 				}
 			}
-
 			pvcCount++
 			isVolRestoreDone := false
 			for _, statusVolume := range restore.Status.Volumes {
@@ -876,7 +901,7 @@ func (a *ApplicationRestoreController) restoreVolumes(restore *storkapi.Applicat
 				return nil
 			} else {
 				var message string
-				logrus.Infof("%s re cr %v status %v", funct, crName, resourceExport.Status.Status)
+				logrus.Infof("%s: resource-export cr [%v] status: %v", funct, crName, resourceExport.Status.Status)
 				switch resourceExport.Status.Status {
 				case kdmpapi.ResourceExportStatusFailed:
 					message = fmt.Sprintf("%s Error creating CR %v for pvc creation: %v", funct, crName, resourceExport.Status.Reason)
@@ -954,13 +979,13 @@ func (a *ApplicationRestoreController) restoreVolumes(restore *storkapi.Applicat
 		for _, vInfo := range volumeInfos {
 			if vInfo.Status == storkapi.ApplicationRestoreStatusInProgress || vInfo.Status == storkapi.ApplicationRestoreStatusInitial ||
 				vInfo.Status == storkapi.ApplicationRestoreStatusPending {
-				log.ApplicationRestoreLog(restore).Infof("Volume restore still in progress: %v->%v", vInfo.SourceVolume, vInfo.RestoreVolume)
+				log.ApplicationRestoreLog(restore).Infof("Volume restore still in progress: %v->%v for namespace %s", vInfo.SourceVolume, vInfo.RestoreVolume, vInfo.SourceNamespace)
 				inProgress = true
 			} else if vInfo.Status == storkapi.ApplicationRestoreStatusFailed {
 				a.recorder.Event(restore,
 					v1.EventTypeWarning,
 					string(vInfo.Status),
-					fmt.Sprintf("Error restoring volume %v->%v: %v", vInfo.SourceVolume, vInfo.RestoreVolume, vInfo.Reason))
+					fmt.Sprintf("Error restoring volume %v->%v for namespace %s: %v", vInfo.SourceVolume, vInfo.RestoreVolume, vInfo.SourceNamespace, vInfo.Reason))
 				restore.Status.Stage = storkapi.ApplicationRestoreStageFinal
 				restore.Status.FinishTimestamp = metav1.Now()
 				restore.Status.Status = storkapi.ApplicationRestoreStatusFailed
@@ -970,7 +995,7 @@ func (a *ApplicationRestoreController) restoreVolumes(restore *storkapi.Applicat
 				a.recorder.Event(restore,
 					v1.EventTypeNormal,
 					string(vInfo.Status),
-					fmt.Sprintf("Volume %v->%v restored successfully", vInfo.SourceVolume, vInfo.RestoreVolume))
+					fmt.Sprintf("Volume %v->%v restored successfully for namespace %s", vInfo.SourceVolume, vInfo.RestoreVolume, vInfo.SourceNamespace))
 			}
 		}
 	}
@@ -996,7 +1021,7 @@ func (a *ApplicationRestoreController) restoreVolumes(restore *storkapi.Applicat
 		}
 		err = a.restoreResources(restore, updateCr)
 		if err != nil {
-			log.ApplicationRestoreLog(restore).Errorf("Error restoring resources: %v", err)
+			log.ApplicationRestoreLog(restore).Errorf("Error restoring resources from namespace %s: %v", restore.Namespace, err)
 			return err
 		}
 	}
@@ -2151,4 +2176,27 @@ func (a *ApplicationRestoreController) cleanupResources(restore *storkapi.Applic
 		}
 	}
 	return nil
+}
+
+// processVMResourcesForVMRestore maps VM resources such as  PVC, ConfigMap and Secrets with VirtualMachines in includeResourcs and populates
+// them to includeResource for VM Restore. Resources not associated to any VMs in includeResources will be skipped including them for restore.
+func (a *ApplicationRestoreController) processVMResourcesForVMRestore(restore *storkapi.ApplicationRestore) ([]storkapi.ObjectInfo, error) {
+
+	backup, err := storkops.Instance().GetApplicationBackup(restore.Spec.BackupName, restore.Namespace)
+	if err != nil {
+		return nil, fmt.Errorf("error getting backup spec for VirtualMachine specific restore: %v", err)
+	}
+	// get objectMap of includeResources
+	objectMap := storkapi.CreateObjectsMap(restore.Spec.IncludeResources)
+	resourceObjects, err := a.downloadResources(backup, restore.Spec.BackupLocation, restore.Namespace)
+	if err != nil {
+		log.ApplicationRestoreLog(restore).Errorf("error downloading resources for VirtualMachine specific restore: %v", err)
+		return nil, err
+	}
+
+	includeResourceList, err := resourcecollector.GetVMResourcesFromResourceObject(resourceObjects, objectMap)
+	if err != nil {
+		return nil, err
+	}
+	return includeResourceList, nil
 }
