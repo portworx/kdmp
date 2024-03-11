@@ -171,6 +171,10 @@ func runMaintenance(maintenanceType string) error {
 		repo.Name = genericBackupDir + "/"
 		bucket = blob.PrefixedBucket(bucket, repo.Name)
 		repoList, err = getRepoList(bucket)
+		if len(repoList) == 0 {
+			logrus.Warnf("Provider is non-nfs, No directory %v exists, verify if it is a resource only backup", repo.Name)
+			return nil
+		}
 		if err != nil {
 			logrus.Errorf("getting repo list failed for bucket [%v]: %v", repo.Path, err)
 			return err
