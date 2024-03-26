@@ -123,6 +123,7 @@ update-deployment:
 vendor-sync:
 	go mod tidy
 	go mod vendor
+	sed -i '1 i\// +build skipcompile\n' vendor/kubevirt.io/client-go/kubecli/kubevirt_test_utils.go
 
 ### kdmp-operator targets ###
 build-kdmp:

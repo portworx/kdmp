@@ -8,6 +8,8 @@ import (
 	"net/http"
 	"time"
 
+	// TODO: This package has been deprecated. A replacement package is available [github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/compute/armcompute]. We should migrate
+	//lint:ignore SA1019 Ignore this import during staticcheck
 	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-03-01/compute"
 	"github.com/Azure/go-autorest/autorest"
 	azure_rest "github.com/Azure/go-autorest/autorest/azure"
@@ -156,10 +158,10 @@ func (a *azure) Stop() error {
 func (a *azure) OwnsPVCForBackup(
 	coreOps core.Ops,
 	pvc *v1.PersistentVolumeClaim,
-	cmBackupType string,
+	directKDMP bool,
 	crBackupType string,
 ) bool {
-	if cmBackupType == storkapi.ApplicationBackupGeneric {
+	if directKDMP {
 		// If user has forced the backupType in config map, default to generic always
 		return false
 	}
