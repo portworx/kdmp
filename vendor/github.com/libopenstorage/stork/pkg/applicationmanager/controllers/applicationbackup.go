@@ -132,6 +132,7 @@ type ApplicationBackupController struct {
 	reconcileTime        time.Duration
 	vmIncludeResource    map[string][]stork_api.ObjectInfo
 	vmIncludeResourceMap map[string]map[stork_api.ObjectInfo]bool
+	vmNsListMap          map[string]map[string]bool
 }
 
 // Init Initialize the application backup controller
@@ -151,6 +152,7 @@ func (a *ApplicationBackupController) Init(mgr manager.Manager, backupAdminNames
 	a.execRulesCompleted = make(map[string]bool)
 	a.vmIncludeResource = make(map[string][]stork_api.ObjectInfo)
 	a.vmIncludeResourceMap = make(map[string]map[stork_api.ObjectInfo]bool)
+	a.vmNsListMap = make(map[string]map[string]bool)
 	return controllers.RegisterTo(mgr, "application-backup-controller", a, &stork_api.ApplicationBackup{})
 }
 
@@ -225,14 +227,20 @@ func (a *ApplicationBackupController) setDefaults(backup *stork_api.ApplicationB
 	return updated
 }
 
+// updateWithAllNamespaces checks all the namespaces in the cluster, selects the ones to be backed up
+// and writes them in the backup object.
 func (a *ApplicationBackupController) updateWithAllNamespaces(backup *stork_api.ApplicationBackup) error {
 	namespaces, err := core.Instance().ListNamespaces(nil)
 	if err != nil {
 		return fmt.Errorf("error updating with all namespaces for wildcard: %v", err)
 	}
-	pxNs, _ := utils.GetPortworxNamespace()
-	// add portworx ns to Ignored NS map
-	utils.IgnoreNamespaces[pxNs] = true
+	pxNs, err := utils.GetPortworxNamespace()
+	if err == nil {
+		// add portworx ns to Ignored NS map
+		for _, ns := range pxNs {
+			utils.IgnoreNamespaces[ns] = true
+		}
+	}
 	namespacesToBackup := make([]string, 0)
 	for _, ns := range namespaces.Items {
 		if _, found := utils.IgnoreNamespaces[ns.Name]; !found {
@@ -319,6 +327,10 @@ func (a *ApplicationBackupController) handle(ctx context.Context, backup *stork_
 				delete(a.vmIncludeResourceMap, string(backup.UID))
 				log.ApplicationBackupLog(backup).Infof("cleaning up vmIncludeResources for VM backupObjectType")
 			}
+			if _, ok := a.vmNsListMap[string(backup.UID)]; ok {
+				delete(a.vmNsListMap, string(backup.UID))
+				log.ApplicationBackupLog(backup).Infof("cleaning up vmNsListMap for VM backupObjectType")
+			}
 			// Calling cleanupResources which will cleanup the resources created by applicationbackup controller. Including the post exec rule CR for manual backup when created through the px-backup
 			// In the case of kdmp driver, it will cleanup the dataexport CRs.
 			err = a.cleanupResources(backup)
@@ -352,7 +364,6 @@ func (a *ApplicationBackupController) handle(ctx context.Context, backup *stork_
 	}
 
 	if labelSelector := backup.Spec.NamespaceSelector; len(labelSelector) != 0 {
-		var pxNs string
 		namespaces, err := core.Instance().ListNamespacesV2(labelSelector)
 		if err != nil {
 			errMsg := fmt.Sprintf("error listing namespaces with label selectors: %v, error: %v", labelSelector, err)
@@ -365,10 +376,14 @@ func (a *ApplicationBackupController) handle(ctx context.Context, backup *stork_
 		}
 		var selectedNamespaces []string
 		if len(backup.Spec.Namespaces) == 0 {
-			pxNs, _ = utils.GetPortworxNamespace()
+			pxNs, err := utils.GetPortworxNamespace()
+			if err == nil {
+				// add portworx ns to Ignored NS map
+				for _, ns := range pxNs {
+					utils.IgnoreNamespaces[ns] = true
+				}
+			}
 		}
-		// add portworx ns to Ignored NS map
-		utils.IgnoreNamespaces[pxNs] = true
 		for _, namespace := range namespaces.Items {
 			if _, found := utils.IgnoreNamespaces[namespace.Name]; !found {
 				selectedNamespaces = append(selectedNamespaces, namespace.Name)
@@ -487,6 +502,17 @@ func (a *ApplicationBackupController) handle(ctx context.Context, backup *stork_
 				return nil
 			}
 		}
+
+		kdmpData, err := core.Instance().GetConfigMap(drivers.KdmpConfigmapName, drivers.KdmpConfigmapNamespace)
+		if err != nil {
+			return fmt.Errorf("error reading kdmp config map: %v", err)
+		}
+		driverType := kdmpData.Data[genericBackupKey]
+		if driverType == stork_api.ApplicationBackupGeneric {
+			backup.Spec.DirectKDMP = true
+			logrus.Tracef("driverType: %v", driverType)
+		}
+
 		fallthrough
 	case stork_api.ApplicationBackupStageImportResource:
 		if IsBackupObjectTypeVirtualMachine(backup) {
@@ -713,16 +739,15 @@ func (a *ApplicationBackupController) backupVolumes(backup *stork_api.Applicatio
 
 		var pvcCount int
 		for _, namespace := range backup.Spec.Namespaces {
+			if !a.isNsPresentForVmBackup(backup, namespace) {
+				// For VM Backup, if namespace does not have any VMs to backup we would
+				// want to skip the volumes from this namespace for backup.
+				continue
+			}
 			pvcList, err := core.Instance().GetPersistentVolumeClaims(namespace, backup.Spec.Selectors)
 			if err != nil {
 				return fmt.Errorf("error getting list of volumes to backup: %v", err)
 			}
-			kdmpData, err := core.Instance().GetConfigMap(drivers.KdmpConfigmapName, drivers.KdmpConfigmapNamespace)
-			if err != nil {
-				return fmt.Errorf("error reading kdmp config map: %v", err)
-			}
-			driverType := kdmpData.Data[genericBackupKey]
-			logrus.Tracef("driverType: %v", driverType)
 			for _, pvc := range pvcList.Items {
 				// If a list of resources was specified during backup check if
 				// this PVC was included
@@ -754,7 +779,7 @@ func (a *ApplicationBackupController) backupVolumes(backup *stork_api.Applicatio
 					continue
 				}
 				var driverName string
-				driverName, err = volume.GetPVCDriverForBackup(core.Instance(), &pvc, driverType, backup.Spec.BackupType)
+				driverName, err = volume.GetPVCDriverForBackup(core.Instance(), &pvc, backup.Spec.DirectKDMP, backup.Spec.BackupType)
 				if err != nil {
 					// Skip unsupported PVCs
 					if _, ok := err.(*errors.ErrNotSupported); ok {
@@ -805,8 +830,8 @@ func (a *ApplicationBackupController) backupVolumes(backup *stork_api.Applicatio
 						// as Cancelling, cancel any other started backups and then mark
 						// it as failed
 						if _, ok := err.(*volume.ErrStorageProviderBusy); ok {
-							inProgressMsg := fmt.Sprintf("Volume backups are in progress. Backups are failing for some volumes"+
-								" since the storage provider is busy: %v. Backup will be retried", err)
+							inProgressMsg := fmt.Sprintf("error: %v. Volume backups are in progress. Backups are failing for some volumes"+
+								" since the storage provider is busy. Backup will be retried", err)
 							log.ApplicationBackupLog(backup).Errorf(inProgressMsg)
 							a.recorder.Event(backup,
 								v1.EventTypeWarning,
@@ -868,7 +893,7 @@ func (a *ApplicationBackupController) backupVolumes(backup *stork_api.Applicatio
 				}
 				for _, volInfo := range volumeInfos {
 					if volInfo.BackupID == "" {
-						log.ApplicationBackupLog(backup).Infof("Snapshot of volume [%v] hasn't completed yet, retry checking status", volInfo.PersistentVolumeClaim)
+						log.ApplicationBackupLog(backup).Infof("Snapshot of volume [%v] from namespace [%v] hasn't completed yet, retry checking status", volInfo.PersistentVolumeClaim, volInfo.Namespace)
 						// Some portworx volume snapshot is not completed yet
 						// hence we will retry checking the status in the next reconciler iteration
 						// *stork_api.ApplicationBackupVolumeInfo.Status is not being checked here
@@ -949,23 +974,26 @@ func (a *ApplicationBackupController) backupVolumes(backup *stork_api.Applicatio
 			for _, vInfo := range volumeInfos {
 				if vInfo.Status == stork_api.ApplicationBackupStatusInProgress || vInfo.Status == stork_api.ApplicationBackupStatusInitial ||
 					vInfo.Status == stork_api.ApplicationBackupStatusPending {
-					log.ApplicationBackupLog(backup).Infof("Volume backup still in progress: %v", vInfo.Volume)
+					log.ApplicationBackupLog(backup).Infof("Volume backup still in progress: %v, namespace: %v ", vInfo.Volume, vInfo.Namespace)
 					inProgress = true
+
 				} else if vInfo.Status == stork_api.ApplicationBackupStatusFailed {
+					errorMsg := fmt.Sprintf("Error backing up volume %v from namespace: %v : %v", vInfo.Volume, vInfo.Namespace, vInfo.Reason)
 					a.recorder.Event(backup,
 						v1.EventTypeWarning,
 						string(vInfo.Status),
-						fmt.Sprintf("Error backing up volume %v: %v", vInfo.Volume, vInfo.Reason))
+						errorMsg)
+
 					backup.Status.Stage = stork_api.ApplicationBackupStageFinal
 					backup.Status.FinishTimestamp = metav1.Now()
 					backup.Status.Status = stork_api.ApplicationBackupStatusFailed
-					backup.Status.Reason = vInfo.Reason
+					backup.Status.Reason = errorMsg
 					break
 				} else if vInfo.Status == stork_api.ApplicationBackupStatusSuccessful {
 					a.recorder.Event(backup,
 						v1.EventTypeNormal,
 						string(vInfo.Status),
-						fmt.Sprintf("Volume %v backed up successfully", vInfo.Volume))
+						fmt.Sprintf("Volume %v from %v namespace backed up successfully", vInfo.Volume, vInfo.Namespace))
 				}
 			}
 		}
@@ -1738,6 +1766,11 @@ func (a *ApplicationBackupController) backupResources(
 		var incResNsBatch []string
 		var resourceTypeNsBatch []string
 		for _, ns := range batch {
+			if !a.isNsPresentForVmBackup(backup, ns) {
+				// For VM Backup, if namespace does not have any VMs to backup we would
+				// want to skip resources from this namespace for backup.
+				continue
+			}
 			// As we support both includeResource and ResourceType to be mentioned
 			// match out ns for which we want to take includeResource path and
 			// for which we want to take ResourceType path
@@ -1748,7 +1781,7 @@ func (a *ApplicationBackupController) backupResources(
 					incResNsBatch = append(incResNsBatch, ns)
 				}
 			} else {
-				incResNsBatch = batch
+				incResNsBatch = append(incResNsBatch, ns)
 			}
 		}
 		if len(incResNsBatch) != 0 {
@@ -1981,7 +2014,7 @@ func (a *ApplicationBackupController) backupResources(
 			// Check the status of the resourceExport CR and update it to the applicationBackup CR
 			switch resourceExport.Status.Status {
 			case kdmpapi.ResourceExportStatusFailed:
-				message = fmt.Sprintf("Error uploading resources: %v", resourceExport.Status.Reason)
+				message = fmt.Sprintf("Error uploading resources: %v, namespace: %s", resourceExport.Status.Reason, resourceExport.Namespace)
 				backup.Status.Status = stork_api.ApplicationBackupStatusFailed
 				backup.Status.Stage = stork_api.ApplicationBackupStageFinal
 				backup.Status.Reason = message
@@ -2021,7 +2054,7 @@ func (a *ApplicationBackupController) backupResources(
 	}
 	// Upload the resources to the backup location
 	if err = a.uploadResources(backup, allObjects); err != nil {
-		message := fmt.Sprintf("Error uploading resources: %v", err)
+		message := fmt.Sprintf("Error uploading resources: %v, namespace: %s", err, backup.Namespace)
 		backup.Status.Status = stork_api.ApplicationBackupStatusFailed
 		backup.Status.Stage = stork_api.ApplicationBackupStageFinal
 		backup.Status.Reason = message
@@ -2042,7 +2075,7 @@ func (a *ApplicationBackupController) backupResources(
 	backup.Status.FinishTimestamp = metav1.Now()
 	backup.Status.Status = stork_api.ApplicationBackupStatusSuccessful
 	if len(backup.Spec.NamespaceSelector) != 0 && len(backup.Spec.Namespaces) == 0 {
-		backup.Status.Reason = "Namespace label selector did not find any namespaces with selected labels for backup"
+		backup.Status.Reason = fmt.Sprintf("Namespace label selector [%s] did not find any namespaces with selected labels for backup", backup.Spec.NamespaceSelector)
 	} else {
 		backup.Status.Reason = "Volumes and resources were backed up successfully"
 	}
@@ -2406,13 +2439,15 @@ func (a *ApplicationBackupController) createVMIncludeResources(backup *stork_api
 	if err != nil {
 		return nil, nil, err
 	}
+	nsMap := make(map[string]bool)
 	// Second fetch VM resources from the list of filtered VMs and freeze/thaw rule for each of them.
 	vmIncludeResources, objectMap, preExecRule, postExecRule := resourcecollector.GetVMIncludeResourceInfoList(vmList,
-		objectMap, backup.Spec.SkipAutoExecRules)
+		objectMap, nsMap, backup.Spec.SkipAutoExecRules)
 
 	// update in memory data structure for later use.
 	a.vmIncludeResourceMap[string(backup.UID)] = objectMap
 	a.vmIncludeResource[string(backup.UID)] = vmIncludeResources
+	a.vmNsListMap[string(backup.UID)] = nsMap
 
 	if len(preExecRule) <= 0 || len(postExecRule) <= 0 {
 		// No VMs needed free/thaw rule, skip creating ruleCr
@@ -2429,4 +2464,15 @@ func (a *ApplicationBackupController) createVMIncludeResources(backup *stork_api
 // IsBackupObjectTypeVirtualMachine returns true if backupObjectType is VirtualMachine
 func IsBackupObjectTypeVirtualMachine(backup *stork_api.ApplicationBackup) bool {
 	return backup.Spec.BackupObjectType == resourcecollector.PxBackupObjectType_virtualMachine
+}
+
+// isNsPresentForVmBackup check if namspace had any VMs to backup.
+func (a *ApplicationBackupController) isNsPresentForVmBackup(backup *stork_api.ApplicationBackup, ns string) bool {
+
+	if !IsBackupObjectTypeVirtualMachine(backup) {
+		return true
+	}
+	nsMap := a.vmNsListMap[string(backup.UID)]
+	return nsMap[ns]
+
 }
