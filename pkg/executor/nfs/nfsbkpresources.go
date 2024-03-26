@@ -230,9 +230,25 @@ func uploadResource(
 		resourceCollectorOpts.SkipServices = true
 	}
 
-	// Always backup optional resources. When restorting they need to be
+	// Always backup optional resources. When restoring they need to be
 	// explicitly added to the spec
+	nsMap := make(map[string]bool)
 	objectMap := stork_api.CreateObjectsMap(backup.Spec.IncludeResources)
+	if backup.Spec.BackupObjectType == resourcecollector.PxBackupObjectType_virtualMachine {
+		// This is VM specific backup lets fetch VM resources for backup.
+		// First fetch VMs from various filters provided.
+		vmList, vmobjectMap, err := resourcecollector.GetVMIncludeListFromBackup(backup)
+		if err != nil {
+			log.ApplicationBackupLog(backup).Errorf("error processing VM resources for VM backup: %v", err)
+			return err
+		}
+		objectMap = vmobjectMap
+
+		// Second fetch VM resources from the list of filtered VMs for each of them. We set skipAutoExecRules
+		// to true as we dont need rules at this stage.
+		_, objectMap, _, _ = resourcecollector.GetVMIncludeResourceInfoList(vmList, objectMap, nsMap, true)
+
+	}
 	namespacelist := backup.Spec.Namespaces
 	// GetResources takes more time, if we have more number of namespaces
 	// So, submitting it in batches and in between each batch,
@@ -244,6 +260,11 @@ func uploadResource(
 		var incResNsBatch []string
 		var resourceTypeNsBatch []string
 		for _, ns := range batch {
+			if !isNsPresentForVmBackup(backup, ns, nsMap) {
+				// For VM Backup, if namespace does not have any VMs to backup we would
+				// want to skip resources from this namespace for backup.
+				continue
+			}
 			// As we support both includeResource and ResourceType to be mentioned
 			// match out ns for which we want to take includeResource path and
 			// for which we want to take ResourceType path
@@ -254,7 +275,7 @@ func uploadResource(
 					incResNsBatch = append(incResNsBatch, ns)
 				}
 			} else {
-				incResNsBatch = batch
+				incResNsBatch = append(incResNsBatch, ns)
 			}
 		}
 		if len(incResNsBatch) != 0 {
@@ -957,4 +978,13 @@ func getAnnotationValueFromApplicationBackup(backup *stork_api.ApplicationBackup
 		val = backup.Annotations[key]
 	}
 	return val
+}
+
+func isNsPresentForVmBackup(backup *stork_api.ApplicationBackup, ns string, nsmap map[string]bool) bool {
+
+	if backup.Spec.BackupObjectType != resourcecollector.PxBackupObjectType_virtualMachine {
+		return true
+	}
+	return nsmap[ns]
+
 }
