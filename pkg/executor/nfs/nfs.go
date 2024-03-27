@@ -32,6 +32,7 @@ func NewCommand() *cobra.Command {
 		newDeleteResourcesCommand(),
 		newRestoreVolumeCommand(),
 		newCSIVolumeRestoreCommand(),
+		newProcessVMResourcesCommand(),
 	)
 
 	cmds.PersistentFlags().AddGoFlagSet(flag.CommandLine)
