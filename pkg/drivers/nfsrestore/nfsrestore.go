@@ -183,6 +183,9 @@ func jobForRestoreResource(
 	resources corev1.ResourceRequirements,
 ) (*batchv1.Job, error) {
 	funct := "jobForRestoreResource"
+	podUserId := int64(777)
+	notAllowed := false
+	allowed := true
 	// Read the ApplicationRestore stage and decide which restore operation to perform
 	restoreCR, err := storkops.Instance().GetApplicationRestore(jobOption.AppCRName, jobOption.AppCRNamespace)
 	if err != nil {
@@ -294,6 +297,20 @@ func jobForRestoreResource(
 									Name:      "cred-secret",
 									MountPath: drivers.KopiaCredSecretMount,
 									ReadOnly:  true,
+								},
+							},
+							SecurityContext: &corev1.SecurityContext{
+								RunAsNonRoot:             &(allowed),
+								RunAsUser:                &podUserId,
+								RunAsGroup:               &podUserId,
+								AllowPrivilegeEscalation: &(notAllowed),
+								SeccompProfile: &corev1.SeccompProfile{
+									Type: "RuntimeDefault",
+								},
+								Capabilities: &corev1.Capabilities{
+									Drop: []corev1.Capability{
+										"ALL",
+									},
 								},
 							},
 						},

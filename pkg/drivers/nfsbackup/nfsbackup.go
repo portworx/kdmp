@@ -199,7 +199,9 @@ func jobForBackupResource(
 	}, " ")
 
 	labels := addJobLabels(jobOption)
-
+	podUserId := int64(777)
+	notAllowed := false
+	allowed := true
 	nfsExecutorImage, imageRegistrySecret, err := utils.GetExecutorImageAndSecret(drivers.NfsExecutorImage,
 		jobOption.NfsImageExecutorSource,
 		jobOption.NfsImageExecutorSourceNs,
@@ -251,6 +253,20 @@ func jobForBackupResource(
 									Name:      "cred-secret",
 									MountPath: drivers.KopiaCredSecretMount,
 									ReadOnly:  true,
+								},
+							},
+							SecurityContext: &corev1.SecurityContext{
+								RunAsNonRoot:             &(allowed),
+								RunAsUser:                &podUserId,
+								RunAsGroup:               &podUserId,
+								AllowPrivilegeEscalation: &(notAllowed),
+								SeccompProfile: &corev1.SeccompProfile{
+									Type: "RuntimeDefault",
+								},
+								Capabilities: &corev1.Capabilities{
+									Drop: []corev1.Capability{
+										"ALL",
+									},
 								},
 							},
 						},

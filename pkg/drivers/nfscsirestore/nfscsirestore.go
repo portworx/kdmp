@@ -181,7 +181,9 @@ func jobForRestoreCSISnapshot(
 	jobOption drivers.JobOpts,
 	resources corev1.ResourceRequirements,
 ) (*batchv1.Job, error) {
-
+	podUserId := int64(777)
+	notAllowed := false
+	allowed := true
 	cmd := strings.Join([]string{
 		"/nfsexecutor",
 		"restore-csi-vol",
@@ -247,6 +249,20 @@ func jobForRestoreCSISnapshot(
 									Name:      "cred-secret",
 									MountPath: drivers.KopiaCredSecretMount,
 									ReadOnly:  true,
+								},
+							},
+							SecurityContext: &corev1.SecurityContext{
+								RunAsNonRoot:             &(allowed),
+								RunAsUser:                &podUserId,
+								RunAsGroup:               &podUserId,
+								AllowPrivilegeEscalation: &(notAllowed),
+								SeccompProfile: &corev1.SeccompProfile{
+									Type: "RuntimeDefault",
+								},
+								Capabilities: &corev1.Capabilities{
+									Drop: []corev1.Capability{
+										"ALL",
+									},
 								},
 							},
 						},
