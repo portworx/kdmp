@@ -8,6 +8,8 @@ import (
 	"net/http"
 	"time"
 
+	// TODO: This package has been deprecated. A replacement package is available [github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/compute/armcompute]. We should migrate
+	//lint:ignore SA1019 Ignore this import during staticcheck
 	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-03-01/compute"
 	"github.com/Azure/go-autorest/autorest"
 	azure_rest "github.com/Azure/go-autorest/autorest/azure"
@@ -156,10 +158,10 @@ func (a *azure) Stop() error {
 func (a *azure) OwnsPVCForBackup(
 	coreOps core.Ops,
 	pvc *v1.PersistentVolumeClaim,
-	cmBackupType string,
+	directKDMP bool,
 	crBackupType string,
 ) bool {
-	if cmBackupType == storkapi.ApplicationBackupGeneric {
+	if directKDMP {
 		// If user has forced the backupType in config map, default to generic always
 		return false
 	}
@@ -188,7 +190,7 @@ func (a *azure) OwnsPVC(coreOps core.Ops, pvc *v1.PersistentVolumeClaim) bool {
 		// Try to get info from the PV since storage class could be deleted
 		pv, err := coreOps.GetPersistentVolume(pvc.Spec.VolumeName)
 		if err != nil {
-			logrus.Warnf("Error getting pv %v for pvc %v: %v", pvc.Spec.VolumeName, pvc.Name, err)
+			logrus.Errorf("Error getting pv %v for pvc %v in namespace %s: %v", pvc.Spec.VolumeName, pvc.Name, pvc.Namespace, err)
 			return false
 		}
 		return a.OwnsPV(pv)
@@ -691,6 +693,11 @@ func (a *azure) GetPodPatches(podNamespace string, pod *v1.Pod) ([]k8sutils.JSON
 // GetCSIPodPrefix returns prefix for the csi pod names in the deployment
 func (a *azure) GetCSIPodPrefix() (string, error) {
 	return "", &errors.ErrNotSupported{}
+}
+
+// IsVirtualMachineSupported returns true if the driver supports VM scheduling
+func (a *azure) IsVirtualMachineSupported() bool {
+	return false
 }
 
 func init() {

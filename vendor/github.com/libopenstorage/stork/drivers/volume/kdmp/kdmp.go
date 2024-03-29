@@ -111,7 +111,7 @@ func (k *kdmp) Stop() error {
 	return nil
 }
 
-func (k *kdmp) OwnsPVCForBackup(coreOps core.Ops, pvc *v1.PersistentVolumeClaim, cmBackupType string, crBackupType string) bool {
+func (k *kdmp) OwnsPVCForBackup(coreOps core.Ops, pvc *v1.PersistentVolumeClaim, directKDMP bool, crBackupType string) bool {
 	// KDMP can handle any PVC type. KDMP driver will always be a fallback
 	// option when none of the other supported drivers by stork own the PVC
 	return true
@@ -162,7 +162,9 @@ func isCSISnapshotClassRequired(pvc *v1.PersistentVolumeClaim) (string, bool) {
 		// In the case errors, we will allow the kdmp controller csi steps to decide on snapshot support.
 		return "", true
 	}
-	return storkvolume.IsCSIDriverWithoutSnapshotSupport(pv)
+
+	driverName, isWithoutSnapshotSupport := storkvolume.IsCSIDriverWithoutSnapshotSupport(pv)
+	return driverName, !isWithoutSnapshotSupport
 }
 
 func getZones(pv *v1.PersistentVolume) ([]string, error) {
@@ -260,7 +262,7 @@ func (k *kdmp) StartBackup(backup *storkapi.ApplicationBackup,
 		labels[utils.ApplicationBackupCRUIDKey] = utils.GetValidLabel(utils.GetShortUID(string(backup.UID)))
 		labels[pvcNameKey] = utils.GetValidLabel(pvc.Name)
 		labels[pvcUIDKey] = utils.GetValidLabel(utils.GetShortUID(string(pvc.UID)))
-		labels[kdmpStorageClassKey] = volumeInfo.StorageClass
+		labels[kdmpStorageClassKey] = utils.GetValidLabel(volumeInfo.StorageClass)
 		// If backup from px-backup, update the backup object details in the label
 		if val, ok := backup.Annotations[utils.PxbackupAnnotationCreateByKey]; ok {
 			if val == utils.PxbackupAnnotationCreateByValue {
@@ -281,6 +283,7 @@ func (k *kdmp) StartBackup(backup *storkapi.ApplicationBackup,
 		dataExport.Annotations[utils.SkipResourceAnnotation] = "true"
 		dataExport.Annotations[utils.BackupObjectUIDKey] = string(backup.Annotations[utils.PxbackupObjectUIDKey])
 		dataExport.Annotations[pvcUIDKey] = string(pvc.UID)
+		dataExport.Annotations[kdmpStorageClassKey] = volumeInfo.StorageClass
 		dataExport.Name = getGenericCRName(utils.PrefixBackup, string(backup.UID), string(pvc.UID), pvc.Namespace)
 		dataExport.Namespace = pvc.Namespace
 		dataExport.Spec.Type = kdmpapi.DataExportKopia
@@ -297,16 +300,12 @@ func (k *kdmp) StartBackup(backup *storkapi.ApplicationBackup,
 			APIVersion: pvc.APIVersion,
 		}
 
-		driverName, snapshotClassNotRequired := isCSISnapshotClassRequired(&pvc)
-		if !snapshotClassNotRequired {
+		driverName, snapshotClassRequired := isCSISnapshotClassRequired(&pvc)
+		if !backup.Spec.DirectKDMP && snapshotClassRequired {
 			snapshotStorageClass := k.getSnapshotClassName(driverName, backup)
 			// In case of KDMP, if VolumeSnapshot is given and user want to use Default VolumeSnapshotClass then we need to
-			// get the default volumesnapshotclass name to populate in applicationBackup status VolumeInfo.VoluneSnapshot along with snapshot name
-
-			// Retaining "default" and "Default" because previous users who are using api based or CRD method to create Backup
-			// might be using those string, from newer version we will be using "Use-default-volumesnapshotclass" as identifier for using
-			// default volumesnapshotclass for creating volumeSnapshot
-			if snapshotStorageClass == "Default" || snapshotStorageClass == "default" || snapshotStorageClass == "Use-default-volumesnapshotclass" {
+			// get the default volumeSnapshotClass name to populate in applicationBackup status VolumeInfo.VolumeSnapshot along with snapshot name
+			if snapshotStorageClass == "Default" || snapshotStorageClass == "default" {
 				vscs, err := externalsnapshotter.Instance().ListSnapshotClasses()
 				if err != nil {
 					return nil, fmt.Errorf("unable to list volumesnapshotclasses : %+v", err.Error())
@@ -318,6 +317,11 @@ func (k *kdmp) StartBackup(backup *storkapi.ApplicationBackup,
 							dataExport.Spec.SnapshotStorageClass = vsc.GetName()
 						}
 					}
+				}
+
+				// if no default volumeSnapshotClass found for that Provisioner we should fail backup for KDMP + LocalSnapshot Driver
+				if dataExport.Spec.SnapshotStorageClass == "" {
+					return nil, fmt.Errorf("no default volumesnapshotclass found for driver : %s", pv.Spec.CSI.Driver)
 				}
 			} else {
 				dataExport.Spec.SnapshotStorageClass = snapshotStorageClass
@@ -1015,8 +1019,13 @@ func (k *kdmp) GetPodPatches(podNamespace string, pod *v1.Pod) ([]k8sutils.JSONP
 }
 
 // GetCSIPodPrefix returns prefix for the csi pod names in the deployment
-func (a *kdmp) GetCSIPodPrefix() (string, error) {
+func (k *kdmp) GetCSIPodPrefix() (string, error) {
 	return "", &errors.ErrNotSupported{}
+}
+
+// IsVirtualMachineSupported returns true if the driver supports VM scheduling
+func (k *kdmp) IsVirtualMachineSupported() bool {
+	return false
 }
 
 func init() {

@@ -221,10 +221,10 @@ func (c *csi) Stop() error {
 func (c *csi) OwnsPVCForBackup(
 	coreOps core.Ops,
 	pvc *v1.PersistentVolumeClaim,
-	cmBackupType string,
+	directKDMP bool,
 	crBackupType string,
 ) bool {
-	if cmBackupType == storkapi.ApplicationBackupGeneric || crBackupType == storkapi.ApplicationBackupGeneric {
+	if directKDMP || crBackupType == storkapi.ApplicationBackupGeneric {
 		// If user has forced the backupType in config map or applicationBackup CR, default to generic always
 		return false
 	}
@@ -1870,7 +1870,7 @@ func (c *csi) GetPodPatches(podNamespace string, pod *v1.Pod) ([]k8sutils.JSONPa
 }
 
 // GetCSIPodPrefix returns prefix for the csi pod names in the deployment
-func (a *csi) GetCSIPodPrefix() (string, error) {
+func (c *csi) GetCSIPodPrefix() (string, error) {
 	return "", &errors.ErrNotSupported{}
 }
 

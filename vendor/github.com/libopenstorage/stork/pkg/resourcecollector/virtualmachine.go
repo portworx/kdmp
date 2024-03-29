@@ -1,6 +1,7 @@
 package resourcecollector
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -25,7 +26,8 @@ const (
 	//VMUnFreezeCmd is the template for VM unfreeze command
 	VMUnFreezeCmd = "/usr/bin/virt-freezer --unfreeze --name %s --namespace %s"
 	// VMContainerName is the name of the container to use for freeze/thaw
-	VMContainerName = "compute"
+	VMContainerName             = "compute"
+	VMPodSelectorCreatedByLabel = "kubevirt.io/created-by"
 )
 
 // IsVirtualMachineRunning returns true if virtualMachine is in running state
@@ -155,9 +157,20 @@ func GetVMUnFreezeRule(vm kubevirtv1.VirtualMachine) string {
 
 // GetVMPodLabel return podSelector label for the given VM
 func GetVMPodLabel(vm kubevirtv1.VirtualMachine) map[string]string {
-	return map[string]string{
-		VMPodSelectorLabel: vm.GetName(),
+	kv := kubevirtops.Instance()
+	podSelectorLabel := make(map[string]string)
+	vmi, err := kv.GetVirtualMachineInstance(context.TODO(), vm.Name, vm.Namespace)
+	if err != nil {
+		// We will never come here if VM is up and running. However, if we do get error here,
+		// we will log the error and move on. created-by label is only required for more than
+		// one VMs with same name but different namespace. Hence, we will skip this field and
+		// let rule executor handle the error if applicable.
+		logrus.Errorf("error fetching VMI for vm %v(%v) while creating podLabelSelector:%v", vm.Name, vm.Namespace, err)
+	} else {
+		podSelectorLabel[VMPodSelectorCreatedByLabel] = string(vmi.GetUID())
 	}
+	podSelectorLabel[VMPodSelectorLabel] = vm.GetName()
+	return podSelectorLabel
 }
 
 // Transform dataVolume: to persistentVolumeClaim:
@@ -481,7 +494,7 @@ func GetVMIncludeListFromBackup(backup *storkapi.ApplicationBackup) (
 
 // GetVMIncludeResourceInfoList returns VMs and VM resources in IncludeResource format.
 // Also returns preExec and postExec rule Item with freeze/thaw rule for each of the filter VMs
-func GetVMIncludeResourceInfoList(vmList []kubevirtv1.VirtualMachine, objectMap map[storkapi.ObjectInfo]bool, skipAutoVMRule bool) (
+func GetVMIncludeResourceInfoList(vmList []kubevirtv1.VirtualMachine, objectMap map[storkapi.ObjectInfo]bool, nsMap map[string]bool, skipAutoVMRule bool) (
 	[]storkapi.ObjectInfo,
 	map[storkapi.ObjectInfo]bool,
 	[]storkapi.RuleItem,
@@ -503,6 +516,9 @@ func GetVMIncludeResourceInfoList(vmList []kubevirtv1.VirtualMachine, objectMap 
 			},
 			Name:      vm.Name,
 			Namespace: vm.Namespace,
+		}
+		if !nsMap[vm.Namespace] {
+			nsMap[vm.Namespace] = true
 		}
 		// We would have mapped vmInfo specified in backup.Spec.IncludeResource but,
 		// VMList from namespaces would not have been. Map them here.
@@ -547,4 +563,18 @@ func GetVMIncludeResourceInfoList(vmList []kubevirtv1.VirtualMachine, objectMap 
 	}
 	return vmResourceInfoList, objectMap, freezeRulesItems, unFreezeRulesItems
 
+}
+
+// ISVmPresentInNS returns true if a given name space at least has one VM in it
+func IsVmPresentInNS(ns string) bool {
+	kv := kubevirtops.Instance()
+
+	listOptions := &metav1.ListOptions{
+		Limit: 1,
+	}
+	blist, err := kv.BatchListVirtualMachines(ns, listOptions)
+	if err == nil && len(blist.Items) > 0 {
+		return true
+	}
+	return false
 }
