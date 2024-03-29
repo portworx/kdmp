@@ -97,10 +97,10 @@ func (g *gcp) Stop() error {
 func (g *gcp) OwnsPVCForBackup(
 	coreOps core.Ops,
 	pvc *v1.PersistentVolumeClaim,
-	cmBackupType string,
+	directKDMP bool,
 	crBackupType string,
 ) bool {
-	if cmBackupType == storkapi.ApplicationBackupGeneric {
+	if directKDMP {
 		// If user has forced the backupType in config map, default to generic always
 		return false
 	}
@@ -129,7 +129,7 @@ func (g *gcp) OwnsPVC(coreOps core.Ops, pvc *v1.PersistentVolumeClaim) bool {
 		// Try to get info from the PV since storage class could be deleted
 		pv, err := coreOps.GetPersistentVolume(pvc.Spec.VolumeName)
 		if err != nil {
-			logrus.Warnf("Error getting pv %v for pvc %v: %v", pvc.Spec.VolumeName, pvc.Name, err)
+			logrus.Errorf("Error getting pv %v for pvc %v in namespace %s: %v", pvc.Spec.VolumeName, pvc.Name, pvc.Namespace, err)
 			return false
 		}
 		return g.OwnsPV(pv)
@@ -665,8 +665,13 @@ func (g *gcp) GetPodPatches(podNamespace string, pod *v1.Pod) ([]k8sutils.JSONPa
 }
 
 // GetCSIPodPrefix returns prefix for the csi pod names in the deployment
-func (a *gcp) GetCSIPodPrefix() (string, error) {
+func (g *gcp) GetCSIPodPrefix() (string, error) {
 	return "", &errors.ErrNotSupported{}
+}
+
+// IsVirtualMachineSupported returns true if the driver supports VM scheduling
+func (g *gcp) IsVirtualMachineSupported() bool {
+	return false
 }
 
 func init() {

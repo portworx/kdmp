@@ -101,7 +101,7 @@ type Driver interface {
 
 	// OwnsPVCForBackup returns true if the PVC is owned by the driver
 	// Since we have extra check need to do for backup case, added separate version of API.
-	OwnsPVCForBackup(coreOps core.Ops, pvc *v1.PersistentVolumeClaim, cmBackupType string, crBackupType string) bool
+	OwnsPVCForBackup(coreOps core.Ops, pvc *v1.PersistentVolumeClaim, directKDMP bool, crBackupType string) bool
 
 	// OwnsPV returns true if the PV is owned by the driver
 	OwnsPV(pvc *v1.PersistentVolume) bool
@@ -124,6 +124,9 @@ type Driver interface {
 
 	// GetCSIPodPrefix returns prefix for the csi pod names in the deployment
 	GetCSIPodPrefix() (string, error)
+
+	// IsVirtualMachineSupported returns true if the driver supports VM scheduling
+	IsVirtualMachineSupported() bool
 
 	// GroupSnapshotPluginInterface Interface for group snapshots
 	GroupSnapshotPluginInterface
@@ -264,6 +267,8 @@ type Info struct {
 	NeedsAntiHyperconvergence bool
 	// WindowsVolume is a flag to indicate if the volume is being used by a windows Pod
 	WindowsVolume bool
+	// AttachedOn is the node instance identifier for clustered systems.
+	AttachedOn string
 }
 
 // NodeStatus Status of driver on a node
@@ -338,7 +343,7 @@ func Get(name string) (Driver, error) {
 // not owned by any available driver
 func GetPVCDriverForBackup(coreOps core.Ops,
 	pvc *v1.PersistentVolumeClaim,
-	cmBackupType string,
+	directKDMP bool,
 	crBackupType string,
 ) (string, error) {
 	for _, driverName := range orderedListOfDrivers {
@@ -346,7 +351,7 @@ func GetPVCDriverForBackup(coreOps core.Ops,
 		if !ok {
 			continue
 		}
-		if d.OwnsPVCForBackup(coreOps, pvc, cmBackupType, crBackupType) {
+		if d.OwnsPVCForBackup(coreOps, pvc, directKDMP, crBackupType) {
 			return driverName, nil
 		}
 	}
