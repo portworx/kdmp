@@ -35,6 +35,7 @@ import (
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	k8s_errors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 )
@@ -318,6 +319,46 @@ func uploadResource(
 			return err
 		}
 	}
+
+	// Let's skip the PV and PVCs which got in failed or skipped state
+	processPartialObjects := make([]runtime.Unstructured, 0)
+	failedVolInfoMap := make(map[string]stork_api.ApplicationBackupStatusType)
+	for _, vol := range backup.Status.Volumes {
+		if vol.Status == stork_api.ApplicationBackupStatusFailed {
+			failedVolInfoMap[vol.Volume] = vol.Status
+		}
+	}
+	// Go through all the objects from the list
+	for _, obj := range allObjects {
+		objectType, err := meta.TypeAccessor(obj)
+		if err != nil {
+			return err
+		}
+		if objectType.GetKind() == "PersistentVolumeClaim" {
+			var pvc v1.PersistentVolumeClaim
+			// Find the matching object - PVC, and if it's state is undesired skip it.
+			if err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.UnstructuredContent(), &pvc); err != nil {
+				return fmt.Errorf("error converting to persistent colume claim: %v", err)
+			}
+			if _, ok := failedVolInfoMap[pvc.Spec.VolumeName]; ok {
+				continue
+			}
+		} else if objectType.GetKind() == "PersistentVolume" {
+			var pv v1.PersistentVolume
+			// Again find persistent volume and check if it is in failed or skipped state. If yes, skip it.
+			if err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.UnstructuredContent(), &pv); err != nil {
+				return fmt.Errorf("error converting to persistent volume: %v", err)
+			}
+			// Check if it already exsists in the map.
+			if _, ok := failedVolInfoMap[pv.Name]; ok {
+				continue
+			}
+		}
+		processPartialObjects = append(processPartialObjects, obj)
+	}
+
+	// Update obj list - allObjects with skipped pv and pvcs
+	allObjects = processPartialObjects
 
 	// TODO: Need to create directory with UID GUID needed
 	// for nfs share
