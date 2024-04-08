@@ -324,8 +324,7 @@ func uploadResource(
 	processPartialObjects := make([]runtime.Unstructured, 0)
 	failedVolInfoMap := make(map[string]stork_api.ApplicationBackupStatusType)
 	for _, vol := range backup.Status.Volumes {
-		if vol.Status == stork_api.ApplicationBackupStatusFailed ||
-			vol.Status == stork_api.ApplicationBackupStatusSkip {
+		if vol.Status == stork_api.ApplicationBackupStatusFailed {
 			failedVolInfoMap[vol.Volume] = vol.Status
 		}
 	}
