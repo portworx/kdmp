@@ -320,7 +320,7 @@ func uploadResource(
 		}
 	}
 
-	// Let's skip the PV and PVCs which got in failed or skipped state
+	// Let's skip the PV and PVCs which got in failed state to be uploaded to backup location
 	processPartialObjects := make([]runtime.Unstructured, 0)
 	failedVolInfoMap := make(map[string]stork_api.ApplicationBackupStatusType)
 	for _, vol := range backup.Status.Volumes {
