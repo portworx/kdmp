@@ -3362,8 +3362,8 @@ github.com/libopenstorage/stork v1.4.1-0.20230502135851-9cacb19e1df5/go.mod h1:R
 github.com/libopenstorage/stork v1.4.1-0.20230519043154-cbc10dffaf19/go.mod h1:Xm4DHoViynFXMQKBXGj3IkA77LY2RBFkNtv6vbo3wNw=
 github.com/libopenstorage/stork v1.4.1-0.20230601053837-5dd68f026569/go.mod h1:+mKPMCPNhS/XOF2RPcNFijkr67CCCWp0o8OXVG6xxAk=
 github.com/libopenstorage/stork v1.4.1-0.20230610103146-72cf75320066/go.mod h1:Yst+fnOYjWk6SA5pXZBKm19wtiinjxQ/vgYTXI3k80Q=
-github.com/libopenstorage/stork v1.4.1-0.20240328182547-c2b9a7f58456 h1:UG/504ONcBlbsZjIyMmb+1e3YgQ9mIF1XkoBKht2pEs=
-github.com/libopenstorage/stork v1.4.1-0.20240328182547-c2b9a7f58456/go.mod h1:C2cjADUSiR31AM298nRPx+Wz1q5cPeDCvtvq7SZAH9s=
+github.com/libopenstorage/stork v1.4.1-0.20240423095633-85719d1cbf2c h1:UhJykH+NaQI4Sskm7gs2NZpuoj8bhQViT0TG7qfuAPQ=
+github.com/libopenstorage/stork v1.4.1-0.20240423095633-85719d1cbf2c/go.mod h1:K+1WdxpmU3tS1CJQITl5UlHnV3JLWHXCxTzF9cN7BEM=
 github.com/libopenstorage/systemutils v0.0.0-20160208220149-44ac83be3ce1/go.mod h1:xwNGC7xiz/BQ/wbMkvHujL8Gjgseg+x41xMek7sKRRQ=
 github.com/liggitt/tabwriter v0.0.0-20181228230101-89fcab3d43de h1:9TO3cAIGXtEhnIaL+V+BEER86oLrvS+kWobKpbJuye0=
 github.com/liggitt/tabwriter v0.0.0-20181228230101-89fcab3d43de/go.mod h1:zAbeS9B/r2mtpb6U+EI2rYA5OAXxsYw6wTamcNW+zcE=
@@ -3889,8 +3889,8 @@ github.com/portworx/px-backup-api v1.0.1-0.20200915150042-274508e876ef/go.mod h1
 github.com/portworx/px-object-controller v0.0.0-20220804234424-40d3b8a84987/go.mod h1:g3pw2lI2AjqAixUCRhaBdKTY98znsCPR7NGRrlpimVU=
 github.com/portworx/pxc v0.33.0 h1:tQmljY8uJNc74opxUBnxopR+6E77RKESsNUYBaDWIQY=
 github.com/portworx/pxc v0.33.0/go.mod h1:Tl7hf4K2CDr0XtxzM08sr9H/KsMhscjf9ydb+MnT0U4=
-github.com/portworx/sched-ops v1.20.4-rc1.0.20240326040227-268b4afc2e7e h1:lwzFD+EX1m+59Haw31cW/9qgnmRWOvwZNvf0PiBiO0E=
-github.com/portworx/sched-ops v1.20.4-rc1.0.20240326040227-268b4afc2e7e/go.mod h1:aBipy9Jl9IS77SFZi2RqH2UT8MeKEmja1MYembOaZrY=
+github.com/portworx/sched-ops v1.20.4-rc1.0.20240412161623-5bba89276178 h1:bMydYkNDHiwfKl0UO+ls4NBSG0BGoW0oLYP+VZfluik=
+github.com/portworx/sched-ops v1.20.4-rc1.0.20240412161623-5bba89276178/go.mod h1:KOe618gr1FAzVmLNe9LFHss19df3MBZ0qom6Ct7RpyM=
 github.com/portworx/talisman v0.0.0-20210302012732-8af4564777f7/go.mod h1:e8a6uFpSbOlRpZQlW9aXYogC+GWAo065G0RL9hDkD4Q=
 github.com/portworx/torpedo v0.20.4-rc1.0.20210325154352-eb81b0cdd145/go.mod h1:CkLAs/ojTzSu3SPyeDxc3qhsbRU78H5Xz1qJlj1Ap1U=
 github.com/posener/complete v1.1.1/go.mod h1:em0nMJCgc9GFtwrmVmEMR/ZL6WyhyjMBndrE9hABlRI=
