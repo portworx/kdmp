@@ -8,9 +8,9 @@ require (
 	github.com/hashicorp/go-version v1.6.0
 	github.com/kubernetes-csi/external-snapshotter/client/v4 v4.2.0
 	github.com/kubernetes-incubator/external-storage v0.20.4-openstorage-rc7
-	github.com/libopenstorage/stork v1.4.1-0.20240328182547-c2b9a7f58456
+	github.com/libopenstorage/stork v1.4.1-0.20240423095633-85719d1cbf2c
 	github.com/portworx/pxc v0.33.0
-	github.com/portworx/sched-ops v1.20.4-rc1.0.20240327204940-8669c1f67a40
+	github.com/portworx/sched-ops v1.20.4-rc1.0.20240331082638-605dbf61e0be
 	github.com/sirupsen/logrus v1.9.3
 	github.com/spf13/cobra v1.7.0
 	github.com/spf13/pflag v1.0.5
@@ -209,7 +209,7 @@ replace (
 	github.com/kubernetes-incubator/external-storage v0.20.4-openstorage-rc10 => github.com/libopenstorage/external-storage v0.20.4-openstorage-rc10
 	github.com/libopenstorage/openstorage => github.com/libopenstorage/openstorage v1.0.1-0.20240304221553-5aaf2148a210
 	github.com/libopenstorage/secrets => github.com/libopenstorage/secrets v0.0.0-20220413195519-57d1c446c5e9
-	github.com/portworx/sched-ops => github.com/portworx/sched-ops v1.20.4-rc1.0.20240326040227-268b4afc2e7e
+	github.com/portworx/sched-ops => github.com/portworx/sched-ops v1.20.4-rc1.0.20240412161623-5bba89276178
 	golang.org/x/net => golang.org/x/net v0.20.0
 	google.golang.org/grpc => google.golang.org/grpc v1.60.0
 	k8s.io/api => k8s.io/api v0.25.0
