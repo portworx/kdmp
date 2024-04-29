@@ -15,6 +15,7 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/pointer"
 )
 
 // Driver is a nfsbackup implementation of the data export interface.
@@ -199,7 +200,6 @@ func jobForBackupResource(
 	}, " ")
 
 	labels := addJobLabels(jobOption)
-
 	nfsExecutorImage, imageRegistrySecret, err := utils.GetExecutorImageAndSecret(drivers.NfsExecutorImage,
 		jobOption.NfsImageExecutorSource,
 		jobOption.NfsImageExecutorSourceNs,
@@ -215,6 +215,10 @@ func jobForBackupResource(
 	if err != nil {
 		logrus.Errorf("failed to get the toleration details: %v", err)
 		return nil, fmt.Errorf("failed to get the toleration details for job [%s/%s]", jobOption.Namespace, jobOption.RestoreExportName)
+	}
+	podUserId, podGroupId, err := utils.GetPsaEnabledAppUID(jobOption.SourcePVCName, jobOption.Namespace)
+	if err != nil {
+		logrus.Errorf("failed to get the UID and GID for pvc %s %v", jobOption.SourcePVCName, err)
 	}
 	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
@@ -253,6 +257,18 @@ func jobForBackupResource(
 									ReadOnly:  true,
 								},
 							},
+							SecurityContext: &corev1.SecurityContext{
+								RunAsNonRoot:             pointer.Bool(true),
+								AllowPrivilegeEscalation: pointer.Bool(false),
+								SeccompProfile: &corev1.SeccompProfile{
+									Type: "RuntimeDefault",
+								},
+								Capabilities: &corev1.Capabilities{
+									Drop: []corev1.Capability{
+										"ALL",
+									},
+								},
+							},
 						},
 					},
 					Tolerations: tolerations,
@@ -270,6 +286,15 @@ func jobForBackupResource(
 			},
 		},
 	}
+	if job.Spec.Template.Spec.SecurityContext != nil {
+		if podUserId != utils.UndefinedId {
+			job.Spec.Template.Spec.SecurityContext.RunAsUser = &podUserId
+		}
+		if podGroupId != utils.UndefinedId {
+			job.Spec.Template.Spec.SecurityContext.RunAsGroup = &podGroupId
+		}
+	}
+
 	// Add the image secret in job spec only if it is present in the stork deployment.
 	if len(imageRegistrySecret) != 0 {
 		job.Spec.Template.Spec.ImagePullSecrets = utils.ToImagePullSecret(utils.GetImageSecretName(jobOption.RestoreExportName))

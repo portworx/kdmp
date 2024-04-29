@@ -18,6 +18,7 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/pointer"
 )
 
 // Driver is a nfsbackup implementation of the data export interface.
@@ -183,6 +184,8 @@ func jobForRestoreResource(
 	resources corev1.ResourceRequirements,
 ) (*batchv1.Job, error) {
 	funct := "jobForRestoreResource"
+	podUserId := int64(777)
+
 	// Read the ApplicationRestore stage and decide which restore operation to perform
 	restoreCR, err := storkops.Instance().GetApplicationRestore(jobOption.AppCRName, jobOption.AppCRNamespace)
 	if err != nil {
@@ -248,7 +251,10 @@ func jobForRestoreResource(
 		logrus.Infof("failed to get the px service name and namespace: %v", err)
 		return nil, fmt.Errorf("failed to get the px service name and namespace: %v", err)
 	}
-
+	podUserId, podGroupId, err := utils.GetPsaEnabledAppUID(jobOption.SourcePVCName, jobOption.Namespace)
+	if err != nil {
+		logrus.Errorf("failed to get the UID and GID for pvc %s %v", jobOption.SourcePVCName, err)
+	}
 	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      jobOption.RestoreExportName,
@@ -296,6 +302,18 @@ func jobForRestoreResource(
 									ReadOnly:  true,
 								},
 							},
+							SecurityContext: &corev1.SecurityContext{
+								RunAsNonRoot:             pointer.Bool(true),
+								AllowPrivilegeEscalation: pointer.Bool(false),
+								SeccompProfile: &corev1.SeccompProfile{
+									Type: "RuntimeDefault",
+								},
+								Capabilities: &corev1.Capabilities{
+									Drop: []corev1.Capability{
+										"ALL",
+									},
+								},
+							},
 						},
 					},
 					Tolerations: tolerations,
@@ -312,6 +330,14 @@ func jobForRestoreResource(
 				},
 			},
 		},
+	}
+	if job.Spec.Template.Spec.SecurityContext != nil {
+		if podUserId != utils.UndefinedId {
+			job.Spec.Template.Spec.SecurityContext.RunAsUser = &podUserId
+		}
+		if podGroupId != utils.UndefinedId {
+			job.Spec.Template.Spec.SecurityContext.RunAsGroup = &podGroupId
+		}
 	}
 	// Add the image secret in job spec only if it is present in the stork deployment.
 	if len(imageRegistrySecret) != 0 {
