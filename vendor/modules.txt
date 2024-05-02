@@ -441,7 +441,7 @@ github.com/libopenstorage/openstorage-sdk-clients/sdk/golang
 github.com/libopenstorage/secrets
 github.com/libopenstorage/secrets/aws/credentials
 github.com/libopenstorage/secrets/k8s
-# github.com/libopenstorage/stork v1.4.1-0.20240423093509-d6763d780f42
+# github.com/libopenstorage/stork v1.4.1-0.20240502172400-885982c36058
 ## explicit; go 1.21
 github.com/libopenstorage/stork/drivers
 github.com/libopenstorage/stork/drivers/volume
@@ -569,7 +569,7 @@ github.com/portworx/pxc/pkg/component
 github.com/portworx/pxc/pkg/config
 github.com/portworx/pxc/pkg/kubernetes
 github.com/portworx/pxc/pkg/util
-# github.com/portworx/sched-ops v1.20.4-rc1.0.20240411193047-d17313c6c11b => github.com/portworx/sched-ops v1.20.4-rc1.0.20240412161623-5bba89276178
+# github.com/portworx/sched-ops v1.20.4-rc1.0.20240424153814-f3083bdb4578 => github.com/portworx/sched-ops v1.20.4-rc1.0.20240412161623-5bba89276178
 ## explicit; go 1.19
 github.com/portworx/sched-ops/k8s/apiextensions
 github.com/portworx/sched-ops/k8s/apps
