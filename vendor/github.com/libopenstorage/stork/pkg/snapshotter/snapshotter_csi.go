@@ -49,11 +49,9 @@ const (
 	skipResourceAnnotation  = "stork.libopenstorage.org/skip-resource"
 
 	// defaultSnapshotTimeout represents the duration to wait before timing out on snapshot completion
-	defaultSnapshotTimeout = time.Minute * 5
+	defaultSnapshotTimeout = time.Minute * 30
 	// SnapshotTimeoutKey represents the duration to wait before timing out on snapshot completion
 	SnapshotTimeoutKey = "SNAPSHOT_TIMEOUT"
-	// restoreTimeout is the duration to wait before timing out the restore
-	restoreTimeout = time.Minute * 5
 	// snapDeleteAnnotation needs to be set if volume snapshot is scheduled for deletion
 	snapDeleteAnnotation = "snapshotScheduledForDeletion"
 	// snapRestoreAnnotation needs to be set if volume snapshot is scheduled for restore
@@ -741,7 +739,12 @@ func (c *csiDriver) RestoreStatus(pvcName, namespace string) (RestoreInfo, error
 			}
 		}
 	}
-
+	// Lets use SNAPSHOT_TIMEOUT for restoreTimeout as well.
+	restoreTimeout, err := getSnapshotTimeout()
+	if err == nil {
+		logrus.Warnf("failed to obtain timeout value for snapshot %s: %v, falling back on default snapshot timeout value %s", vsName, err, defaultSnapshotTimeout.String())
+		restoreTimeout = defaultSnapshotTimeout
+	}
 	if time.Now().After(pvc.CreationTimestamp.Add(restoreTimeout)) {
 		restoreInfo.Status = StatusFailed
 		restoreInfo.Reason = formatReasonErrorMessage(fmt.Sprintf("PVC restore timeout out after %s", restoreTimeout.String()), vsError, vscError)
@@ -1561,6 +1564,11 @@ func (c *csiDriver) RestoreFromLocalSnapshot(backupLocation *storkapi.BackupLoca
 	}
 
 	// create a new pvc for restore from the snapshot
+	if pvc.Spec.Selector != nil {
+		// Remove the labelselector, as it is a dynamic provisioning.
+		logrus.Debugf("RestoreFromLocalSnapshot: pvc:%v/%v - pvc.Spec.Selector: %v", pvc.Namespace, pvc.Name, pvc.Spec.Selector)
+		pvc.Spec.Selector = nil
+	}
 	pvcName := pvc.Name
 	pvc, err = c.RestoreVolumeClaim(
 		RestoreSnapshotName(vsName),
