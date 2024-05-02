@@ -38,8 +38,7 @@ func newDeleteCommand() *cobra.Command {
 }
 
 func isNfsKopiaRepositoryFileExists(repo *executor.Repository) bool {
-	repoBaseDir := repo.Path + genericBackupDir + "/"
-	kopiaRepoFile := filepath.Join(repoBaseDir, repo.Name, kopiaNFSRepositoryFile)
+	kopiaRepoFile := filepath.Join(repo.Path, repo.Name, kopiaNFSRepositoryFile)
 	_, err := os.Stat(kopiaRepoFile)
 	if err != nil && os.IsNotExist(err) {
 		logrus.Debugf("kopia repository file %v does not exist", kopiaRepoFile)
