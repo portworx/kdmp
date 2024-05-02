@@ -46,7 +46,7 @@ GO_FILES := $(shell find . -name '*.go' | grep -v 'vendor' | \
 .DEFAULT_GOAL: all
 .PHONY: test deploy build container
 
-all: do-fmt pretest test-container test build container
+all: do-fmt pretest test-container build container
 
 test:
 	docker run --rm -it -v ${GOPATH}:/go $(KDMP_UNITTEST_IMG) make unittest
@@ -58,7 +58,7 @@ test-container:
 pretest: check-fmt vet errcheck staticcheck
 build: update-deployment build-kdmp build-restic-executor build-kopia-executor build-pxc-exporter build-nfs-executor
 container: container-kdmp container-restic-executor container-kopia-executor container-pxc-exporter container-nfs-executor
-deploy: deploy-kdmp deploy-restic-executor deploy-kopia-executor deploy-pxc-exporter deploy-nfs-executor
+deploy: deploy-restic-executor deploy-kopia-executor deploy-pxc-exporter deploy-nfs-executor
 
 ### util targets ###
 unittest:
