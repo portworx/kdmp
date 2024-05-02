@@ -2,3 +2,5 @@
 /bin
 profile.out
 coverage.txt
+.vscode/
+.idea/
