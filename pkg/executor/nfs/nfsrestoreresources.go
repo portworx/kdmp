@@ -384,7 +384,7 @@ func getPVCToPVMapping(allObjects []runtime.Unstructured) (map[string]*v1.Persis
 }
 
 func isGenericCSIPersistentVolume(pv *v1.PersistentVolume) (bool, error) {
-	driverName, err := volume.GetPVDriver(pv)
+	driverName, err := volume.GetPVDriverForRestore(pv)
 	if err != nil {
 		return false, err
 	}
