@@ -1319,7 +1319,6 @@ func getNamespacedPVCLocation(pvc *v1.PersistentVolumeClaim) string {
 
 // getPVCToPVMapping constructs a mapping of PVC name/namespace to PV objects
 func getPVCToPVMapping(allObjects []runtime.Unstructured) (map[string]*v1.PersistentVolume, error) {
-
 	// Get mapping of PVC name to PV name
 	pvNameToPVCName := make(map[string]string)
 	for _, o := range allObjects {
@@ -1365,7 +1364,7 @@ func getPVCToPVMapping(allObjects []runtime.Unstructured) (map[string]*v1.Persis
 }
 
 func isGenericCSIPersistentVolume(pv *v1.PersistentVolume) (bool, error) {
-	driverName, err := volume.GetPVDriver(pv)
+	driverName, err := volume.GetPVDriverForRestore(pv)
 	if err != nil {
 		return false, err
 	}
@@ -1599,10 +1598,24 @@ func (a *ApplicationRestoreController) applyResources(
 	namespacedName := types.NamespacedName{}
 	namespacedName.Namespace = restore.Namespace
 	namespacedName.Name = restore.Name
-
-	pvNameMappings, err := a.getPVNameMappings(restore, objects)
-	if err != nil {
-		return err
+	// The applyResources is getting called in both the volume stage and resource stage.
+	// In the volume stage, it is getting called for applying the preRestore object.
+	// During the volume stage, we will not have restoreVolume updated in the volumeInfo structure.
+	// In between two driver's PVC restore processing, there is a chance that applicationrestore CR will status.VolumeInfo
+	// updated with the basic information of the volume, with out restoreVolume name.
+	// List of prerestore resource for each driver is as follow:
+	// aws, azure, gke driver does not have any preRestore object.
+	// kdmp - restore PVC spec but we do not apply it in the volume stage, as we do not call applyResource for kdmp case.
+	// PXD - for px volumes, we apply the secrets of encrypted volumes.
+	// That means , we do not need to call getPVNameMappings during volume stage.
+	// So, avoiding the call to getPVNameMappings, if it getting called from volume stage.
+	var pvNameMappings map[string]string
+	var err error
+	if restore.Status.Stage != storkapi.ApplicationRestoreStageVolumes {
+		pvNameMappings, err = a.getPVNameMappings(restore, objects)
+		if err != nil {
+			return err
+		}
 	}
 	objectMap := storkapi.CreateObjectsMap(restore.Spec.IncludeResources)
 	tempObjects := make([]runtime.Unstructured, 0)
