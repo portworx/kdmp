@@ -20,15 +20,17 @@ import (
 )
 
 const (
-	progressCheckInterval = 5 * time.Second
-	genericBackupDir      = "generic-backup"
-	kopiaRepositoryFile   = "kopia.repository"
-	annualSnapshots       = "2147483647"
-	monthlySnapshots      = "2147483647"
-	weeklySnapshots       = "2147483647"
-	dailySnapshots        = "2147483647"
-	hourlySnapshots       = "2147483647"
-	latestSnapshots       = "2147483647"
+	progressCheckInterval    = 5 * time.Second
+	genericBackupDir         = "generic-backup"
+	kopiaRepositoryFile      = "kopia.repository"
+	annualSnapshots          = "2147483647"
+	monthlySnapshots         = "2147483647"
+	weeklySnapshots          = "2147483647"
+	dailySnapshots           = "2147483647"
+	hourlySnapshots          = "2147483647"
+	latestSnapshots          = "2147483647"
+	azureChinaStorageDomain  = "blob.core.chinacloudapi.cn"
+	azurePublicStorageDomain = "blob.core.windows.net"
 )
 
 var (
@@ -211,12 +213,22 @@ func populateGCEAccessDetails(initCmd *kopia.Command, repository *executor.Repos
 }
 
 func populateAzureccessDetails(initCmd *kopia.Command, repository *executor.Repository) *kopia.Command {
+	//Construct Azure storage Domain
+	var storageDomain string
+	switch repository.AzureConfig.Environment {
+	case "AzureChinaCloud":
+		storageDomain = azureChinaStorageDomain
+	case "AzurePublicCloud":
+		storageDomain = azurePublicStorageDomain
+	}
 	initCmd.AddArg("--container")
 	initCmd.AddArg(repository.Path)
 	initCmd.AddArg("--storage-account")
 	initCmd.AddArg(repository.AzureConfig.StorageAccountName)
 	initCmd.AddArg("--storage-key")
 	initCmd.AddArg(repository.AzureConfig.StorageAccountKey)
+	initCmd.AddArg("--storage-domain")
+	initCmd.AddArg(storageDomain)
 
 	return initCmd
 }
@@ -600,6 +612,7 @@ func buildStorkBackupLocation(repository *executor.Repository) (*storkv1.BackupL
 		backupLocation.Location.AzureConfig = &storkv1.AzureConfig{
 			StorageAccountName: repository.AzureConfig.StorageAccountName,
 			StorageAccountKey:  repository.AzureConfig.StorageAccountKey,
+			Environment:        storkv1.AzureEnvironment(repository.AzureConfig.Environment),
 		}
 	}
 
