@@ -135,6 +135,13 @@ func restoreVolResourcesAndApply(
 			if volumeBackup.Namespace != namespace {
 				continue
 			}
+
+			// Skip portworx volumes in case of nfsRestore PB-6687
+			if driverName == "pxd" {
+				logrus.Debugf("%s : Skipping portworx volume %s", funct, volumeBackup.Volume)
+				continue
+			}
+
 			// If a list of resources was specified during restore check if
 			// this PVC was included
 			info.Name = volumeBackup.PersistentVolumeClaim
