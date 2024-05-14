@@ -13,7 +13,7 @@ script:
     elif [ "${TRAVIS_BRANCH}" == "master" ]; then
       export DOCKER_IMAGE_TAG=master-latest
     else
-      export RELEASE_VER=`git rev-parse --short HEAD`
+      export DOCKER_IMAGE_TAG=${TRAVIS_BRANCH}
     fi
     make all &&
     if [ "${TRAVIS_PULL_REQUEST}" == "false" ]; then
