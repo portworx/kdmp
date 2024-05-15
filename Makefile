@@ -44,7 +44,15 @@ GO_FILES := $(shell find . -name '*.go' | grep -v 'vendor' | \
                                    grep -v 'generated')
 
 .DEFAULT_GOAL: all
-.PHONY: test deploy build container
+.PHONY: test vendor vendor-update deploy build container
+
+vendor-update:
+	go mod download
+
+vendor:
+	go mod tidy
+	go mod vendor
+	sed -i '1 i\// +build skipcompile\n' vendor/kubevirt.io/client-go/kubecli/kubevirt_test_utils.go
 
 all: do-fmt pretest test-container build container
 
