@@ -199,7 +199,6 @@ func jobForBackupResource(
 	}, " ")
 
 	labels := addJobLabels(jobOption)
-
 	nfsExecutorImage, imageRegistrySecret, err := utils.GetExecutorImageAndSecret(drivers.NfsExecutorImage,
 		jobOption.NfsImageExecutorSource,
 		jobOption.NfsImageExecutorSourceNs,
@@ -216,6 +215,7 @@ func jobForBackupResource(
 		logrus.Errorf("failed to get the toleration details: %v", err)
 		return nil, fmt.Errorf("failed to get the toleration details for job [%s/%s]", jobOption.Namespace, jobOption.RestoreExportName)
 	}
+
 	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      jobOption.RestoreExportName,
@@ -270,6 +270,18 @@ func jobForBackupResource(
 			},
 		},
 	}
+
+	// Add security Context only if the PSA is enabled.
+	if jobOption.PsaIsEnabled == "true" {
+		// The Job is intended to backup resources to  NFS backuplocation
+		// and it doesn't need a specific JOB uid/gid since it will be sqaushed at NFS server
+		// hence used a global hardcoded UID/GID.
+		job, err = utils.AddSecurityContextToJob(job, utils.KdmpJobUid, utils.KdmpJobGid)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	// Add the image secret in job spec only if it is present in the stork deployment.
 	if len(imageRegistrySecret) != 0 {
 		job.Spec.Template.Spec.ImagePullSecrets = utils.ToImagePullSecret(utils.GetImageSecretName(jobOption.RestoreExportName))

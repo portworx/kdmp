@@ -25,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/utils/pointer"
 )
 
 const (
@@ -67,6 +68,11 @@ const (
 	IstioInjectLabel  = "sidecar.istio.io/inject"
 	// ProcessVMResourceSuccessMsg - vm resources processed successfully
 	ProcessVMResourceSuccessMsg = "vm resources processed successfully"
+	PsaEnabledKey               = "portworx.io/psa-enabled"
+	PsaUIDKey                   = "portworx.io/psa-uid"
+	PsaGIDKey                   = "portworx.io/psa-gid"
+	KdmpJobUid                  = "1013"
+	KdmpJobGid                  = "1013"
 )
 
 var (
@@ -965,4 +971,42 @@ func GetShortUID(uid string) string {
 		return uid
 	}
 	return uid[:8]
+}
+
+// Add container security Context to job pod if the PSA is enabled.
+// if static uids like kdmpJobUid or kdmpJobGid is used that means
+// these are dummy UIDs used for backing up resources to backuplocation
+// which doesn't need specific UID specific permission.
+func AddSecurityContextToJob(job *batchv1.Job, podUserId, podGroupId string) (*batchv1.Job, error) {
+	if job == nil {
+		return job, fmt.Errorf("recieved a nil job object to add security context")
+	}
+	if podUserId != "" {
+		uid, err := strconv.ParseInt(podUserId, 10, 64)
+		if err != nil {
+			logrus.Errorf("failed to convert the UID to int: %v", err)
+			return nil, fmt.Errorf("failed to convert the UID to int: %v", err)
+		}
+		job.Spec.Template.Spec.SecurityContext.RunAsUser = &uid
+	}
+	if podGroupId != "" {
+		gid, err := strconv.ParseInt(podGroupId, 10, 64)
+		if err != nil {
+			logrus.Errorf("failed to convert the GID to int: %v", err)
+			return nil, fmt.Errorf("failed to convert the GID to int: %v", err)
+		}
+		job.Spec.Template.Spec.SecurityContext.RunAsGroup = &gid
+	}
+	// Add RunAsNonRoot to true and drop all capabilities and seccomp profile and allowPrivilegeEscalation to false
+	job.Spec.Template.Spec.Containers[0].SecurityContext.RunAsNonRoot = pointer.Bool(true)
+	job.Spec.Template.Spec.Containers[0].SecurityContext.AllowPrivilegeEscalation = pointer.Bool(false)
+	job.Spec.Template.Spec.Containers[0].SecurityContext.SeccompProfile = &corev1.SeccompProfile{
+		Type: "RuntimeDefault",
+	}
+	job.Spec.Template.Spec.Containers[0].SecurityContext.Capabilities = &corev1.Capabilities{
+		Drop: []corev1.Capability{
+			"ALL",
+		},
+	}
+	return job, nil
 }

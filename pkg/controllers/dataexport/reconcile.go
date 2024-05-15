@@ -1137,9 +1137,9 @@ func (c *Controller) stageLocalSnapshotRestore(ctx context.Context, dataExport *
 		}
 		// Already done with max retries, so moving to kdmp restore anyway
 		data := updateDataExportDetail{
-			stage:  kdmpapi.DataExportStageTransferScheduled,
-			status: kdmpapi.DataExportStatusInitial,
-			reason: "switching to restore from objectstore bucket as restoring from local snapshot did not happen",
+			stage:                     kdmpapi.DataExportStageTransferScheduled,
+			status:                    kdmpapi.DataExportStatusInitial,
+			reason:                    "switching to restore from objectstore bucket as restoring from local snapshot did not happen",
 			resetLocalSnapshotRestore: true,
 		}
 		logrus.Infof("%v: In stageLocalSnapshotRestore stage, local snapshot restore failed, trying KDMP restore.", dataExport.Name)
@@ -1872,12 +1872,20 @@ func startTransferJob(
 		nfsServerAddr  string
 		nfsExportPath  string
 		nfsMountOption string
+		psaIsEnabled   string
+		psaJobUid      string
+		psaJobGid      string
 	)
 
 	if backupLocation != nil {
 		nfsServerAddr = backupLocation.Location.NFSConfig.ServerAddr
 		nfsExportPath = backupLocation.Location.NFSConfig.SubPath
 		nfsMountOption = backupLocation.Location.NFSConfig.MountOptions
+	}
+	if dataExport != nil {
+		psaIsEnabled = getAnnotationValue(dataExport, utils.PsaEnabledKey)
+		psaJobUid = getAnnotationValue(dataExport, utils.PsaUIDKey)
+		psaJobGid = getAnnotationValue(dataExport, utils.PsaGIDKey)
 	}
 	switch drv.Name() {
 	case drivers.Rsync:
@@ -1927,6 +1935,9 @@ func startTransferJob(
 			drivers.WithNfsServer(nfsServerAddr),
 			drivers.WithNfsExportDir(nfsExportPath),
 			drivers.WithNfsMountOption(nfsMountOption),
+			drivers.WithPsaIsEnabled(psaIsEnabled),
+			drivers.WithPodUserId(psaJobUid),
+			drivers.WithPodGroupId(psaJobGid),
 		)
 	case drivers.KopiaRestore:
 		return drv.StartJob(
@@ -1945,6 +1956,9 @@ func startTransferJob(
 			drivers.WithJobConfigMapNs(jobConfigMapNs),
 			drivers.WithNfsServer(nfsServerAddr),
 			drivers.WithNfsExportDir(nfsExportPath),
+			drivers.WithPsaIsEnabled(psaIsEnabled),
+			drivers.WithPodUserId(psaJobUid),
+			drivers.WithPodGroupId(psaJobGid),
 		)
 	}
 
@@ -2353,6 +2367,17 @@ func startNfsCSIRestoreVolumeJob(
 	bl *storkapi.BackupLocation,
 ) (string, error) {
 
+	var (
+		psaIsEnabled string
+		psaJobUid    string
+		psaJobGid    string
+	)
+
+	if de != nil {
+		psaIsEnabled = getAnnotationValue(de, utils.PsaEnabledKey)
+		psaJobUid = getAnnotationValue(de, utils.PsaUIDKey)
+		psaJobGid = getAnnotationValue(de, utils.PsaGIDKey)
+	}
 	jobName := utils.GetCsiRestoreJobName(drivers.NFSCSIRestore, de.Name)
 	err := utils.CreateNfsSecret(utils.GetCredSecretName(jobName), bl, de.Namespace, nil)
 	if err != nil {
@@ -2371,6 +2396,9 @@ func startNfsCSIRestoreVolumeJob(
 			drivers.WithNfsExportDir(bl.Location.NFSConfig.SubPath),
 			drivers.WithNfsMountOption(bl.Location.NFSConfig.MountOptions),
 			drivers.WithNfsSubPath(bl.Location.Path),
+			drivers.WithPsaIsEnabled(psaIsEnabled),
+			drivers.WithPodUserId(psaJobUid),
+			drivers.WithPodGroupId(psaJobGid),
 		)
 	}
 	return "", fmt.Errorf("unknown driver for nfs csi volume restore: %s", drv.Name())

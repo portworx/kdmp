@@ -38,6 +38,14 @@ type updateResourceExportFields struct {
 	LargeResourceEnabled  bool
 }
 
+func getAnnotationValue(re *kdmpapi.ResourceExport, key string) string {
+	var val string
+	if _, ok := re.Annotations[key]; ok {
+		val = re.Annotations[key]
+	}
+	return val
+}
+
 func (c *Controller) process(ctx context.Context, in *kdmpapi.ResourceExport) (bool, error) {
 	funct := "resourceExport.process"
 	if in == nil {
@@ -400,6 +408,8 @@ func startNfsResourceJob(
 	bl *storkapi.BackupLocation,
 ) (string, error) {
 
+	isPsaEnabled := getAnnotationValue(re, utils.PsaEnabledKey)
+
 	err := utils.CreateNfsSecret(utils.GetCredSecretName(re.Name), bl, re.Namespace, nil)
 	if err != nil {
 		logrus.Errorf("failed to create NFS cred secret: %v", err)
@@ -425,6 +435,7 @@ func startNfsResourceJob(
 			drivers.WithNfsExportDir(bl.Location.NFSConfig.SubPath),
 			drivers.WithJobConfigMap(jobConfigMap),
 			drivers.WithJobConfigMapNs(jobConfigMapNs),
+			drivers.WithPsaIsEnabled(isPsaEnabled),
 		)
 	case drivers.NFSRestore:
 		return drv.StartJob(
@@ -443,6 +454,7 @@ func startNfsResourceJob(
 			drivers.WithNfsExportDir(bl.Location.NFSConfig.SubPath),
 			drivers.WithJobConfigMap(jobConfigMap),
 			drivers.WithJobConfigMapNs(jobConfigMapNs),
+			drivers.WithPsaIsEnabled(isPsaEnabled),
 		)
 	}
 	return "", fmt.Errorf("unknown data transfer driver: %s", drv.Name())
