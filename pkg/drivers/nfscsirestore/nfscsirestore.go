@@ -266,6 +266,13 @@ func jobForRestoreCSISnapshot(
 			},
 		},
 	}
+	// Add security Context only if the PSA is enabled.
+	if jobOption.PodUserId != "" || jobOption.PodGroupId != "" {
+		job, err = utils.AddSecurityContextToJob(job, jobOption.PodUserId, jobOption.PodGroupId)
+		if err != nil {
+			return nil, err
+		}
+	}
 	// Add the image secret in job spec only if it is present in the stork deployment.
 	if len(imageRegistrySecret) != 0 {
 		job.Spec.Template.Spec.ImagePullSecrets = utils.ToImagePullSecret(utils.GetImageSecretName(jobName))
