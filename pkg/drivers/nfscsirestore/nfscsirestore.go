@@ -80,6 +80,15 @@ func (d Driver) JobStatus(id string) (*drivers.JobStatus, error) {
 		logrus.Errorf("%s: %v", fn, errMsg)
 		return nil, fmt.Errorf(errMsg)
 	}
+
+	// Check whether job has violated the pod security standard
+	psaViolated := utils.IsJobPodSecurityFailed(job, namespace)
+	if psaViolated {
+		utils.DisplayJobpodLogandEvents(job.Name, job.Namespace)
+		errMsg := fmt.Sprintf("job [%v/%v] failed to meet the pod security standard, please check job pod's description for more detail", namespace, name)
+		return utils.ToJobStatus(0, errMsg, batchv1.JobFailed), nil
+	}
+
 	// Check for mount point failure
 	mountFailed := utils.IsJobPodMountFailed(job, namespace)
 	if mountFailed {

@@ -889,6 +889,29 @@ func IsJobPodMountFailed(job *batchv1.Job, namespace string) bool {
 	return false
 }
 
+// Check if a job has failed because of podSecurity violation
+func IsJobPodSecurityFailed(job *batchv1.Job, namespace string) bool {
+	fn := "IsJobPodSecurityFailed"
+
+	opts := metav1.ListOptions{
+		FieldSelector: "involvedObject.name=" + string(job.Name),
+	}
+	events, err := core.Instance().ListEvents(namespace, opts)
+	if err != nil {
+		errMsg := fmt.Sprintf("failed to fetch events for job [%s/%s]: %v", namespace, job.Name, err)
+		logrus.Debugf("%s: %v", fn, errMsg)
+		return false
+	}
+	// if the job event reason is Failedcreate due to fobidden podSecurity violation
+	// then return true
+	for _, event := range events.Items {
+		if event.Reason == "FailedCreate" && strings.Contains(event.Message, "violates PodSecurity") {
+			return true
+		}
+	}
+	return false
+}
+
 // DisplayJobpodLogandEvents - Prints the Job pod description, log and events
 func DisplayJobpodLogandEvents(jobName string, namespace string) {
 	// Get job from the namespace
@@ -976,7 +999,7 @@ func GetShortUID(uid string) string {
 }
 
 // Add container security Context to job pod if the PSA is enabled.
-// if static uids like kdmpJobUid or kdmpJobGid is used that means
+// If static uids like kdmpJobUid or kdmpJobGid is used that means
 // these are dummy UIDs used for backing up resources to backuplocation
 // which doesn't need specific UID specific permission.
 func AddSecurityContextToJob(job *batchv1.Job, podUserId, podGroupId string) (*batchv1.Job, error) {
