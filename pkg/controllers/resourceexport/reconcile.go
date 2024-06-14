@@ -38,14 +38,6 @@ type updateResourceExportFields struct {
 	LargeResourceEnabled  bool
 }
 
-func getAnnotationValue(re *kdmpapi.ResourceExport, key string) string {
-	var val string
-	if _, ok := re.Annotations[key]; ok {
-		val = re.Annotations[key]
-	}
-	return val
-}
-
 func (c *Controller) process(ctx context.Context, in *kdmpapi.ResourceExport) (bool, error) {
 	funct := "resourceExport.process"
 	if in == nil {
