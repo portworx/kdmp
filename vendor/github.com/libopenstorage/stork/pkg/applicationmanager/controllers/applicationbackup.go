@@ -1174,7 +1174,7 @@ func (a *ApplicationBackupController) backupVolumes(backup *stork_api.Applicatio
 			backup.Status.FailedVolCount++
 		}
 	}
-	if len(backup.Status.Volumes) == backup.Status.FailedVolCount {
+	if (len(backup.Status.Volumes) != 0) && (len(backup.Status.Volumes) == backup.Status.FailedVolCount) {
 		// This case signifies that none of the volumes are successfully backed up
 		// hence marking it as failed
 		backup.Status.Stage = stork_api.ApplicationBackupStageFinal
@@ -2204,7 +2204,6 @@ func (a *ApplicationBackupController) backupResources(
 						backup.Status.Status = stork_api.ApplicationBackupStatusSuccessful
 						backup.Status.Reason = "Volumes and resources were backed up successfully"
 					}
-					backup.Status.Reason = "Volumes and resources were backed up successfully"
 				}
 
 				// Only on success compute the total backup size
@@ -2257,7 +2256,6 @@ func (a *ApplicationBackupController) backupResources(
 			backup.Status.Status = stork_api.ApplicationBackupStatusSuccessful
 			backup.Status.Reason = "Volumes and resources were backed up successfully"
 		}
-		backup.Status.Reason = "Volumes and resources were backed up successfully"
 	}
 	// Only on success compute the total backup size
 	for _, vInfo := range backup.Status.Volumes {

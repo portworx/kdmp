@@ -611,7 +611,6 @@ func (a *ApplicationRestoreController) restoreVolumes(restore *storkapi.Applicat
 	pvcCount := 0
 	restoreDone := 0
 	backupVolumeInfoMappings := make(map[string][]*storkapi.ApplicationBackupVolumeInfo)
-	hasPXDdriver := false
 	for _, namespace := range backup.Spec.Namespaces {
 		if _, ok := restore.Spec.NamespaceMapping[namespace]; !ok {
 			continue
@@ -649,9 +648,6 @@ func (a *ApplicationRestoreController) restoreVolumes(restore *storkapi.Applicat
 				backupVolumeInfoMappings[volumeBackup.DriverName] = make([]*storkapi.ApplicationBackupVolumeInfo, 0)
 			}
 			backupVolumeInfoMappings[volumeBackup.DriverName] = append(backupVolumeInfoMappings[volumeBackup.DriverName], volumeBackup)
-			if volumeBackup.DriverName == volume.PortworxDriverName {
-				hasPXDdriver = true
-			}
 		}
 	}
 	if restore.Status.Volumes == nil {
@@ -679,10 +675,10 @@ func (a *ApplicationRestoreController) restoreVolumes(restore *storkapi.Applicat
 		// Portworx driver restore is not supported via job as it can be a secured px volume
 		// to access the token, we need to run the driver.startRestore in the same context as the stork controller
 		// this check is equivalent to (if !nfs || (nfs && driverName == volume.PortworxDriverName))
-		if !nfs || hasPXDdriver {
+		for driverName, vInfos := range backupVolumeInfoMappings {
 			// Here backupVolumeInfoMappings is framed based on driver name mapping, hence startRestore()
 			// gets called once per driver
-			for driverName, vInfos := range backupVolumeInfoMappings {
+			if !nfs || (nfs && driverName == volume.PortworxDriverName) {
 				backupVolInfos := vInfos
 				driver, err := volume.Get(driverName)
 				//	BL NFS + kdmp = nfs code path
@@ -1395,13 +1391,19 @@ func getPVCToPVMapping(allObjects []runtime.Unstructured) (map[string]*v1.Persis
 	return pvcNameToPV, nil
 }
 
-func isGenericCSIPersistentVolume(pv *v1.PersistentVolume) (bool, error) {
+func isGenericCSIPersistentVolume(pv *v1.PersistentVolume, volInfos []*storkapi.ApplicationRestoreVolumeInfo) (bool, error) {
 	driverName, err := volume.GetPVDriverForRestore(pv)
 	if err != nil {
 		return false, err
 	}
 	if driverName == "csi" {
 		return true, nil
+	}
+	// in case of cloud disk such as GCE, AWS, Azure, we need to skip the volumes as its now moved to csi
+	for _, vInfo := range volInfos {
+		if vInfo.RestoreVolume == pv.Name && vInfo.DriverName == "csi" {
+			return true, nil
+		}
 	}
 	return false, nil
 }
@@ -1524,7 +1526,7 @@ func (a *ApplicationRestoreController) removeCSIVolumesBeforeApply(
 			}
 
 			// Check if this PV is a generic CSI one
-			isGenericCSIPVC, err := isGenericCSIPersistentVolume(&pv)
+			isGenericCSIPVC, err := isGenericCSIPersistentVolume(&pv, restore.Status.Volumes)
 			if err != nil {
 				return nil, fmt.Errorf("failed to check if PV was provisioned by a CSI driver: %v", err)
 			}
@@ -1532,6 +1534,7 @@ func (a *ApplicationRestoreController) removeCSIVolumesBeforeApply(
 			if err != nil {
 				return nil, err
 			}
+
 			// Only add this object if it's not a generic CSI PV
 			if !isGenericCSIPVC && !isGenericDriverPV {
 				tempObjects = append(tempObjects, o)
@@ -1556,7 +1559,7 @@ func (a *ApplicationRestoreController) removeCSIVolumesBeforeApply(
 
 			// We have found a PV for this PVC. Check if it is a generic CSI PV
 			// that we do not already have native volume driver support for.
-			isGenericCSIPVC, err := isGenericCSIPersistentVolume(pv)
+			isGenericCSIPVC, err := isGenericCSIPersistentVolume(pv, restore.Status.Volumes)
 			if err != nil {
 				return nil, err
 			}
