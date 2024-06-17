@@ -79,6 +79,7 @@ type ApplicationBackupStatus struct {
 	TotalSize            uint64                           `json:"totalSize"`
 	ResourceCount        int                              `json:"resourceCount"`
 	LargeResourceEnabled bool                             `json:"largeResourceEnabled"`
+	FailedVolCount       int                              `json:"failedVolCount"`
 }
 
 // ObjectInfo contains info about an object being backed up or restored
@@ -91,6 +92,15 @@ type ObjectInfo struct {
 // ApplicationBackupResourceInfo is the info for the backup of a resource
 type ApplicationBackupResourceInfo struct {
 	ObjectInfo `json:",inline"`
+	Status     ApplicationBackupStatusType `json:"status"`
+	Reason     string                      `json:"reason"`
+}
+
+// This object is used in VolumeInfo for PSA enabled cluster to retain the runAsUser ID and runAsGroup ID used by
+// Job pod(KDMP/NFS)during backup. We will use the same IDs to spin up Job Pods during restore.
+type JobSecurityContext struct {
+	RunAsUser  int64 `json:"runAsUser"`
+	RunAsGroup int64 `json:"runAsGroup"`
 }
 
 // ApplicationBackupVolumeInfo is the info for the backup of a volume
@@ -110,6 +120,9 @@ type ApplicationBackupVolumeInfo struct {
 	StorageClass             string                      `json:"storageClass"`
 	Provisioner              string                      `json:"provisioner"`
 	VolumeSnapshot           string                      `json:"volumeSnapshot"`
+	// It preserves the uid and gid of the pod that is run by the backup job
+	// that helps in restore operation. this is required only when PSA is enforced.
+	JobSecurityContext JobSecurityContext `json:",inline"`
 }
 
 // ApplicationBackupStatusType is the status of the application backup

@@ -101,14 +101,24 @@ func (s *ApplicationBackupScheduleController) Reconcile(ctx context.Context, req
 }
 
 // Handle updates for ApplicationBackupSchedule objects
-func (s *ApplicationBackupScheduleController) handle(ctx context.Context, backupSchedule *stork_api.ApplicationBackupSchedule) error {
+func (s *ApplicationBackupScheduleController) handle(_ context.Context, backupSchedule *stork_api.ApplicationBackupSchedule) error {
 	if backupSchedule.DeletionTimestamp != nil {
+		return nil
+	}
+
+	err := handleCSINametoCSIMapMigration(&backupSchedule.Spec.Template.Spec)
+	if err != nil {
+		log.ApplicationBackupScheduleLog(backupSchedule).Errorf("Error creating CSISnapshotMap: %v", err)
+		s.recorder.Event(backupSchedule,
+			v1.EventTypeWarning,
+			string(stork_api.ApplicationBackupStatusFailed),
+			err.Error())
 		return nil
 	}
 
 	s.setDefaults(backupSchedule)
 	// First update the status of any pending backups
-	err := s.updateApplicationBackupStatus(backupSchedule)
+	err = s.updateApplicationBackupStatus(backupSchedule)
 	if err != nil {
 		msg := fmt.Sprintf("Error updating backup status: %v", err)
 		s.recorder.Event(backupSchedule,
@@ -342,6 +352,9 @@ func (s *ApplicationBackupScheduleController) startApplicationBackup(backupSched
 	}
 	if backup.Annotations == nil {
 		backup.Annotations = make(map[string]string)
+	}
+	if skipDriver, ok := backupSchedule.Annotations[utils.PxbackupAnnotationSkipdriverKey]; ok {
+		backup.Annotations[utils.PxbackupAnnotationSkipdriverKey] = skipDriver
 	}
 	backup.Annotations[ApplicationBackupScheduleNameAnnotation] = backupSchedule.Name
 	backup.Annotations[ApplicationBackupSchedulePolicyTypeAnnotation] = string(policyType)

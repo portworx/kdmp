@@ -3421,8 +3421,12 @@ func (p *portworx) StartBackup(backup *storkapi.ApplicationBackup,
 				return volumeInfos, &storkvolume.ErrStorageProviderBusy{Reason: cloudBackupCreateErr.Error()}
 			}
 			if _, ok := cloudBackupCreateErr.(*ost_errors.ErrExists); !ok {
-				return nil, fmt.Errorf("failed to start backup for %v (%v/%v): %v",
+				volumeInfo.Status = storkapi.ApplicationBackupStatusFailed
+				volumeInfo.Reason = fmt.Sprintf("%v", cloudBackupCreateErr)
+				volumeInfos = append(volumeInfos, volumeInfo)
+				logrus.Infof("failed to start backup for %v (%v/%v): %v",
 					volume, pvc.Namespace, pvc.Name, cloudBackupCreateErr)
+				continue
 			}
 		} else if err == nil {
 			// Only add volumeInfos if this was a successful backup
@@ -3433,6 +3437,8 @@ func (p *portworx) StartBackup(backup *storkapi.ApplicationBackup,
 }
 
 func (p *portworx) GetBackupStatus(backup *storkapi.ApplicationBackup) ([]*storkapi.ApplicationBackupVolumeInfo, error) {
+	volumeInfos := make([]*storkapi.ApplicationBackupVolumeInfo, 0)
+
 	if !p.initDone {
 		if err := p.initPortworxClients(); err != nil {
 			return nil, err
@@ -3440,9 +3446,14 @@ func (p *portworx) GetBackupStatus(backup *storkapi.ApplicationBackup) ([]*stork
 	}
 
 	driverMap := make(map[string]volume.VolumeDriver)
-	volumeInfos := make([]*storkapi.ApplicationBackupVolumeInfo, 0)
 	for _, vInfo := range backup.Status.Volumes {
 		if vInfo.DriverName != storkvolume.PortworxDriverName {
+			continue
+		}
+		// Skip for volumes which are in failed state as there is no need to proceed
+		// further and we have to return the orginal volInfo back to caller
+		if vInfo.Status == storkapi.ApplicationBackupStatusFailed {
+			volumeInfos = append(volumeInfos, vInfo)
 			continue
 		}
 		token, err := p.getUserToken(vInfo.Options, vInfo.Namespace)

@@ -132,7 +132,7 @@ func restoreVolResourcesAndApply(
 		}
 		for _, volumeBackup := range backup.Status.Volumes {
 			driverName := volumeBackup.DriverName
-			if volumeBackup.Namespace != namespace {
+			if volumeBackup.Namespace != namespace || volumeBackup.Status == storkapi.ApplicationBackupStatusFailed {
 				continue
 			}
 
