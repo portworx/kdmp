@@ -114,6 +114,11 @@ const (
 	UndefinedId = int64(-1)
 	PsaUIDKey   = "portworx.io/psa-uid"
 	PsaGIDKey   = "portworx.io/psa-gid"
+
+	// Keeping track of how many backups done in a schedule
+	BackupsDoneAnnotation = "portworx.io/backups-done"
+	// kdmp repo path
+	KdmpPath = "portworx.io/kdmp-path"
 )
 
 // Map of ignored namespace to be backed up for faster lookout

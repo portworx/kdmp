@@ -505,7 +505,7 @@ github.com/libopenstorage/openstorage-sdk-clients/sdk/golang
 github.com/libopenstorage/secrets
 github.com/libopenstorage/secrets/aws/credentials
 github.com/libopenstorage/secrets/k8s
-# github.com/libopenstorage/stork v1.4.1-0.20240617152950-2e3df62da9ae
+# github.com/libopenstorage/stork v1.4.1-0.20240619113513-324d14d62d3a
 ## explicit; go 1.21
 github.com/libopenstorage/stork/drivers
 github.com/libopenstorage/stork/drivers/volume
