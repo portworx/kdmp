@@ -383,13 +383,19 @@ func getPVCToPVMapping(allObjects []runtime.Unstructured) (map[string]*v1.Persis
 	return pvcNameToPV, nil
 }
 
-func isGenericCSIPersistentVolume(pv *v1.PersistentVolume) (bool, error) {
+func isGenericCSIPersistentVolume(pv *v1.PersistentVolume, volInfos []*storkapi.ApplicationRestoreVolumeInfo) (bool, error) {
 	driverName, err := volume.GetPVDriverForRestore(pv)
 	if err != nil {
 		return false, err
 	}
 	if driverName == "csi" {
 		return true, nil
+	}
+	// in case of cloud disk such as GCE, AWS, Azure, we need to skip the volumes as its now moved to csi
+	for _, vInfo := range volInfos {
+		if vInfo.RestoreVolume == pv.Name && vInfo.DriverName == "csi" {
+			return true, nil
+		}
 	}
 	return false, nil
 }
@@ -436,7 +442,7 @@ func removeCSIVolumesBeforeApply(
 			}
 
 			// Check if this PV is a generic CSI one
-			isGenericCSIPVC, err := isGenericCSIPersistentVolume(&pv)
+			isGenericCSIPVC, err := isGenericCSIPersistentVolume(&pv, restore.Status.Volumes)
 			if err != nil {
 				return nil, fmt.Errorf("failed to check if PV was provisioned by a CSI driver: %v", err)
 			}
@@ -468,7 +474,7 @@ func removeCSIVolumesBeforeApply(
 
 			// We have found a PV for this PVC. Check if it is a generic CSI PV
 			// that we do not already have native volume driver support for.
-			isGenericCSIPVC, err := isGenericCSIPersistentVolume(pv)
+			isGenericCSIPVC, err := isGenericCSIPersistentVolume(pv, restore.Status.Volumes)
 			if err != nil {
 				return nil, err
 			}
