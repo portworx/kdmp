@@ -273,6 +273,7 @@ func jobFor(
 	jobName string,
 	resources corev1.ResourceRequirements,
 	nodeName string,
+	live bool,
 ) (*batchv1.Job, error) {
 	backupName := jobName
 
@@ -410,6 +411,14 @@ func jobFor(
 		job.Spec.Template.Spec.ImagePullSecrets = utils.ToImagePullSecret(utils.GetImageSecretName(jobName))
 	}
 
+	// Add node affinity to the job spec
+	if !live {
+		job, err = utils.AddNodeAffinityToJob(job, jobOption)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	if len(jobOption.NfsServer) != 0 {
 		volumeMount := corev1.VolumeMount{
 			Name:      utils.NfsVolumeName,
@@ -494,6 +503,7 @@ func buildJob(jobName string, jobOptions drivers.JobOpts) (*batchv1.Job, error) 
 	}
 	var resourceNamespace string
 	var nodeName string
+	var live bool
 	// filter out the pods that are create by us
 	for _, pod := range pods {
 		labels := pod.ObjectMeta.Labels
@@ -504,6 +514,7 @@ func buildJob(jobName string, jobOptions drivers.JobOpts) (*batchv1.Job, error) 
 			// get the nodeName, if the pods is in Running state, So that we can schedule
 			// kopia job on the same node.
 			nodeName = pod.Spec.NodeName
+			live = true
 			break
 		}
 	}
@@ -518,6 +529,7 @@ func buildJob(jobName string, jobOptions drivers.JobOpts) (*batchv1.Job, error) 
 		jobName,
 		resources,
 		nodeName,
+		live,
 	)
 }
 
