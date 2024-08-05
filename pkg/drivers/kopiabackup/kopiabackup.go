@@ -493,7 +493,6 @@ func buildJob(jobName string, jobOptions drivers.JobOpts) (*batchv1.Job, error) 
 		return nil, fmt.Errorf(errMsg)
 	}
 	var resourceNamespace string
-	var live bool
 	var nodeName string
 	// filter out the pods that are create by us
 	for _, pod := range pods {
@@ -509,7 +508,7 @@ func buildJob(jobName string, jobOptions drivers.JobOpts) (*batchv1.Job, error) 
 		}
 	}
 	resourceNamespace = jobOptions.Namespace
-	if err := utils.SetupServiceAccount(jobName, resourceNamespace, roleFor(live)); err != nil {
+	if err := utils.SetupServiceAccount(jobName, resourceNamespace, roleFor()); err != nil {
 		errMsg := fmt.Sprintf("error creating service account %s/%s: %v", resourceNamespace, jobName, err)
 		logrus.Errorf("%s: %v", fn, errMsg)
 		return nil, fmt.Errorf(errMsg)
@@ -522,7 +521,7 @@ func buildJob(jobName string, jobOptions drivers.JobOpts) (*batchv1.Job, error) 
 	)
 }
 
-func roleFor(live bool) *rbacv1.Role {
+func roleFor() *rbacv1.Role {
 	role := &rbacv1.Role{
 		Rules: []rbacv1.PolicyRule{
 			{
@@ -531,23 +530,6 @@ func roleFor(live bool) *rbacv1.Role {
 				Verbs:     []string{rbacv1.VerbAll},
 			},
 		},
-	}
-	// Only live backup, we will add the hostaccess and privilege option.
-	if live {
-		hostAccessRule := rbacv1.PolicyRule{
-			APIGroups:     []string{"security.openshift.io"},
-			Resources:     []string{"securitycontextconstraints"},
-			ResourceNames: []string{"hostaccess"},
-			Verbs:         []string{"use"},
-		}
-		role.Rules = append(role.Rules, hostAccessRule)
-		PrivilegedRule := rbacv1.PolicyRule{
-			APIGroups:     []string{"security.openshift.io"},
-			Resources:     []string{"securitycontextconstraints"},
-			ResourceNames: []string{"privileged"},
-			Verbs:         []string{"use"},
-		}
-		role.Rules = append(role.Rules, PrivilegedRule)
 	}
 	return role
 }
