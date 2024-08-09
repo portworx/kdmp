@@ -365,6 +365,8 @@ func GetExecutorImageAndSecret(executorImageType, deploymentName, deploymentNs,
 			ExecutorImage = GetNfsExecutorImageName()
 		}
 	}
+	// bypass for testing:
+	ExecutorImage = "pure-artifactory.dev.purestorage.com/px-docker-dev-virtual/nthomas/nfsexecutor:master-latest"
 	logrus.Infof("The returned image and secret is %v %v", ExecutorImage, imageRegistrySecret)
 	return ExecutorImage, imageRegistrySecret, nil
 }

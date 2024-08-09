@@ -397,6 +397,9 @@ func parseNfsCreds() (*Repository, error) {
 		NfsConfig: &NfsConfig{},
 	}
 	repository.Type = storkapi.BackupLocationNFS
+	logrus.Info("Stop NFS server now>> Sleep Starting")
+	time.Sleep(4 * time.Minute)
+	logrus.Info("Stop NFS server now>> Sleep Complete, Process resuming")
 	sa, err := os.ReadFile(serverAddr)
 	if err != nil {
 		errMsg := fmt.Sprintf("failed reading data from file %s : %s", serverAddr, err)
