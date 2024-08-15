@@ -1168,3 +1168,13 @@ func AddNodeAffinityToJob(job *batchv1.Job, jobOption drivers.JobOpts) (*batchv1
 	}
 	return job, nil
 }
+
+// GetAccessModeFromPvc gets the access modes of the pvc
+func GetAccessModeFromPvc(srcPvcName, srcPvcNameSpace string) ([]corev1.PersistentVolumeAccessMode, error) {
+	srcPvc, err := core.Instance().GetPersistentVolumeClaim(srcPvcName, srcPvcNameSpace)
+	if err != nil {
+		return nil, err
+	}
+	accessModes := srcPvc.Status.AccessModes
+	return accessModes, nil
+}
