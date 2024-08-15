@@ -402,10 +402,6 @@ func jobFor(
 		}
 	}
 
-	if len(nodeName) != 0 {
-		job.Spec.Template.Spec.NodeName = nodeName
-	}
-
 	// Add the image secret in job spec only if it is present in the stork deployment.
 	if len(imageRegistrySecret) != 0 {
 		job.Spec.Template.Spec.ImagePullSecrets = utils.ToImagePullSecret(utils.GetImageSecretName(jobName))
@@ -416,6 +412,28 @@ func jobFor(
 		job, err = utils.AddNodeAffinityToJob(job, jobOption)
 		if err != nil {
 			return nil, err
+		}
+	} else {
+		accessModes, err := utils.GetAccessModeFromPvc(jobOption.SourcePVCName, jobOption.SourcePVCNamespace)
+		if err != nil {
+			return nil, err
+		}
+
+		var singleNodeMount bool
+		for _, val := range accessModes {
+			if val == "ReadWriteOnce" || val == "ReadWriteOncePod" {
+				singleNodeMount = true
+				break
+			}
+		}
+
+		if singleNodeMount && len(nodeName) != 0 {
+			job.Spec.Template.Spec.NodeName = nodeName
+		} else if !singleNodeMount {
+			job, err = utils.AddNodeAffinityToJob(job, jobOption)
+			if err != nil {
+				return nil, err
+			}
 		}
 	}
 
