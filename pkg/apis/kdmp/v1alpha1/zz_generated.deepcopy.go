@@ -292,6 +292,38 @@ func (in *ResourceBackup) DeepCopyInto(out *ResourceBackup) {
 			}
 		}
 	}
+	if in.ExistingVolumeInfoList != nil {
+		in, out := &in.ExistingVolumeInfoList, &out.ExistingVolumeInfoList
+		*out = make([]*storkv1alpha1.ApplicationRestoreVolumeInfo, len(*in))
+		for i := range *in {
+			if (*in)[i] != nil {
+				in, out := &(*in)[i], &(*out)[i]
+				*out = new(storkv1alpha1.ApplicationRestoreVolumeInfo)
+				(*in).DeepCopyInto(*out)
+			}
+		}
+	}
+	if in.DriverToRestoreCompleteListMap != nil {
+		in, out := &in.DriverToRestoreCompleteListMap, &out.DriverToRestoreCompleteListMap
+		*out = make(map[string][]*storkv1alpha1.ApplicationRestoreVolumeInfo, len(*in))
+		for key, val := range *in {
+			var outVal []*storkv1alpha1.ApplicationRestoreVolumeInfo
+			if val == nil {
+				(*out)[key] = nil
+			} else {
+				in, out := &val, &outVal
+				*out = make([]*storkv1alpha1.ApplicationRestoreVolumeInfo, len(*in))
+				for i := range *in {
+					if (*in)[i] != nil {
+						in, out := &(*in)[i], &(*out)[i]
+						*out = new(storkv1alpha1.ApplicationRestoreVolumeInfo)
+						(*in).DeepCopyInto(*out)
+					}
+				}
+			}
+			(*out)[key] = outVal
+		}
+	}
 	return
 }
 

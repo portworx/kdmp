@@ -286,6 +286,7 @@ func restoreVolResourcesAndApply(
 				}
 			}
 		}
+		/*
 		// Get restore volume batch count
 		batchCount := k8sutils.DefaultRestoreVolumeBatchCount
 		restoreVolumeBatchCount, err := k8sutils.GetConfigValue(k8sutils.StorkControllerConfigMapName, metav1.NamespaceSystem, k8sutils.RestoreVolumeBatchCountKey)
@@ -331,6 +332,7 @@ func restoreVolResourcesAndApply(
 			time.Sleep(volumeBatchSleepInterval)
 			restoreCompleteList = append(restoreCompleteList, restoreVolumeInfos...)
 		}
+		*/
 	}
 
 	// Check if all the PVC's are in bounded state
