@@ -305,18 +305,18 @@ func (in *ResourceBackup) DeepCopyInto(out *ResourceBackup) {
 	}
 	if in.DriverToRestoreCompleteListMap != nil {
 		in, out := &in.DriverToRestoreCompleteListMap, &out.DriverToRestoreCompleteListMap
-		*out = make(map[string][]*storkv1alpha1.ApplicationRestoreVolumeInfo, len(*in))
+		*out = make(map[string][]*storkv1alpha1.ApplicationBackupVolumeInfo, len(*in))
 		for key, val := range *in {
-			var outVal []*storkv1alpha1.ApplicationRestoreVolumeInfo
+			var outVal []*storkv1alpha1.ApplicationBackupVolumeInfo
 			if val == nil {
 				(*out)[key] = nil
 			} else {
 				in, out := &val, &outVal
-				*out = make([]*storkv1alpha1.ApplicationRestoreVolumeInfo, len(*in))
+				*out = make([]*storkv1alpha1.ApplicationBackupVolumeInfo, len(*in))
 				for i := range *in {
 					if (*in)[i] != nil {
 						in, out := &(*in)[i], &(*out)[i]
-						*out = new(storkv1alpha1.ApplicationRestoreVolumeInfo)
+						*out = new(storkv1alpha1.ApplicationBackupVolumeInfo)
 						(*in).DeepCopyInto(*out)
 					}
 				}

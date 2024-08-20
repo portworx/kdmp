@@ -85,8 +85,7 @@ type ResourceBackup struct {
 	// ExistingVolumeInfoList - existing volumeInfo list
 	ExistingVolumeInfoList []*storkapi.ApplicationRestoreVolumeInfo `json:"existingVolumeInfoList,omitempty"`
 	// map of driver to restoreVolumeInfoList
-	DriverToRestoreCompleteListMap map[string][]*storkapi.ApplicationRestoreVolumeInfo `json:"driverToRestoreCompleteListMap,omitempty"`
-
+	DriverToRestoreCompleteListMap map[string][]*storkapi.ApplicationBackupVolumeInfo `json:"driverToRestoreCompleteListMap,omitempty"`
 }
 
 // ResourceBackupSpec configuration parameters for ResourceBackup

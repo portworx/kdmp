@@ -2,12 +2,12 @@ package nfs
 
 import (
 	"fmt"
-	"strconv"
+	// "strconv"
 	"time"
 
 	"github.com/libopenstorage/stork/drivers/volume"
 	storkapi "github.com/libopenstorage/stork/pkg/apis/stork/v1alpha1"
-	"github.com/libopenstorage/stork/pkg/k8sutils"
+	// "github.com/libopenstorage/stork/pkg/k8sutils"
 	"github.com/libopenstorage/stork/pkg/log"
 	"github.com/libopenstorage/stork/pkg/resourcecollector"
 	kdmpapi "github.com/portworx/kdmp/pkg/apis/kdmp/v1alpha1"
@@ -176,8 +176,9 @@ func restoreVolResourcesAndApply(
 	// Iterate over bkp vol info and create the pvc
 	existingRestoreVolInfos := make([]*storkapi.ApplicationRestoreVolumeInfo, 0)
 	restoreCompleteList := make([]*storkapi.ApplicationRestoreVolumeInfo, 0)
-	var sErr error
-	var restoreVolumeInfos []*storkapi.ApplicationRestoreVolumeInfo
+	driverToRestoreCompleteListMap := make(map[string][]*storkapi.ApplicationBackupVolumeInfo)
+	// var sErr error
+	// var restoreVolumeInfos []*storkapi.ApplicationRestoreVolumeInfo
 
 	for driverName, bkpvInfo := range backupVolumeInfoMappings {
 		driver, err := volume.Get(driverName)
@@ -195,8 +196,9 @@ func restoreVolResourcesAndApply(
 			logrus.Tracef("backupVolInfos: %+v", backupVolInfos)
 			logrus.Tracef("existingRestoreVolInfos: %+v", existingRestoreVolInfos)
 		}
+		driverToRestoreCompleteListMap[driverName] = backupVolInfos
 
-		restoreCompleteList = append(restoreCompleteList, existingRestoreVolInfos...)
+		// restoreCompleteList = append(restoreCompleteList, existingRestoreVolInfos...)
 		preRestoreObjects, err := driver.GetPreRestoreResources(backup, restore, objects, storageClassByte)
 		if err != nil {
 			log.ApplicationRestoreLog(restore).Errorf("Error getting PreRestore Resources: %v", err)
@@ -267,74 +269,73 @@ func restoreVolResourcesAndApply(
 				return err
 			}
 		}
-		// Get restore volume batch sleep interval
-		volumeBatchSleepInterval, err := time.ParseDuration(k8sutils.DefaultRestoreVolumeBatchSleepInterval)
-		if err != nil {
-			logrus.Infof("error in parsing default restore volume sleep interval %s",
-				k8sutils.DefaultRestoreVolumeBatchSleepInterval)
-		}
-		RestoreVolumeBatchSleepInterval, err := k8sutils.GetConfigValue(k8sutils.StorkControllerConfigMapName,
-			metav1.NamespaceSystem, k8sutils.RestoreVolumeBatchSleepIntervalKey)
-		if err != nil {
-			logrus.Infof("error in reading %v cm, switching to default restore volume sleep interval",
-				k8sutils.StorkControllerConfigMapName)
-		} else {
-			if len(RestoreVolumeBatchSleepInterval) != 0 {
-				volumeBatchSleepInterval, err = time.ParseDuration(RestoreVolumeBatchSleepInterval)
-				if err != nil {
-					logrus.Infof("error in conversion of volumeBatchSleepInterval: %v", err)
-				}
-			}
-		}
 		/*
-		// Get restore volume batch count
-		batchCount := k8sutils.DefaultRestoreVolumeBatchCount
-		restoreVolumeBatchCount, err := k8sutils.GetConfigValue(k8sutils.StorkControllerConfigMapName, metav1.NamespaceSystem, k8sutils.RestoreVolumeBatchCountKey)
-		if err != nil {
-			logrus.Debugf("error in reading %v cm, defaulting restore volume batch count", k8sutils.StorkControllerConfigMapName)
-		} else {
-			if len(restoreVolumeBatchCount) != 0 {
-				batchCount, err = strconv.Atoi(restoreVolumeBatchCount)
-				if err != nil {
-					logrus.Debugf("error in conversion of restoreVolumeBatchCount: %v", err)
+			// Get restore volume batch sleep interval
+			volumeBatchSleepInterval, err := time.ParseDuration(k8sutils.DefaultRestoreVolumeBatchSleepInterval)
+			if err != nil {
+				logrus.Infof("error in parsing default restore volume sleep interval %s",
+					k8sutils.DefaultRestoreVolumeBatchSleepInterval)
+			}
+			RestoreVolumeBatchSleepInterval, err := k8sutils.GetConfigValue(k8sutils.StorkControllerConfigMapName,
+				metav1.NamespaceSystem, k8sutils.RestoreVolumeBatchSleepIntervalKey)
+			if err != nil {
+				logrus.Infof("error in reading %v cm, switching to default restore volume sleep interval",
+					k8sutils.StorkControllerConfigMapName)
+			} else {
+				if len(RestoreVolumeBatchSleepInterval) != 0 {
+					volumeBatchSleepInterval, err = time.ParseDuration(RestoreVolumeBatchSleepInterval)
+					if err != nil {
+						logrus.Infof("error in conversion of volumeBatchSleepInterval: %v", err)
+					}
 				}
 			}
-		}
-		for i := 0; i < len(backupVolInfos); i += batchCount {
-			batchVolInfo := backupVolInfos[i:min(i+batchCount, len(backupVolInfos))]
-			restoreVolumeInfos, sErr = driver.StartRestore(restore, batchVolInfo, preRestoreObjects)
-			if sErr != nil {
-				if _, ok := sErr.(*volume.ErrStorageProviderBusy); ok {
-					msg := fmt.Sprintf("Volume restores are in progress. Restores are failing for some volumes"+
-						" since the storage provider is busy. Restore will be retried. Error: %v", err)
-					log.ApplicationRestoreLog(restore).Errorf(msg)
-					rb, err := kdmpschedops.Instance().GetResourceBackup(rbCrName, rbCrNamespace)
+			// Get restore volume batch count
+			batchCount := k8sutils.DefaultRestoreVolumeBatchCount
+			restoreVolumeBatchCount, err := k8sutils.GetConfigValue(k8sutils.StorkControllerConfigMapName, metav1.NamespaceSystem, k8sutils.RestoreVolumeBatchCountKey)
+			if err != nil {
+				logrus.Debugf("error in reading %v cm, defaulting restore volume batch count", k8sutils.StorkControllerConfigMapName)
+			} else {
+				if len(restoreVolumeBatchCount) != 0 {
+					batchCount, err = strconv.Atoi(restoreVolumeBatchCount)
 					if err != nil {
-						errMsg := fmt.Sprintf("error reading ResourceBackup CR[%v/%v]: %v", rbCrNamespace, rbCrName, err)
-						return fmt.Errorf(errMsg)
+						logrus.Debugf("error in conversion of restoreVolumeBatchCount: %v", err)
 					}
-					// Update the success status to resource backup CR
-					rb.Status.Status = kdmpapi.ResourceBackupStatusInProgress
-					rb.Status.Reason = msg
-					rb.Status.ProgressPercentage = 0
+				}
+			}
+			for i := 0; i < len(backupVolInfos); i += batchCount {
+				batchVolInfo := backupVolInfos[i:min(i+batchCount, len(backupVolInfos))]
+				restoreVolumeInfos, sErr = driver.StartRestore(restore, batchVolInfo, preRestoreObjects)
+				if sErr != nil {
+					if _, ok := sErr.(*volume.ErrStorageProviderBusy); ok {
+						msg := fmt.Sprintf("Volume restores are in progress. Restores are failing for some volumes"+
+							" since the storage provider is busy. Restore will be retried. Error: %v", err)
+						log.ApplicationRestoreLog(restore).Errorf(msg)
+						rb, err := kdmpschedops.Instance().GetResourceBackup(rbCrName, rbCrNamespace)
+						if err != nil {
+							errMsg := fmt.Sprintf("error reading ResourceBackup CR[%v/%v]: %v", rbCrNamespace, rbCrName, err)
+							return fmt.Errorf(errMsg)
+						}
+						// Update the success status to resource backup CR
+						rb.Status.Status = kdmpapi.ResourceBackupStatusInProgress
+						rb.Status.Reason = msg
+						rb.Status.ProgressPercentage = 0
 
-					_, err = kdmpschedops.Instance().UpdateResourceBackup(rb)
-					if err != nil {
-						errMsg := fmt.Sprintf("error updating ResourceBackup CR[%v/%v]: %v", rbCrNamespace, rbCrName, err)
-						return fmt.Errorf(errMsg)
+						_, err = kdmpschedops.Instance().UpdateResourceBackup(rb)
+						if err != nil {
+							errMsg := fmt.Sprintf("error updating ResourceBackup CR[%v/%v]: %v", rbCrNamespace, rbCrName, err)
+							return fmt.Errorf(errMsg)
+						}
+						return nil
 					}
-					return nil
+					message := fmt.Sprintf("Error starting Application Restore for volumes: %v", sErr)
+					log.ApplicationRestoreLog(restore).Errorf(message)
+					return sErr
 				}
-				message := fmt.Sprintf("Error starting Application Restore for volumes: %v", sErr)
-				log.ApplicationRestoreLog(restore).Errorf(message)
-				return sErr
+				time.Sleep(volumeBatchSleepInterval)
+				restoreCompleteList = append(restoreCompleteList, restoreVolumeInfos...)
 			}
-			time.Sleep(volumeBatchSleepInterval)
-			restoreCompleteList = append(restoreCompleteList, restoreVolumeInfos...)
-		}
 		*/
 	}
-
 	// Check if all the PVC's are in bounded state
 	rb, err := kdmpschedops.Instance().GetResourceBackup(rbCrName, rbCrNamespace)
 	if err != nil {
@@ -342,6 +343,8 @@ func restoreVolResourcesAndApply(
 		return fmt.Errorf(errMsg)
 	}
 	// Update the success status to resource backup CR
+	rb.DriverToRestoreCompleteListMap = driverToRestoreCompleteListMap
+	rb.ExistingVolumeInfoList = existingRestoreVolInfos
 	rb.Status.Status = kdmpapi.ResourceBackupStatusSuccessful
 	rb.Status.Reason = utils.PvcBoundSuccessMsg
 	rb.Status.ProgressPercentage = 100
