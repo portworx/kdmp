@@ -27,16 +27,18 @@ import (
 // updateResourceExportFields when an update needs to be done to ResourceExport
 // user can choose which field to be updated and pass the same to updateStatus()
 type updateResourceExportFields struct {
-	stage                 kdmpapi.ResourceExportStage
-	status                kdmpapi.ResourceExportStatus
-	reason                string
-	id                    string
-	resources             []*kdmpapi.ResourceRestoreResourceInfo
-	RestoreCompleteList   []*storkapi.ApplicationRestoreVolumeInfo
-	TotalResourceCount    int64
-	RestoredResourceCount int64
-	ResourceApplyStage    kdmpapi.ResourceExportResourceApplyPhase
-	LargeResourceEnabled  bool
+	stage                          kdmpapi.ResourceExportStage
+	status                         kdmpapi.ResourceExportStatus
+	reason                         string
+	id                             string
+	resources                      []*kdmpapi.ResourceRestoreResourceInfo
+	RestoreCompleteList            []*storkapi.ApplicationRestoreVolumeInfo
+	ExistingVolumeInfoList         []*storkapi.ApplicationRestoreVolumeInfo
+	DriverToRestoreCompleteListMap map[string][]*storkapi.ApplicationBackupVolumeInfo
+	TotalResourceCount             int64
+	RestoredResourceCount          int64
+	ResourceApplyStage             kdmpapi.ResourceExportResourceApplyPhase
+	LargeResourceEnabled           bool
 }
 
 func (c *Controller) process(ctx context.Context, in *kdmpapi.ResourceExport) (bool, error) {
@@ -226,15 +228,17 @@ func (c *Controller) process(ctx context.Context, in *kdmpapi.ResourceExport) (b
 		case drivers.JobStateCompleted:
 			// Go for clean up with success state
 			updateData := updateResourceExportFields{
-				stage:                 kdmpapi.ResourceExportStageFinal,
-				status:                kdmpapi.ResourceExportStatusSuccessful,
-				reason:                "Job successful",
-				resources:             rb.Status.Resources,
-				RestoreCompleteList:   rb.RestoreCompleteList,
-				TotalResourceCount:    rb.Status.TotalResourceCount,
-				RestoredResourceCount: rb.Status.RestoredResourceCount,
-				ResourceApplyStage:    kdmpapi.ResourceExportResourceApplyPhase(rb.Status.ResourceApplyStage),
-				LargeResourceEnabled:  rb.Status.LargeResourceEnabled,
+				stage:                          kdmpapi.ResourceExportStageFinal,
+				status:                         kdmpapi.ResourceExportStatusSuccessful,
+				reason:                         "Job successful",
+				resources:                      rb.Status.Resources,
+				RestoreCompleteList:            rb.RestoreCompleteList,
+				ExistingVolumeInfoList:         rb.ExistingVolumeInfoList,
+				DriverToRestoreCompleteListMap: rb.DriverToRestoreCompleteListMap,
+				TotalResourceCount:             rb.Status.TotalResourceCount,
+				RestoredResourceCount:          rb.Status.RestoredResourceCount,
+				ResourceApplyStage:             kdmpapi.ResourceExportResourceApplyPhase(rb.Status.ResourceApplyStage),
+				LargeResourceEnabled:           rb.Status.LargeResourceEnabled,
 			}
 			return true, c.updateStatus(resourceExport, updateData)
 		}
@@ -328,6 +332,14 @@ func (c *Controller) updateStatus(re *kdmpapi.ResourceExport, data updateResourc
 
 		if len(data.RestoreCompleteList) != 0 {
 			re.RestoreCompleteList = data.RestoreCompleteList
+		}
+
+		if len(data.ExistingVolumeInfoList) != 0 {
+			re.ExistingVolumeInfoList = data.ExistingVolumeInfoList
+		}
+
+		if len(data.DriverToRestoreCompleteListMap) != 0 {
+			re.DriverToRestoreCompleteListMap = data.DriverToRestoreCompleteListMap
 		}
 
 		if data.TotalResourceCount != 0 {

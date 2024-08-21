@@ -109,6 +109,10 @@ type ResourceExport struct {
 	Status ResourceStatus `json:"status,omitempty"`
 	// RestoreCompleteList - restore complete volumeInfo
 	RestoreCompleteList []*storkapi.ApplicationRestoreVolumeInfo `json:"restoreCompleteList,omitempty"`
+	// ExistingVolumeInfoList - existing volumeInfo list
+	ExistingVolumeInfoList []*storkapi.ApplicationRestoreVolumeInfo `json:"existingVolumeInfoList,omitempty"`
+	// map of driver to restoreVolumeInfoList
+	DriverToRestoreCompleteListMap map[string][]*storkapi.ApplicationBackupVolumeInfo `json:"driverToRestoreCompleteListMap,omitempty"`
 }
 
 // ResourceExportSpec configuration parameters for ResourceExport
