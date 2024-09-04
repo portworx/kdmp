@@ -1982,6 +1982,7 @@ func startTransferJob(
 			drivers.WithNfsExportDir(nfsExportPath),
 			drivers.WithPodUserId(psaJobUid),
 			drivers.WithPodGroupId(psaJobGid),
+			drivers.WithNfsMountOption(nfsMountOption),
 		)
 	}
 
