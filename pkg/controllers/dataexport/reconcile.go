@@ -1936,6 +1936,7 @@ func startTransferJob(
 			drivers.WithNfsMountOption(nfsMountOption),
 			drivers.WithPodUserId(psaJobUid),
 			drivers.WithPodGroupId(psaJobGid),
+			drivers.WithDestinationPath(dataExport.Annotations[stork_utils.KdmpPath]),
 		)
 	case drivers.KopiaRestore:
 		return drv.StartJob(

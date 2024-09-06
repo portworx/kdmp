@@ -59,6 +59,7 @@ type JobOpts struct {
 	ResoureBackupName          string
 	ResoureBackupNamespace     string
 	S3DisableSSL               bool
+	DestinationPath            string
 	// psa specifc option to be used by job
 	PodUserId  string
 	PodGroupId string
@@ -533,6 +534,14 @@ func WithPodUserId(podUserId string) JobOption {
 func WithPodGroupId(PodGroupId string) JobOption {
 	return func(opts *JobOpts) error {
 		opts.PodGroupId = PodGroupId
+		return nil
+	}
+}
+
+// WithDestinationPath is job parameter.
+func WithDestinationPath(path string) JobOption {
+	return func(opts *JobOpts) error {
+		opts.DestinationPath = strings.TrimSpace(path)
 		return nil
 	}
 }

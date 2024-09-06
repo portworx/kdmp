@@ -284,7 +284,7 @@ func jobFor(
 		"--volume-backup-name",
 		backupName,
 		"--repository",
-		toRepoName(jobOption.RepoPVCName, jobOption.Namespace),
+		toRepoName(jobOption.RepoPVCName, jobOption.Namespace, jobOption.DestinationPath),
 		"--credentials",
 		jobOption.DataExportName,
 		"--backup-location",
@@ -465,8 +465,8 @@ func jobFor(
 	return job, nil
 }
 
-func toRepoName(pvcName, pvcNamespace string) string {
-	return fmt.Sprintf("%s-%s", pvcNamespace, pvcName)
+func toRepoName(pvcName, pvcNamespace string, pathExtension string) string {
+	return fmt.Sprintf("%s-%s-%s", pvcNamespace, pvcName, pathExtension)
 }
 
 func addJobLabels(jobOpts drivers.JobOpts) map[string]string {
