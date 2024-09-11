@@ -1,4 +1,4 @@
-RELEASE_VER ?= 1.2.12
+RELEASE_VER ?= 1.2.12-ppc
 BUILD_DATE  := $(shell date -u +'%Y-%m-%dT%H:%M:%SZ')
 BASE_DIR    := $(shell git rev-parse --show-toplevel)
 GIT_SHA     := $(shell git rev-parse --short HEAD)
@@ -175,7 +175,7 @@ build-kopia-executor:
 	@echo "Build kopia-executor"
 	docker run --rm -v $(shell pwd):/go/src/github.com/portworx/kdmp $(DOCK_BUILD_CNT) \
 		/bin/bash -c 'cd /go/src/github.com/portworx/kdmp/cmd/executor/kopia; \
-	CGO_ENABLED=0 GOOS=linux go build -buildvcs=false -ldflags="-s -w \
+	CGO_ENABLED=0 GOOS=linux GOARCH=ppc64le go build -buildvcs=false -ldflags="-s -w \
 	-X github.com/portworx/kdmp/pkg/version.gitVersion=${RELEASE_VER} \
 	-X github.com/portworx/kdmp/pkg/version.gitCommit=${GIT_SHA} \
 	-X github.com/portworx/kdmp/pkg/version.buildDate=${BUILD_DATE}" \
@@ -186,7 +186,7 @@ build-nfs-executor:
 	@echo "Build nfs-executor"
 	docker run --rm -v $(shell pwd):/go/src/github.com/portworx/kdmp $(DOCK_BUILD_CNT) \
 		/bin/bash -c 'cd /go/src/github.com/portworx/kdmp/cmd/executor/nfs; \
-	CGO_ENABLED=0 GOOS=linux go build -buildvcs=false -ldflags="-s -w \
+	CGO_ENABLED=0 GOOS=linux GOARCH=ppc64le go build -buildvcs=false -ldflags="-s -w \
 	-X github.com/portworx/kdmp/pkg/version.gitVersion=${RELEASE_VER} \
 	-X github.com/portworx/kdmp/pkg/version.gitCommit=${GIT_SHA} \
 	-X github.com/portworx/kdmp/pkg/version.buildDate=${BUILD_DATE}" \

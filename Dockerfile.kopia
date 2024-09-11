@@ -1,9 +1,7 @@
-FROM registry.access.redhat.com/ubi9-minimal:latest
+FROM registry.access.redhat.com/ubi8/s2i-core:1-440
+FROM --platform=ppc64le registry.access.redhat.com/ubi9/ubi:9.2-755
 
 MAINTAINER Portworx Inc. <support@portworx.com>
-
-RUN microdnf install -y bash vim make wget gpg ca-certificates yum && \
-        microdnf clean all
 
 WORKDIR /
 
