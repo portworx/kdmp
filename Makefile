@@ -90,7 +90,7 @@ staticcheck:
 errcheck:
 	docker run --rm -v $(shell pwd):/go/src/github.com/portworx/kdmp $(DOCK_BUILD_CNT) \
 		/bin/bash -c "cd /go/src/github.com/portworx/kdmp; \
-	GO111MODULE=off go get -u github.com/kisielk/errcheck; \
+	go install github.com/kisielk/errcheck@v1.7.0; \
 	git config --global --add safe.directory /go/src/github.com/portworx/kdmp; \
 	errcheck -ignoregenerated -ignorepkg fmt -verbose -blank $(PKGS); \
 	errcheck -ignoregenerated -ignorepkg fmt -verbose -blank -tags unittest $(PKGS)"
