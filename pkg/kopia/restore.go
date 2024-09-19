@@ -3,6 +3,8 @@ package kopia
 import (
 	"bytes"
 	"fmt"
+	"io"
+	"log"
 	"os"
 	"os/exec"
 	"strconv"
@@ -98,8 +100,13 @@ func NewRestoreExecutor(cmd *Command) Executor {
 func (b *restoreExecutor) Run() error {
 
 	b.execCmd = b.cmd.RestoreCmd()
-	b.execCmd.Stdout = b.outBuf
-	b.execCmd.Stderr = b.errBuf
+
+	// Create multi-writers to stream output to both buffer and CLI
+	stdoutWriter := io.MultiWriter(b.outBuf, newLogWriter(log.New(os.Stdout, "", 0), commandExecLogInterval))
+	stderrWriter := io.MultiWriter(b.errBuf, newLogWriter(log.New(os.Stderr, "", 0), commandExecLogInterval))
+
+	b.execCmd.Stdout = stdoutWriter
+	b.execCmd.Stderr = stderrWriter
 
 	if err := b.execCmd.Start(); err != nil {
 		b.lastError = err

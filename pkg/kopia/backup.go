@@ -4,12 +4,19 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
+	"log"
 	"os"
 	"os/exec"
+	"sync"
 	"time"
 
 	cmdexec "github.com/portworx/kdmp/pkg/executor"
 	"github.com/sirupsen/logrus"
+)
+
+const (
+	commandExecLogInterval = 30 * time.Second
 )
 
 // BackupSummaryResponse describes single snapshot entry.
@@ -74,6 +81,34 @@ type backupExecutor struct {
 	lastError       error
 }
 
+type logWriter struct {
+	logger      *log.Logger
+	lastLogTime time.Time
+	interval    time.Duration
+	mu          sync.Mutex
+}
+
+func newLogWriter(l *log.Logger, interval time.Duration) *logWriter {
+	return &logWriter{
+		logger:   l,
+		interval: interval,
+	}
+}
+
+func (lw *logWriter) Write(p []byte) (n int, err error) {
+	lw.mu.Lock()
+	defer lw.mu.Unlock()
+
+	now := time.Now()
+	// log if the interval has passed since the last log
+	// this is to avoid bloating the logs
+	if now.Sub(lw.lastLogTime) >= lw.interval {
+		lw.logger.Println(string(p), time.Now())
+		lw.lastLogTime = now
+	}
+	return len(p), nil
+}
+
 // GetBackupCommand returns a wrapper over the kopia backup command
 func GetBackupCommand(path, repoName, password, provider, sourcePath string) (*Command, error) {
 	if repoName == "" {
@@ -103,8 +138,13 @@ func NewBackupExecutor(cmd *Command) Executor {
 
 func (b *backupExecutor) Run() error {
 	b.execCmd = b.cmd.BackupCmd()
-	b.execCmd.Stdout = b.outBuf
-	b.execCmd.Stderr = b.errBuf
+
+	// Create multi-writers to stream output to both buffer and CLI
+	stdoutWriter := io.MultiWriter(b.outBuf, newLogWriter(log.New(os.Stdout, "", 0), commandExecLogInterval))
+	stderrWriter := io.MultiWriter(b.errBuf, newLogWriter(log.New(os.Stderr, "", 0), commandExecLogInterval))
+
+	b.execCmd.Stdout = stdoutWriter
+	b.execCmd.Stderr = stderrWriter
 
 	if err := b.execCmd.Start(); err != nil {
 		b.lastError = err
