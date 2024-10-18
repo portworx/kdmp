@@ -550,6 +550,7 @@ func (c *csiDriver) SnapshotStatus(name, namespace string) (SnapshotInfo, error)
 }
 
 func (c *csiDriver) RestoreVolumeClaim(opts ...Option) (*v1.PersistentVolumeClaim, error) {
+	logrus.Infof("Entering function %s", "RestoreVolumeClaim")
 	var err error
 	o := Options{}
 	for _, opt := range opts {
@@ -578,14 +579,14 @@ func (c *csiDriver) RestoreVolumeClaim(opts ...Option) (*v1.PersistentVolumeClai
 				errMsg := fmt.Sprintf("failed to get volumesnapshot [%v/%v]", snapshot.Namespace, snapshot.Name)
 				return "", true, fmt.Errorf("%v", errMsg)
 			}
-			if snapshot.Status == nil || snapshot.Status.RestoreSize == nil {
+			if snapshot.Status == nil {
 				errMsg := fmt.Sprintf("volumesnapshot [%v/%v] status is not updated", snapshot.Namespace, snapshot.Name)
 				return "", true, fmt.Errorf("%v", errMsg)
 			}
 			return "", false, nil
 		}
 		if _, err := task.DoRetryWithTimeout(checkVsStatus, defaultTimeout, progressCheckInterval); err != nil {
-			errMsg := fmt.Sprintf("max retries done, volumesnapshot [%v/%v] status is not updated", snapshot.Namespace, snapshot.Name)
+			errMsg := fmt.Sprintf("max retries done, volumesnapshot [%v/%v] status with size %v is not updated", snapshot.Namespace, snapshot.Name, snapshot.Status.RestoreSize)
 			logrus.Errorf("%v", errMsg)
 			// Exhausted all retries, return error
 			return nil, fmt.Errorf("%v", errMsg)
@@ -615,14 +616,14 @@ func (c *csiDriver) RestoreVolumeClaim(opts ...Option) (*v1.PersistentVolumeClai
 				errMsg := fmt.Sprintf("failed to get volumesnapshot [%v/%v]", snapshot.Namespace, snapshot.Name)
 				return "", true, fmt.Errorf("%v", errMsg)
 			}
-			if snapshot.Status == nil || snapshot.Status.RestoreSize == nil {
+			if snapshot.Status == nil {
 				errMsg := fmt.Sprintf("volumesnapshot [%v/%v] status is not updated", snapshot.Namespace, snapshot.Name)
 				return "", true, fmt.Errorf("%v", errMsg)
 			}
 			return "", false, nil
 		}
 		if _, err := task.DoRetryWithTimeout(checkVsStatus, defaultTimeout, progressCheckInterval); err != nil {
-			errMsg := fmt.Sprintf("max retries done, volumesnapshot [%v/%v] status is not updated", snapshot.Namespace, snapshot.Name)
+			errMsg := fmt.Sprintf("max retries done, volumesnapshot [%v/%v] status with size %v is not updated", snapshot.Namespace, snapshot.Name, snapshot.Status.RestoreSize)
 			logrus.Errorf("%v", errMsg)
 			// Exhausted all retries, return error
 			return nil, fmt.Errorf("%v", errMsg)
