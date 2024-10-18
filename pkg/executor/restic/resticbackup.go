@@ -57,7 +57,7 @@ func runBackup(sourcePath string) error {
 	}
 
 	if volumeBackupName != "" {
-		if err = executor.CreateVolumeBackup(
+		if _, err = executor.CreateVolumeBackup(
 			volumeBackupName,
 			namespace,
 			repo.Name,

@@ -607,7 +607,7 @@ func UpdateResourceBackupStatus(
 }
 
 // CreateVolumeBackup creates volumebackup CRD
-func CreateVolumeBackup(name, namespace, repository, blName, blNamespace string) error {
+func CreateVolumeBackup(name, namespace, repository, blName, blNamespace string) (bool, error) {
 	new := &kdmpapi.VolumeBackup{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
@@ -630,18 +630,21 @@ func CreateVolumeBackup(name, namespace, repository, blName, blNamespace string)
 		if errors.IsNotFound(err) {
 			_, err = kdmpops.Instance().CreateVolumeBackup(context.Background(), new)
 		}
-		return err
+		return false, err
 	}
 
 	if !reflect.DeepEqual(vb.Spec, new.Spec) {
-		return fmt.Errorf("volumebackup %s/%s with different spec already exists", namespace, name)
+		return false, fmt.Errorf("volumebackup %s/%s with different spec already exists", namespace, name)
 	}
 
+	// The Kopia snapshot is considered successful if the volume backup CR status is updated with the SnapshotID.
+	// In this case, we will mark the KDMP pod as successful without performing any further processing.
 	if vb.Status.SnapshotID != "" {
-		return fmt.Errorf("volumebackup %s/%s with snapshot id already exists", namespace, name)
+		logrus.Infof("volumebackup %s/%s with snapshot id already exists", namespace, name)
+		return true, nil
 	}
 
-	return nil
+	return false, nil
 }
 
 // GetSourcePath data source path
