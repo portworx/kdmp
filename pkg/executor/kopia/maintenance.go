@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	storkapi "github.com/libopenstorage/stork/pkg/apis/stork/v1alpha1"
@@ -83,6 +84,69 @@ func getRepoList(bucket *blob.Bucket) ([]string, error) {
 	return repoList, nil
 }
 
+// deleteRepoFolder - This function will delete a repo/folder.
+func deleteRepoFolder(b *blob.Bucket, prefix string) error {
+	fn := "deleteRepoFolder:"
+	logrus.Infof("%s starting deletion for prefix: %s", fn, prefix)
+
+	// Add trailing slash if not present
+	if !strings.HasSuffix(prefix, "/") {
+		prefix = prefix + "/"
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+
+	// First verify if the prefix exists and list objects
+	objectsToDelete := make([]string, 0)
+	iter := b.List(&blob.ListOptions{
+		Prefix: prefix,
+	})
+
+	// List all objects first
+	for {
+		obj, err := iter.Next(ctx)
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			logrus.Errorf("%s error listing objects: %v", fn, err)
+			return fmt.Errorf("%s error listing objects: %v", fn, err)
+		}
+		objectsToDelete = append(objectsToDelete, obj.Key)
+	}
+
+	if len(objectsToDelete) == 0 {
+		logrus.Infof("%s no objects found with prefix %s", fn, prefix)
+		return nil
+	}
+
+	// Delete objects one by one
+	deletedCount := 0
+	for _, key := range objectsToDelete {
+		deleteCtx, deleteCancel := context.WithTimeout(context.Background(), 30*time.Second)
+		err := b.Delete(deleteCtx, key)
+		deleteCancel()
+
+		if err != nil {
+			logrus.Errorf("%s failed to delete object %s: %v", fn, key, err)
+			continue
+		}
+		deletedCount++
+
+		if deletedCount%10 == 0 || deletedCount == len(objectsToDelete) {
+			logrus.Infof("%s deleted %d/%d objects", fn, deletedCount, len(objectsToDelete))
+		}
+	}
+
+	if deletedCount != len(objectsToDelete) {
+		return fmt.Errorf("%s partial deletion: only deleted %d/%d objects", fn, deletedCount, len(objectsToDelete))
+	}
+
+	logrus.Infof("%s successfully deleted all %d objects with prefix: %s", fn, deletedCount, prefix)
+	return nil
+}
+
 func updateBackupLocationMaintenace(
 	maintenanceType string,
 	status kdmp_api.RepoMaintenanceStatusType,
@@ -132,6 +196,8 @@ func runMaintenance(maintenanceType string) error {
 		return fmt.Errorf(errMsg)
 	}
 	var repoList []string
+	var bucket *blob.Bucket
+
 	if repo.Type == storkapi.BackupLocationNFS {
 		repoBaseDir := repo.Path + genericBackupDir + "/"
 		listOfSubDirs, err := returnDirList(repoBaseDir)
@@ -161,7 +227,7 @@ func runMaintenance(maintenanceType string) error {
 			logrus.Errorf("%v", err)
 			return err
 		}
-		bucket, err := objectstore.GetBucket(bl)
+		bucket, err = objectstore.GetBucket(bl)
 		if err != nil {
 			logrus.Errorf("getting bucket details for [%v] failed: %v", repo.Path, err)
 			return err
@@ -169,8 +235,8 @@ func runMaintenance(maintenanceType string) error {
 		// The generic backup will be created under generic-backups/ directory in a bucket.
 		// So, to get the list of repo in the bucket, get list of enteries under genric-backup dir.
 		repo.Name = genericBackupDir + "/"
-		bucket = blob.PrefixedBucket(bucket, repo.Name)
-		repoList, err = getRepoList(bucket)
+		// bucket = blob.PrefixedBucket(bucket, repo.Name)
+		repoList, err = getRepoList(blob.PrefixedBucket(bucket, repo.Name))
 		if len(repoList) == 0 {
 			logrus.Warnf("Provider is non-nfs, No directory %v exists, verify if it is a resource only backup", repo.Name)
 			return nil
@@ -194,6 +260,75 @@ func runMaintenance(maintenanceType string) error {
 			continue
 		}
 		logrus.Infof("connect to repo completed successfully for repository [%v]", repo.Name)
+
+		// TODO: inject stale repo deletion here:
+		// TODO: Limit to only optimized repos
+		snapshotList, err := runKopiaSnapshotList(repo)
+		if err != nil {
+			errMsg := fmt.Sprintf("kopia optimization: snapshot list failed for repo [%v]: %v", repo, err)
+			logrus.Errorf("%s: %v", fn, errMsg)
+			statusErr := updateBackupLocationMaintenace(maintenanceType, kdmp_api.RepoMaintenanceStatusFailed, repo.Name, err.Error())
+			if statusErr != nil {
+				logrus.Warnf("Non Blocking: stale optimization of %smaintenance for repo [%v] failed: %v", maintenanceType, repo.Name, statusErr)
+			}
+		} else if len(snapshotList) == 0 {
+			// This kopia repo is empty, ready for delete
+			logrus.Debugf("kopia optimization: snapshot list is empty for repo [%v]", repo.Name)
+
+			// Skipping NFS repos. !!TODO: VIKAS: Remove this check once NFS is supported
+			if repo.Type == storkapi.BackupLocationNFS {
+				continue
+			}
+			// Validate bucket accessibility first
+			// Recreating bucket: PrefixedBucket actually closes the original bucket when creating a new prefixed bucket.
+			bl, err := buildStorkBackupLocation(repo)
+			if err != nil {
+				logrus.Errorf("%v", err)
+				return err
+			}
+
+			bucket, err = objectstore.GetBucket(bl)
+			if err != nil {
+				logrus.Errorf("getting bucket details for [%v] failed: %v", repo.Path, err)
+				return err
+			}
+			ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
+			defer cancel()
+
+			accessible, err := bucket.IsAccessible(ctx)
+			if err != nil {
+				return fmt.Errorf("%s bucket access check failed for repo [%s]: %v", fn, repo.Name, err)
+			}
+			if !accessible {
+				return fmt.Errorf("%s bucket is not accessible for repo [%s]", fn, repo.Name)
+			}
+
+			// Try to delete the empty repo with improved error handling
+			if err := deleteRepoFolderSafely(ctx, bucket, repo.Name); err != nil {
+				logrus.Errorf("%s failed to delete repo folder %s: %v", fn, repo.Name, err)
+			}
+
+			logrus.Infof("%s deleted repo [%v] successfully", fn, repo.Name)
+			continue
+
+			// if repo.Type != storkapi.BackupLocationNFS {
+			// 	if err := deleteRepoFolder(bucket, repoName); err != nil {
+			// 		logrus.Errorf("failed to delete repo folder %s: %v", repoName, err)
+			// 		// TODO: Optionally: return err if you want to fail the entire operation
+			// 	} else {
+			// 		logrus.Infof("deleted repo [%v] successfully", repoName)
+			// 	}
+
+			// }
+		} else if len(snapshotList) > 0 {
+			logrus.Infof("kopia optimization: snapshot list is not empty for repo [%v] length: [%v]", repo.Name, len(snapshotList))
+			// !!TODO: REMOVE CONTINUE, THIS IS FOR DEVELOPMENT
+			err = cleanKopiaConfigContents()
+			if err != nil {
+				logrus.Errorf("failed to remove config contents from directory %s: %v", cacheDir, err)
+			}
+			continue
+		}
 
 		if err := runKopiaMaintenanceSet(repo); err != nil {
 			errMsg := fmt.Sprintf("maintenance owner set command failed for repo [%v]: %v", repo.Name, err)
@@ -230,7 +365,7 @@ func runMaintenance(maintenanceType string) error {
 
 		// Delete the kopia config files as the next connect command may fail because of this
 		// Not failing the operation if the clean up of the directory fails
-		err := cleanKopiaConfigContents()
+		err = cleanKopiaConfigContents()
 		if err != nil {
 			logrus.Errorf("failed to remove config contents from directory %s: %v", cacheDir, err)
 		}
@@ -243,6 +378,97 @@ func runMaintenance(maintenanceType string) error {
 		logrus.Infof("maintenance full run command completed successfully for repository [%v]", repo.Name)
 	}
 
+	return nil
+}
+
+func deleteRepoFolderSafely(ctx context.Context, b *blob.Bucket, prefix string) error {
+	fn := "deleteRepoFolderSafely:"
+
+	// Ensure prefix ends with slash for safety
+	if !strings.HasSuffix(prefix, "/") {
+		prefix = prefix + "/"
+	}
+
+	// List objects to verify first
+	opts := &blob.ListOptions{
+		Prefix: prefix,
+	}
+
+	// Count objects and total size first
+	var objectCount int
+	var totalSize int64
+	iter := b.List(opts)
+	for {
+		obj, err := iter.Next(ctx)
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return fmt.Errorf("%s error listing objects: %v", fn, err)
+		}
+		if !obj.IsDir {
+			objectCount++
+			totalSize += obj.Size
+		}
+	}
+
+	if objectCount == 0 {
+		logrus.Infof("%s no objects found in prefix %s", fn, prefix)
+		return nil
+	}
+
+	logrus.Infof("%s preparing to delete %d objects (total: %d bytes) from %s",
+		fn, objectCount, totalSize, prefix)
+
+	// Delete objects
+	deleted := 0
+	iter = b.List(opts)
+	for {
+		obj, err := iter.Next(ctx)
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return fmt.Errorf("%s error during deletion listing: %v", fn, err)
+		}
+		if obj.IsDir {
+			continue
+		}
+
+		// Delete with context timeout
+		deleteCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+		err = b.Delete(deleteCtx, obj.Key)
+		cancel()
+
+		if err != nil {
+			return fmt.Errorf("%s failed to delete object %s: %v", fn, obj.Key, err)
+		}
+		deleted++
+
+		if deleted%10 == 0 || deleted == objectCount {
+			logrus.Infof("%s deleted %d/%d objects", fn, deleted, objectCount)
+		}
+	}
+
+	// Verify deletion
+	var remainingCount int
+	iter = b.List(opts)
+	for {
+		_, err := iter.Next(ctx)
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return fmt.Errorf("%s error verifying deletion: %v", fn, err)
+		}
+		remainingCount++
+	}
+
+	if remainingCount > 0 {
+		return fmt.Errorf("%s deletion incomplete, %d objects remain", fn, remainingCount)
+	}
+
+	logrus.Infof("%s successfully deleted all %d objects from %s", fn, deleted, prefix)
 	return nil
 }
 
