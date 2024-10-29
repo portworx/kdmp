@@ -206,6 +206,8 @@ type ClusterDomainsPluginInterface interface {
 	ActivateClusterDomain(*storkapi.ClusterDomainUpdate) error
 	// DeactivateClusterDomain deactivates a cluster domain
 	DeactivateClusterDomain(*storkapi.ClusterDomainUpdate) error
+	// GetClusterDomainNodes returns all the cluster domains with their nodes
+	GetClusterDomainNodes() (map[string][]*api.Node, error)
 }
 
 // BackupRestorePluginInterface Interface to backup and restore volumes
@@ -215,7 +217,7 @@ type BackupRestorePluginInterface interface {
 	StartBackup(*storkapi.ApplicationBackup, []v1.PersistentVolumeClaim) ([]*storkapi.ApplicationBackupVolumeInfo, error)
 	// GetBackupStatus Get the status of backup of the volumes specified in the status
 	// for the backup spec
-	GetBackupStatus(*storkapi.ApplicationBackup) ([]*storkapi.ApplicationBackupVolumeInfo, error)
+	GetBackupStatus(*storkapi.ApplicationBackup) error
 	// CancelBackup Cancel the backup of volumes specified in the status
 	CancelBackup(*storkapi.ApplicationBackup) error
 	// CleanupBackupResources the backup of resource specified backup
@@ -512,6 +514,11 @@ func (c *ClusterDomainsNotSupported) DeactivateClusterDomain(*storkapi.ClusterDo
 	return &errors.ErrNotSupported{}
 }
 
+// GetClusterDomainNodes returns all the cluster domains with their nodes
+func (c *ClusterDomainsNotSupported) GetClusterDomainNodes() (map[string][]*api.Node, error) {
+	return nil, &errors.ErrNotSupported{}
+}
+
 // BackupRestoreNotSupported to be used by drivers that don't support backup
 type BackupRestoreNotSupported struct{}
 
@@ -524,8 +531,8 @@ func (b *BackupRestoreNotSupported) StartBackup(
 }
 
 // GetBackupStatus returns ErrNotSupported
-func (b *BackupRestoreNotSupported) GetBackupStatus(*storkapi.ApplicationBackup) ([]*storkapi.ApplicationBackupVolumeInfo, error) {
-	return nil, &errors.ErrNotSupported{}
+func (b *BackupRestoreNotSupported) GetBackupStatus(*storkapi.ApplicationBackup) error {
+	return nil
 }
 
 // CancelBackup returns ErrNotSupported
@@ -643,23 +650,26 @@ func IsNodeMatch(k8sNode *v1.Node, driverNode *NodeInfo) bool {
 }
 
 // RemoveDuplicateOfflineNodes Removes duplicate offline nodes from the list which have
-// the same IP as an online node
+// the same IP or same scheduler name as an online node
 func RemoveDuplicateOfflineNodes(nodes []*NodeInfo) []*NodeInfo {
 	updatedNodes := make([]*NodeInfo, 0)
 	offlineNodes := make([]*NodeInfo, 0)
 	onlineIPs := make([]string, 0)
+	onlineSchedulerIDs := make([]string, 0)
 	// First add the online nodes to the list
 	for _, node := range nodes {
 		if node.Status == NodeOnline {
 			updatedNodes = append(updatedNodes, node)
 			onlineIPs = append(onlineIPs, node.IPs...)
+			onlineSchedulerIDs = append(onlineSchedulerIDs, node.SchedulerID)
 		} else {
 			offlineNodes = append(offlineNodes, node)
 		}
 	}
 
 	// Then go through the offline nodes and ignore any which have
-	// the same IP as an online node
+	// the same IP as an online node and also ignore any which have the
+	// same scheduler ID as an online node
 	for _, offlineNode := range offlineNodes {
 		found := false
 		for _, offlineIP := range offlineNode.IPs {
@@ -668,6 +678,12 @@ func RemoveDuplicateOfflineNodes(nodes []*NodeInfo) []*NodeInfo {
 					found = true
 					break
 				}
+			}
+		}
+		for _, onlineSchedulerID := range onlineSchedulerIDs {
+			if offlineNode.SchedulerID == onlineSchedulerID {
+				found = true
+				break
 			}
 		}
 		if !found {

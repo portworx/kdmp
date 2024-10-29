@@ -14,6 +14,7 @@ import (
 	stork_driver "github.com/libopenstorage/stork/drivers"
 	storkvolume "github.com/libopenstorage/stork/drivers/volume"
 	storkapi "github.com/libopenstorage/stork/pkg/apis/stork/v1alpha1"
+	storkops "github.com/libopenstorage/stork/pkg/crud/stork"
 	"github.com/libopenstorage/stork/pkg/errors"
 	"github.com/libopenstorage/stork/pkg/k8sutils"
 	"github.com/libopenstorage/stork/pkg/log"
@@ -27,7 +28,6 @@ import (
 	"github.com/portworx/sched-ops/k8s/externalsnapshotter"
 	kdmpShedOps "github.com/portworx/sched-ops/k8s/kdmp"
 	"github.com/portworx/sched-ops/k8s/storage"
-	storkops "github.com/portworx/sched-ops/k8s/stork"
 	"github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
 	k8serror "k8s.io/apimachinery/pkg/api/errors"
@@ -44,6 +44,8 @@ const (
 	volumeinitialDelay = 2 * time.Second
 	volumeFactor       = 1.5
 	volumeSteps        = 20
+	// By default, will increase the pvc size by 10% of snapshot size, if snapshot size is greater than pvc size
+	defaultPvcSizeIncreasePercentage = 10
 	// StorkAPIVersion current api version supported by stork
 	StorkAPIVersion = "stork.libopenstorage.org/v1alpha1"
 	// KdmpAPIVersion current api version supported by KDMP
@@ -362,8 +364,7 @@ func (k *kdmp) StartBackup(backup *storkapi.ApplicationBackup,
 	return volumeInfos, nil
 }
 
-func (k *kdmp) GetBackupStatus(backup *storkapi.ApplicationBackup) ([]*storkapi.ApplicationBackupVolumeInfo, error) {
-	volumeInfos := make([]*storkapi.ApplicationBackupVolumeInfo, 0)
+func (k *kdmp) GetBackupStatus(backup *storkapi.ApplicationBackup) error {
 
 	for _, vInfo := range backup.Status.Volumes {
 		if vInfo.DriverName != storkvolume.KDMPDriverName {
@@ -375,19 +376,17 @@ func (k *kdmp) GetBackupStatus(backup *storkapi.ApplicationBackup) ([]*storkapi.
 			if k8serror.IsNotFound(err) {
 				vInfo.Status = storkapi.ApplicationBackupStatusFailed
 				vInfo.Reason = fmt.Sprintf("%v", err)
-				volumeInfos = append(volumeInfos, vInfo)
 				logrus.Errorf("failed to get backup DataExport CR: %v", err)
 				continue
 			}
 			logrus.Errorf("failed to get backup DataExport CR: %v", err)
-			return volumeInfos, err
+			return err
 		}
 
 		if dataExport.Status.Status == kdmpapi.DataExportStatusFailed &&
 			dataExport.Status.Stage == kdmpapi.DataExportStageFinal {
 			vInfo.Status = storkapi.ApplicationBackupStatusFailed
 			vInfo.Reason = fmt.Sprintf("Backup failed at stage %v for volume: %v", dataExport.Status.Stage, dataExport.Status.Reason)
-			volumeInfos = append(volumeInfos, vInfo)
 			continue
 		}
 
@@ -413,10 +412,9 @@ func (k *kdmp) GetBackupStatus(backup *storkapi.ApplicationBackup) ([]*storkapi.
 				}
 			}
 		}
-		volumeInfos = append(volumeInfos, vInfo)
 	}
 
-	return volumeInfos, nil
+	return nil
 }
 func isDataExportActive(status kdmpapi.ExportStatus) bool {
 	if status.Stage == kdmpapi.DataExportStageTransferInProgress ||
@@ -749,12 +747,26 @@ func (k *kdmp) StartRestore(
 			pvc.Name = bkpvInfo.PersistentVolumeClaim
 			pvc.Namespace = restoreNamespace
 		}
-		// Check if the snapshot size is larger than the pvc size.
-		// Update the pvc size to that of the snapshot size if so.
+		// Below two cases, we will change the PVC original size.
+		// case1: If the snapshot size is greater than the PVC size. In some of the filesystem
+		// provisioned PVC, the content of the PVC is allowed to grow beyond the PVC size.
+		// case2: If the snapshot size + 10% of the snapshot size goes beyind the PVC size.
+		// We also allow the customer to configure the sizePercentage to configured, if the 10% does not
+		// satisfy their storage provisioner.
+		// KDMP_RESTORE_PVC_SIZE_PERCENTAGE parameter need to be added to the kdmp-config configmap in kube-system namespace.
+		sizePercentage := utils.GetRestorePvcSizePercentage()
+		if sizePercentage == 0 {
+			sizePercentage = defaultPvcSizeIncreasePercentage
+		}
+		logrus.Infof("StartRestore: sizePercentage is - %v", sizePercentage)
+		totalSize := int64(bkpvInfo.TotalSize)
+		newPvcQuantity := resource.NewQuantity(
+			totalSize+((int64(sizePercentage)*int64(bkpvInfo.TotalSize))/int64(100)),
+			resource.BinarySI,
+		)
 		pvcQuantity := pvc.Spec.Resources.Requests[v1.ResourceStorage]
-		if pvcQuantity.CmpInt64(int64(bkpvInfo.TotalSize)) == -1 {
-			newPvcQuantity := resource.NewQuantity(int64(bkpvInfo.TotalSize), resource.BinarySI)
-			logrus.Debugf("setting size of pvc %s/%s same as snapshot size %s", pvc.Namespace, pvc.Name, newPvcQuantity.String())
+		if (pvcQuantity.Cmp(*newPvcQuantity)) == -1 {
+			logrus.Debugf("StartRestore: setting size of pvc %s/%s to accommodate snapshot size with buffer %s", pvc.Namespace, pvc.Name, newPvcQuantity.String())
 			pvc.Spec.Resources.Requests[v1.ResourceStorage] = *newPvcQuantity
 		}
 		volumeInfo.PersistentVolumeClaim = bkpvInfo.PersistentVolumeClaim
