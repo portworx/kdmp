@@ -2142,6 +2142,11 @@ func hasLocalRestoreStage(de *kdmpapi.DataExport) bool {
 }
 
 func getDriverType(de *kdmpapi.DataExport) (string, error) {
+	// Quick return for rsync driver
+	if de.Spec.Type == kdmpapi.DataExportRsync {
+		return string(de.Spec.Type), nil
+	}
+	// Do some extra checks for generic backups/restores
 	src := de.Spec.Source
 	dst := de.Spec.Destination
 	doBackup := false
