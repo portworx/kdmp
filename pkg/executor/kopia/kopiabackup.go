@@ -89,7 +89,7 @@ func runBackup(sourcePath string) error {
 		repo.Name = repoName
 	}
 	if volumeBackupName != "" {
-		if err := executor.CreateVolumeBackup(
+		if isSnapshotIDExists, err := executor.CreateVolumeBackup(
 			volumeBackupName,
 			bkpNamespace,
 			repoName,
@@ -98,6 +98,8 @@ func runBackup(sourcePath string) error {
 		); err != nil {
 			logrus.Errorf("%s: %v", fn, err)
 			return err
+		} else if isSnapshotIDExists {
+			return nil
 		}
 	}
 	if rErr != nil {
