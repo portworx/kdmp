@@ -2,6 +2,7 @@ package aws
 
 import (
 	"fmt"
+	"os"
 	"time"
 
 	aws_sdk "github.com/aws/aws-sdk-go/aws"
@@ -17,12 +18,12 @@ import (
 	"github.com/libopenstorage/openstorage/pkg/units"
 	storkvolume "github.com/libopenstorage/stork/drivers/volume"
 	storkapi "github.com/libopenstorage/stork/pkg/apis/stork/v1alpha1"
+	storkops "github.com/libopenstorage/stork/pkg/crud/stork"
 	"github.com/libopenstorage/stork/pkg/errors"
 	"github.com/libopenstorage/stork/pkg/k8sutils"
 	"github.com/libopenstorage/stork/pkg/log"
 	"github.com/portworx/sched-ops/k8s/core"
 	"github.com/portworx/sched-ops/k8s/storage"
-	storkops "github.com/portworx/sched-ops/k8s/stork"
 	"github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -326,13 +327,11 @@ func (a *aws) getFiltersFromMap(filters map[string]string) []*ec2.Filter {
 	return tagFilters
 }
 
-func (a *aws) GetBackupStatus(backup *storkapi.ApplicationBackup) ([]*storkapi.ApplicationBackupVolumeInfo, error) {
+func (a *aws) GetBackupStatus(backup *storkapi.ApplicationBackup) error {
 	client, err := a.getAWSClient(backup.Spec.BackupLocation, backup.Namespace)
 	if err != nil {
-		return nil, err
+		return err
 	}
-
-	volumeInfos := make([]*storkapi.ApplicationBackupVolumeInfo, 0)
 
 	for _, vInfo := range backup.Status.Volumes {
 		if vInfo.DriverName != storkvolume.AWSDriverName {
@@ -340,7 +339,7 @@ func (a *aws) GetBackupStatus(backup *storkapi.ApplicationBackup) ([]*storkapi.A
 		}
 		snapshot, err := a.getEBSSnapshot(vInfo.BackupID, nil, client)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		switch *snapshot.State {
 		case "pending":
@@ -356,10 +355,8 @@ func (a *aws) GetBackupStatus(backup *storkapi.ApplicationBackup) ([]*storkapi.A
 			vInfo.TotalSize = uint64(*snapshot.VolumeSize) * units.GiB
 			vInfo.ActualSize = uint64(*snapshot.VolumeSize) * units.GiB
 		}
-		volumeInfos = append(volumeInfos, vInfo)
 	}
-	return volumeInfos, nil
-
+	return nil
 }
 
 func (a *aws) CancelBackup(backup *storkapi.ApplicationBackup) error {
@@ -672,13 +669,17 @@ func (a *aws) IsVirtualMachineSupported() bool {
 }
 
 func init() {
-	a := &aws{}
-	err := a.Init(nil)
-	if err != nil {
-		logrus.Debugf("Error init'ing aws driver: %v", err)
-	}
-	if err := storkvolume.Register(storkvolume.AWSDriverName, a); err != nil {
-		logrus.Panicf("Error registering aws volume driver: %v", err)
+	if os.Getenv("SKIP_AWS_DRIVER_INIT") == "true" {
+		logrus.Infof("Skipping aws driver init")
+	} else {
+		a := &aws{}
+		err := a.Init(nil)
+		if err != nil {
+			logrus.Debugf("Error init'ing aws driver: %v", err)
+		}
+		if err := storkvolume.Register(storkvolume.AWSDriverName, a); err != nil {
+			logrus.Panicf("Error registering aws volume driver: %v", err)
+		}
 	}
 }
 

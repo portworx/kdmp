@@ -38,6 +38,8 @@ import (
 	storkapi "github.com/libopenstorage/stork/pkg/apis/stork/v1alpha1"
 	applicationcontrollers "github.com/libopenstorage/stork/pkg/applicationmanager/controllers"
 	storkcache "github.com/libopenstorage/stork/pkg/cache"
+	k8sextops "github.com/libopenstorage/stork/pkg/crud/externalstorage"
+	storkops "github.com/libopenstorage/stork/pkg/crud/stork"
 	"github.com/libopenstorage/stork/pkg/errors"
 	"github.com/libopenstorage/stork/pkg/k8sutils"
 	"github.com/libopenstorage/stork/pkg/log"
@@ -45,9 +47,7 @@ import (
 	"github.com/libopenstorage/stork/pkg/snapshot"
 	snapshotcontrollers "github.com/libopenstorage/stork/pkg/snapshot/controllers"
 	"github.com/portworx/sched-ops/k8s/core"
-	k8sextops "github.com/portworx/sched-ops/k8s/externalstorage"
 	"github.com/portworx/sched-ops/k8s/storage"
-	storkops "github.com/portworx/sched-ops/k8s/stork"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -912,7 +912,7 @@ func (p *portworx) GetPodVolumes(podSpec *v1.PodSpec, namespace string, includeP
 		}
 		// If a volume is pending and WFFC, it doesn't exist in Portworx.
 		// No need of querying it.
-		if !isPendingWFFC {
+		if volumeName != "" && !isPendingWFFC {
 			volumeNameList = append(volumeNameList, volumeName)
 		}
 	}
@@ -3168,6 +3168,49 @@ func (p *portworx) DeactivateClusterDomain(cdu *storkapi.ClusterDomainUpdate) er
 	return err
 }
 
+func (p *portworx) GetClusterDomainNodes() (map[string][]*api.Node, error) {
+	domainToNodesMap := make(map[string][]*api.Node)
+	if !p.initDone {
+		if err := p.initPortworxClients(); err != nil {
+			return domainToNodesMap, err
+		}
+	}
+
+	clusterManager, err := p.getClusterManagerClient()
+	if err != nil {
+		return domainToNodesMap, fmt.Errorf("cannot get cluster manager, err: %s", err.Error())
+	}
+
+	// get the cluster details
+	cluster, err := clusterManager.Enumerate()
+	if err != nil {
+		return domainToNodesMap, err
+	}
+
+	// get the node to domain-name map
+	return p.getDomainToNodesMap(cluster.Nodes)
+}
+
+func (p *portworx) getDomainToNodesMap(nodes []*api.Node) (map[string][]*api.Node, error) {
+	clusterManager, err := p.getClusterManagerClient()
+	if err != nil {
+		return nil, fmt.Errorf("cannot get cluster manager, err: %s", err.Error())
+	}
+
+	domainToNodeMap := make(map[string][]*api.Node)
+	for _, node := range nodes {
+		nodeConfig, err := clusterManager.GetNodeConf(node.Id)
+		if err != nil {
+			return nil, err
+		}
+		if nodeConfig.ClusterDomain == "" {
+			continue
+		}
+		domainToNodeMap[nodeConfig.ClusterDomain] = append(domainToNodeMap[nodeConfig.ClusterDomain], node)
+	}
+	return domainToNodeMap, nil
+}
+
 func (p *portworx) getNodesToDomainMap(nodes []*api.Node) (map[string]string, error) {
 	clusterManager, err := p.getClusterManagerClient()
 	if err != nil {
@@ -3436,12 +3479,11 @@ func (p *portworx) StartBackup(backup *storkapi.ApplicationBackup,
 	return volumeInfos, nil
 }
 
-func (p *portworx) GetBackupStatus(backup *storkapi.ApplicationBackup) ([]*storkapi.ApplicationBackupVolumeInfo, error) {
-	volumeInfos := make([]*storkapi.ApplicationBackupVolumeInfo, 0)
+func (p *portworx) GetBackupStatus(backup *storkapi.ApplicationBackup) error {
 
 	if !p.initDone {
 		if err := p.initPortworxClients(); err != nil {
-			return nil, err
+			return err
 		}
 	}
 
@@ -3452,33 +3494,32 @@ func (p *portworx) GetBackupStatus(backup *storkapi.ApplicationBackup) ([]*stork
 		}
 		// Skip for volumes which are in failed state as there is no need to proceed
 		// further and we have to return the orginal volInfo back to caller
-		if vInfo.Status == storkapi.ApplicationBackupStatusFailed {
-			volumeInfos = append(volumeInfos, vInfo)
+		if vInfo.Status == storkapi.ApplicationBackupStatusFailed || vInfo.Status == storkapi.ApplicationBackupStatusSuccessful {
 			continue
 		}
 		token, err := p.getUserToken(vInfo.Options, vInfo.Namespace)
 		if err != nil {
-			return nil, fmt.Errorf("failed to fetch portworx user token: %v", err)
+			return fmt.Errorf("failed to fetch portworx user token: %v", err)
 		}
 		volDriver, ok := driverMap[token]
 		if !ok {
 			volDriver, _, err = p.getUserVolDriverFromToken(token)
 			if err != nil {
-				return nil, err
+				return err
 			}
 			driverMap[token] = volDriver
 		}
 
 		cloudBackupClient, err := p.getCloudBackupClient()
 		if err != nil {
-			return nil, err
+			return err
 		}
 		ctx, cancel := context.WithTimeout(context.Background(), cloudBackupTimeout)
 		defer cancel()
 		if len(token) > 0 {
 			ctx, err = p.addTokenToContext(ctx, token)
 			if err != nil {
-				return nil, err
+				return err
 			}
 		}
 
@@ -3524,10 +3565,9 @@ func (p *portworx) GetBackupStatus(backup *storkapi.ApplicationBackup) ([]*stork
 				}
 			}
 		}
-		volumeInfos = append(volumeInfos, vInfo)
 	}
 
-	return volumeInfos, nil
+	return nil
 }
 
 func (p *portworx) DeleteBackup(backup *storkapi.ApplicationBackup) (bool, error) {

@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -17,8 +18,8 @@ import (
 	kdmpDriver "github.com/portworx/kdmp/pkg/drivers"
 
 	stork_api "github.com/libopenstorage/stork/pkg/apis/stork/v1alpha1"
+	storkops "github.com/libopenstorage/stork/pkg/crud/stork"
 	"github.com/portworx/sched-ops/k8s/core"
-	storkops "github.com/portworx/sched-ops/k8s/stork"
 	"github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -37,6 +38,8 @@ const (
 	// PXIncrementalCountAnnotation is the annotation used to set cloud backup incremental count
 	// for volume
 	PXIncrementalCountAnnotation = "portworx.io/cloudsnap-incremental-count"
+	// kdmpRestorePvcSizePercentageKey - KDMP restore PVC size increase percentage
+	kdmpRestorePvcSizePercentageKey = "KDMP_RESTORE_PVC_SIZE_PERCENTAGE"
 	// trimCRDGroupNameKey - groups name containing the string from this configmap field will be trimmed
 	trimCRDGroupNameKey = "TRIM_CRD_GROUP_NAME"
 	// QuitRestoreCrTimestampUpdate is sent in the channel to informs the go routine to stop any further update
@@ -168,6 +171,27 @@ func GetTrimmedGroupName(group string) string {
 		}
 	}
 	return group
+}
+
+// GetRestorePvcSizePercentage - get the percentage of size that need to increased during the kdmp restore PVC creation.
+// In the case failure, returning zero to assume default 10% value.
+func GetRestorePvcSizePercentage() int {
+	fn := "GetRestorePvcSizePercentage"
+	kdmpData, err := core.Instance().GetConfigMap(drivers.KdmpConfigmapName, drivers.KdmpConfigmapNamespace)
+	if err != nil {
+		logrus.Debugf("%v: error in reading configMap [%v/%v]",
+			fn, drivers.KdmpConfigmapName, drivers.KdmpConfigmapNamespace)
+		return 0
+	}
+	if len(kdmpData.Data[kdmpRestorePvcSizePercentageKey]) != 0 {
+		sizePercentage, err := strconv.Atoi(kdmpData.Data[kdmpRestorePvcSizePercentageKey])
+		if err != nil {
+			logrus.Debugf("%v: error in converting kdmpRestorePvcSizePercentage to integer: %v", fn, err)
+			return 0
+		}
+		return sizePercentage
+	}
+	return 0
 }
 
 // GetStorageClassNameForPVC - Get the storageClass name from the PVC spec
@@ -629,4 +653,24 @@ func GetAppUidGid(pvcName string, namespace string, backup *stork_api.Applicatio
 		return UndefinedId, UndefinedId, nil
 	}
 	return uid, gid, nil
+}
+
+// ReorganizeLargeResourceError - Check the error message and if large resource error found, reorganize the error message and return true and error
+func ReorganizeLargeResourceError(err error) (bool, error) {
+	// List of expected error messages from large resources
+	expectedMsgs := []string{
+		"request is too large",
+		"trying to send message larger than max",
+		"Request entity too large",
+	}
+
+	for _, msg := range expectedMsgs {
+		if strings.Contains(err.Error(), msg) {
+			// Reorganize the error as per the requirement
+			return true, fmt.Errorf("%v: Refer doc https://docs.portworx.com/portworx-backup-on-prem/reference/large-res-config", err)
+		}
+	}
+
+	// Return the original error if none of the expected errors were found
+	return false, err
 }
