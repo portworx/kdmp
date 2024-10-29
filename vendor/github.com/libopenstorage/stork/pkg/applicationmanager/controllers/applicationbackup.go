@@ -67,34 +67,36 @@ const (
 	nsObjectName       = "namespaces.json"
 	metadataObjectName = "metadata.json"
 
-	allNamespacesSpecifier          = "*"
-	backupVolumeBatchCountEnvVar    = "BACKUP-VOLUME-BATCH-COUNT"
-	defaultBackupVolumeBatchCount   = 3
-	backupResourcesBatchCount       = 15
-	maxRetry                        = 10
-	retrySleep                      = 10 * time.Second
-	genericBackupKey                = "BACKUP_TYPE"
-	kdmpDriverOnly                  = "kdmp"
-	nonKdmpDriverOnly               = "nonkdmp"
-	mixedDriver                     = "mixed"
-	oneMBSizeBytes                  = 1 << (10 * 2)
-	prefixBackup                    = "backup"
-	prefixRestore                   = "restore"
-	applicationBackupCRNameKey      = kdmpAnnotationPrefix + "applicationbackup-cr-name"
-	applicationRestoreCRNameKey     = kdmpAnnotationPrefix + "applicationrestore-cr-name"
-	applicationBackupCRUIDKey       = kdmpAnnotationPrefix + "applicationbackup-cr-uid"
-	applicationRestoreCRUIDKey      = kdmpAnnotationPrefix + "applicationrestore-cr-uid"
-	kdmpAnnotationPrefix            = "kdmp.portworx.com/"
-	pxbackupAnnotationCreateByKey   = pxbackupAnnotationPrefix + "created-by"
-	pxbackupAnnotationCreateByValue = "px-backup"
-	backupObjectNameKey             = kdmpAnnotationPrefix + "backupobject-name"
-	restoreObjectNameKey            = kdmpAnnotationPrefix + "restoreobject-name"
-	pxbackupObjectUIDKey            = pxbackupAnnotationPrefix + "backup-uid"
-	pxbackupAnnotationPrefix        = "portworx.io/"
-	pxbackupObjectNameKey           = pxbackupAnnotationPrefix + "backup-name"
-	backupObjectUIDKey              = kdmpAnnotationPrefix + "backupobject-uid"
-	restoreObjectUIDKey             = kdmpAnnotationPrefix + "restoreobject-uid"
-	skipResourceAnnotation          = "stork.libopenstorage.org/skip-resource"
+	allNamespacesSpecifier           = "*"
+	backupVolumeBatchCountEnvVar     = "BACKUP-VOLUME-BATCH-COUNT"
+	getBackupStatusBatchCountEnvVar  = "GET-BACKUP-STATUS-BATCH-COUNT"
+	defaultBackupVolumeBatchCount    = 3
+	defaultGetBackupStatusBatchCount = 100
+	backupResourcesBatchCount        = 15
+	maxRetry                         = 10
+	retrySleep                       = 10 * time.Second
+	genericBackupKey                 = "BACKUP_TYPE"
+	kdmpDriverOnly                   = "kdmp"
+	nonKdmpDriverOnly                = "nonkdmp"
+	mixedDriver                      = "mixed"
+	oneMBSizeBytes                   = 1 << (10 * 2)
+	prefixBackup                     = "backup"
+	prefixRestore                    = "restore"
+	applicationBackupCRNameKey       = kdmpAnnotationPrefix + "applicationbackup-cr-name"
+	applicationRestoreCRNameKey      = kdmpAnnotationPrefix + "applicationrestore-cr-name"
+	applicationBackupCRUIDKey        = kdmpAnnotationPrefix + "applicationbackup-cr-uid"
+	applicationRestoreCRUIDKey       = kdmpAnnotationPrefix + "applicationrestore-cr-uid"
+	kdmpAnnotationPrefix             = "kdmp.portworx.com/"
+	pxbackupAnnotationCreateByKey    = pxbackupAnnotationPrefix + "created-by"
+	pxbackupAnnotationCreateByValue  = "px-backup"
+	backupObjectNameKey              = kdmpAnnotationPrefix + "backupobject-name"
+	restoreObjectNameKey             = kdmpAnnotationPrefix + "restoreobject-name"
+	pxbackupObjectUIDKey             = pxbackupAnnotationPrefix + "backup-uid"
+	pxbackupAnnotationPrefix         = "portworx.io/"
+	pxbackupObjectNameKey            = pxbackupAnnotationPrefix + "backup-name"
+	backupObjectUIDKey               = kdmpAnnotationPrefix + "backupobject-uid"
+	restoreObjectUIDKey              = kdmpAnnotationPrefix + "restoreobject-uid"
+	skipResourceAnnotation           = "stork.libopenstorage.org/skip-resource"
 	//VmFreezePrefix prefix for freeze rule action
 	vmFreezePrefix = "vm-freeze-pre-rule"
 	//VmUnFreezePrefix prefix for freeze rule action
@@ -352,8 +354,15 @@ func (a *ApplicationBackupController) handle(ctx context.Context, backup *stork_
 		}
 
 		if backup.GetFinalizers() != nil {
+			// Fetch the latest backup object as we need to update after removing the finalizer
+			key := runtimeclient.ObjectKeyFromObject(backup)
+			err := a.client.Get(context.TODO(), key, backup)
+			if err != nil {
+				log.ApplicationBackupLog(backup).Errorf("Error while getting applicationbackup [%v/%v]: %v", backup.Namespace, backup.Name, err)
+				return err
+			}
 			controllers.RemoveFinalizer(backup, controllers.FinalizerCleanup)
-			err := a.client.Update(ctx, backup)
+			err = a.client.Update(ctx, backup)
 			if err != nil {
 				log.ApplicationBackupLog(backup).Errorf("Error while updating applicationbackup [%v/%v]: %v", backup.Namespace, backup.Name, err)
 				return err
@@ -642,12 +651,17 @@ func (a *ApplicationBackupController) handle(ctx context.Context, backup *stork_
 	case stork_api.ApplicationBackupStageApplications:
 		err := a.backupResources(backup)
 		if err != nil {
+			isLargeResourceError, err := utils.ReorganizeLargeResourceError(err)
 			message := fmt.Sprintf("Error backing up resources: %v", err)
 			log.ApplicationBackupLog(backup).Errorf(message)
 			a.recorder.Event(backup,
 				v1.EventTypeWarning,
 				string(stork_api.ApplicationBackupStatusFailed),
 				message)
+			// Check if the error is due to a large resource issue
+			if isLargeResourceError {
+				handleLargeResourceError(a, backup, message)
+			}
 			return nil
 		}
 
@@ -700,6 +714,8 @@ func (a *ApplicationBackupController) updateBackupCRInVolumeStage(
 	stage stork_api.ApplicationBackupStageType,
 	reason string,
 	volumeInfos []*stork_api.ApplicationBackupVolumeInfo,
+	failedVolCount int,
+	appendBackupVols bool,
 ) (*stork_api.ApplicationBackup, error) {
 	backup := &stork_api.ApplicationBackup{}
 	var err error
@@ -725,9 +741,17 @@ func (a *ApplicationBackupController) updateBackupCRInVolumeStage(
 		backup.Status.Status = status
 		backup.Status.Stage = stage
 		backup.Status.Reason = reason
+		backup.Status.FailedVolCount = failedVolCount
 		backup.Status.LastUpdateTimestamp = metav1.Now()
+		// Proceed with volume handling only if volumeInfos is not nil
 		if volumeInfos != nil {
-			backup.Status.Volumes = append(backup.Status.Volumes, volumeInfos...)
+			if appendBackupVols {
+				// Append new volumes to existing ones
+				backup.Status.Volumes = append(backup.Status.Volumes, volumeInfos...)
+			} else {
+				// Overwrite with the new volumes
+				backup.Status.Volumes = volumeInfos
+			}
 		}
 		err = a.client.Update(context.TODO(), backup)
 		if err != nil {
@@ -762,6 +786,8 @@ func (a *ApplicationBackupController) backupVolumes(backup *stork_api.Applicatio
 		backup.Status.Stage,
 		"Starting the Volume backups",
 		nil,
+		backup.Status.FailedVolCount,
+		true,
 	)
 	if err != nil {
 		logrus.Errorf("Error while updateBackupCRInVolumeStage: %v", err)
@@ -921,6 +947,8 @@ func (a *ApplicationBackupController) backupVolumes(backup *stork_api.Applicatio
 								backup.Status.Stage,
 								inProgressMsg,
 								volumeInfos,
+								backup.Status.FailedVolCount,
+								true,
 							)
 							if updateErr != nil {
 								log.ApplicationBackupLog(backup).Errorf("failed to update backup object: %v", updateErr)
@@ -939,6 +967,8 @@ func (a *ApplicationBackupController) backupVolumes(backup *stork_api.Applicatio
 							backup.Status.Stage,
 							"Volume backups are in progress",
 							volumeInfos,
+							backup.Status.FailedVolCount,
+							true,
 						)
 						if err != nil {
 							log.ApplicationBackupLog(backup).Errorf("failed to update backup object: %v", err)
@@ -953,6 +983,8 @@ func (a *ApplicationBackupController) backupVolumes(backup *stork_api.Applicatio
 						backup.Status.Stage,
 						"Volume backups are in progress",
 						volumeInfos,
+						backup.Status.FailedVolCount,
+						true,
 					)
 					if err != nil {
 						return err
@@ -971,12 +1003,12 @@ func (a *ApplicationBackupController) backupVolumes(backup *stork_api.Applicatio
 				return fmt.Errorf("error getting volume driver name: %v", err)
 			}
 			if driverName == volume.PortworxDriverName {
-				volumeInfos, err := driver.GetBackupStatus(backup)
+				batchCount := getBatchCountForGetBackupStatus()
+				err := a.getAndUpdateBackupStatusInBatches(backup, driver, driverName, batchCount)
 				if err != nil {
-					logrus.Errorf("error getting backup status: %v", err)
 					return err
 				}
-				for _, volInfo := range volumeInfos {
+				for _, volInfo := range backup.Status.Volumes {
 					if volInfo.Status == stork_api.ApplicationBackupStatusFailed {
 						continue
 					}
@@ -1041,7 +1073,7 @@ func (a *ApplicationBackupController) backupVolumes(backup *stork_api.Applicatio
 		// Skip checking status if no volumes are being backed up
 		if len(backup.Status.Volumes) != 0 {
 			drivers := a.getDriversForBackup(backup)
-			volumeInfos := make([]*stork_api.ApplicationBackupVolumeInfo, 0)
+			batchCount := getBatchCountForGetBackupStatus()
 			for driverName := range drivers {
 				driver, err := volume.Get(driverName)
 				if err != nil {
@@ -1052,15 +1084,11 @@ func (a *ApplicationBackupController) backupVolumes(backup *stork_api.Applicatio
 					logrus.Debugf("skipping driver %v for status check", driverName)
 					continue
 				}
-				status, err := driver.GetBackupStatus(backup)
+				err = a.getAndUpdateBackupStatusInBatches(backup, driver, driverName, batchCount)
 				if err != nil {
-					log.ApplicationBackupLog(backup).Errorf("failed to get vol status fro driver %v: %v", driverName, err)
 					return err
 				}
-				volumeInfos = append(volumeInfos, status...)
 			}
-			backup.Status.Volumes = volumeInfos
-
 			// As part of partial success volumeInfos is already available, just update the same to backup CR
 			err = a.client.Update(context.TODO(), backup)
 			if err != nil {
@@ -1169,6 +1197,7 @@ func (a *ApplicationBackupController) backupVolumes(backup *stork_api.Applicatio
 	}
 	// append skipped volumes
 	backup.Status.Volumes = append(backup.Status.Volumes, skipVolInfo...)
+	backup.Status.FailedVolCount = 0
 	for _, vol := range backup.Status.Volumes {
 		if vol.Status == stork_api.ApplicationBackupStatusFailed {
 			backup.Status.FailedVolCount++
@@ -1195,37 +1224,18 @@ func (a *ApplicationBackupController) backupVolumes(backup *stork_api.Applicatio
 		backup.Status.LastUpdateTimestamp = metav1.Now()
 		// temporarily store the volume status, So that it will be used during retry.
 		volumeInfos := backup.Status.Volumes
-		// Update the current state and then move on to backing up resources
-		err := a.client.Update(context.TODO(), backup)
+		backup, err = a.updateBackupCRInVolumeStage(
+			namespacedName,
+			stork_api.ApplicationBackupStatusInProgress,
+			backup.Status.Stage,
+			"Application resources backup is in progress",
+			volumeInfos,
+			backup.Status.FailedVolCount,
+			false,
+		)
 		if err != nil {
-			for i := 0; i < maxRetry; i++ {
-				err = a.client.Get(context.TODO(), namespacedName, backup)
-				if err != nil {
-					time.Sleep(retrySleep)
-					continue
-				}
-				if backup.Status.Stage == stork_api.ApplicationBackupStageFinal ||
-					backup.Status.Stage == stork_api.ApplicationBackupStageApplications {
-					log.ApplicationBackupLog(backup).Infof("Returning from ApplicationBackupStageVolumes since the CR is in %v stage", backup.Status.Stage)
-					log.ApplicationBackupLog(backup).Warnf("post-exec rule can get called more than once in case of kdmp & mixed driver scenario, please check logs for the same")
-					return nil
-				}
-				backup.Status.Stage = stork_api.ApplicationBackupStageApplications
-				backup.Status.Status = stork_api.ApplicationBackupStatusInProgress
-				backup.Status.Reason = "Application resources backup is in progress"
-				backup.Status.LastUpdateTimestamp = metav1.Now()
-				backup.Status.Volumes = volumeInfos
-				err = a.client.Update(context.TODO(), backup)
-				if err != nil {
-					time.Sleep(retrySleep)
-					continue
-				} else {
-					break
-				}
-			}
-			if err != nil {
-				return err
-			}
+			log.ApplicationBackupLog(backup).Errorf("failed to update backup object: %v", err)
+			return err
 		}
 
 		// We will not handle individual failure of resources as GetResources() being generic package
@@ -1233,13 +1243,17 @@ func (a *ApplicationBackupController) backupVolumes(backup *stork_api.Applicatio
 		// only a particular resource fetching fails and rest passes.
 		err = a.backupResources(backup)
 		if err != nil {
+			isLargeResourceError, err := utils.ReorganizeLargeResourceError(err)
 			message := fmt.Sprintf("Error backing up resources: %v", err)
 			log.ApplicationBackupLog(backup).Errorf(message)
 			a.recorder.Event(backup,
 				v1.EventTypeWarning,
 				string(stork_api.ApplicationBackupStatusFailed),
 				message)
-
+			// Check if the error is due to a large resource issue
+			if isLargeResourceError {
+				handleLargeResourceError(a, backup, message)
+			}
 			return err
 		}
 	}
@@ -2735,4 +2749,77 @@ func handleCSINametoCSIMapMigration(spec *stork_api.ApplicationBackupSpec) error
 
 func isPartialBackup(backup *stork_api.ApplicationBackup) bool {
 	return backup.Status.FailedVolCount > 0 && backup.Status.FailedVolCount < len(backup.Status.Volumes)
+}
+
+func handleLargeResourceError(a *ApplicationBackupController, backup *stork_api.ApplicationBackup, message string) {
+	// Create a NamespacedName object with the backup's namespace and name
+	namespacedName := types.NamespacedName{Namespace: backup.Namespace, Name: backup.Name}
+
+	// Retry the operation up to 'maxRetry' times
+	for i := 0; i < maxRetry; i++ {
+		// Attempt to get the latest state of the backup object
+		err := a.client.Get(context.TODO(), namespacedName, backup)
+		if err != nil {
+			// If the get operation fails, wait for 'retrySleep' duration and retry
+			time.Sleep(retrySleep)
+			continue
+		}
+
+		// Update the backup status to 'Failed' and set relevant fields
+		backup.Status.Status = stork_api.ApplicationBackupStatusFailed
+		backup.Status.Reason = message
+		backup.Status.Stage = stork_api.ApplicationBackupStageFinal
+		backup.Status.FinishTimestamp = metav1.Now()
+		backup.Status.LastUpdateTimestamp = metav1.Now()
+
+		// Attempt to update the backup object with the new status
+		err = a.client.Update(context.TODO(), backup)
+		if err != nil {
+			// If the update operation fails, wait for 'retrySleep' duration and retry
+			time.Sleep(retrySleep)
+			continue
+		} else {
+			// If the update is successful, exit the loop
+			break
+		}
+	}
+}
+
+func getBatchCountForGetBackupStatus() int {
+	if envValue := os.Getenv(getBackupStatusBatchCountEnvVar); len(envValue) != 0 {
+		batchCount, err := strconv.Atoi(envValue)
+		if err != nil {
+			return defaultGetBackupStatusBatchCount
+		}
+		return batchCount
+	}
+	return defaultGetBackupStatusBatchCount
+}
+
+// getAndUpdateBackupStatusInBatches - fetches the backup status of volumes in batches.
+// Additionally, it updates the backup CR for each batch to prevent backup timeouts in px-backup
+func (a *ApplicationBackupController) getAndUpdateBackupStatusInBatches(
+	backup *stork_api.ApplicationBackup,
+	driver volume.Driver,
+	driverName string,
+	batchCount int,
+) error {
+	volumes := backup.Status.Volumes
+	// Fetch the status of the volumes in batches
+	for i := 0; i < len(volumes); i += batchCount {
+		end := min(i+batchCount, len(volumes))
+		backup.Status.Volumes = volumes[i:end]
+		err := driver.GetBackupStatus(backup)
+		if err != nil {
+			log.ApplicationBackupLog(backup).Errorf("failed to get volume status for driver %v: %v", driverName, err)
+			return err
+		}
+		backup.Status.LastUpdateTimestamp = metav1.Now()
+		backup.Status.Volumes = volumes
+		err = a.client.Update(context.TODO(), backup)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }

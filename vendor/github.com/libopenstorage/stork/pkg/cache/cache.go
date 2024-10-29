@@ -9,6 +9,7 @@ import (
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
+	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/client-go/rest"
 	clientCache "k8s.io/client-go/tools/cache"
 	controllercache "sigs.k8s.io/controller-runtime/pkg/cache"
@@ -36,11 +37,14 @@ type SharedInformerCache interface {
 	// ListApplicationRegistrations lists the application registration CRs from the cache
 	ListApplicationRegistrations() (*storkv1alpha1.ApplicationRegistrationList, error)
 
-	// ListTransformedPods lists the all the Pods from the cache after applying TransformFunc
-	ListTransformedPods() (*corev1.PodList, error)
+	// ListTransformedPods lists the all the Pods running in a node from the cache after applying TransformFunc
+	ListTransformedPods(nodeName string) (*corev1.PodList, error)
 
 	// WatchPods registers the pod event handlers with the informer cache
 	WatchPods(fn func(object interface{})) error
+
+	// GetPersistentVolumeClaim returns the PersistentVolumeClaim in a namespace from the cache after applying TransformFunc
+	GetPersistentVolumeClaim(pvcName string, namespace string) (*corev1.PersistentVolumeClaim, error)
 }
 
 type cache struct {
@@ -100,6 +104,22 @@ func CreateSharedInformerCache(mgr manager.Manager) error {
 			currPod.Status.HostIP = podResource.Status.HostIP
 			return &currPod, nil
 		},
+
+		&corev1.PersistentVolumeClaim{}: func(obj interface{}) (interface{}, error) {
+			pvc, ok := obj.(*corev1.PersistentVolumeClaim)
+			if !ok {
+				return nil, fmt.Errorf("unexpected object type: %T", obj)
+			}
+			currPVC := corev1.PersistentVolumeClaim{}
+			currPVC.Name = pvc.Name
+			currPVC.Namespace = pvc.Namespace
+
+			currPVC.Annotations = pvc.Annotations
+
+			currPVC.Spec = pvc.Spec
+			currPVC.Status = pvc.Status
+			return &currPVC, nil
+		},
 	}
 
 	sharedInformerCache := &cache{}
@@ -110,6 +130,19 @@ func CreateSharedInformerCache(mgr manager.Manager) error {
 		TransformByObject: transformMap,
 	})
 	if err != nil {
+		logrus.Errorf("error creating shared informer cache: %v", err)
+		return err
+	}
+	// indexing pods by nodeName so that we can list all pods running on a node
+	err = sharedInformerCache.controllerCache.IndexField(context.Background(), &corev1.Pod{}, "spec.nodeName", func(obj client.Object) []string {
+		podObject, ok := obj.(*corev1.Pod)
+		if !ok {
+			return []string{}
+		}
+		return []string{podObject.Spec.NodeName}
+	})
+	if err != nil {
+		logrus.Errorf("error indexing field spec.nodeName for pods: %v", err)
 		return err
 	}
 	go sharedInformerCache.controllerCache.Start(context.Background())
@@ -201,12 +234,15 @@ func (c *cache) ListApplicationRegistrations() (*storkv1alpha1.ApplicationRegist
 }
 
 // ListTransformedPods lists the all the Pods from the cache after applying TransformFunc
-func (c *cache) ListTransformedPods() (*corev1.PodList, error) {
+func (c *cache) ListTransformedPods(nodeName string) (*corev1.PodList, error) {
 	if c == nil || c.controllerCache == nil {
 		return nil, fmt.Errorf(cacheNotInitializedErr)
 	}
 	podList := &corev1.PodList{}
-	if err := c.controllerCache.List(context.Background(), podList); err != nil {
+	fieldSelector := &client.ListOptions{
+		FieldSelector: fields.SelectorFromSet(fields.Set{"spec.nodeName": nodeName}),
+	}
+	if err := c.controllerCache.List(context.Background(), podList, fieldSelector); err != nil {
 		return nil, err
 	}
 	return podList, nil
@@ -230,4 +266,16 @@ func (c *cache) WatchPods(fn func(object interface{})) error {
 	})
 
 	return nil
+}
+
+// GetPersistentVolumeClaim returns the transformed PersistentVolumeClaim if present in the cache.
+func (c *cache) GetPersistentVolumeClaim(pvcName string, namespace string) (*corev1.PersistentVolumeClaim, error) {
+	if c == nil || c.controllerCache == nil {
+		return nil, fmt.Errorf(cacheNotInitializedErr)
+	}
+	pvc := &corev1.PersistentVolumeClaim{}
+	if err := c.controllerCache.Get(context.Background(), client.ObjectKey{Name: pvcName, Namespace: namespace}, pvc); err != nil {
+		return nil, err
+	}
+	return pvc, nil
 }
