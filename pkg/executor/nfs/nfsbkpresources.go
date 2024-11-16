@@ -201,7 +201,7 @@ func uploadResource(
 	var err error
 
 	// Listing all resource types
-	if len(backup.Spec.ResourceTypes) != 0 {
+	if len(backup.Spec.ResourceTypes) != 0 || len(backup.Spec.ExcludeResourceTypes) != 0 {
 		optionalResourceTypes := []string{}
 		resourceTypes, err = rc.GetResourceTypes(optionalResourceTypes, true)
 		if err != nil {
@@ -269,7 +269,7 @@ func uploadResource(
 			// As we support both includeResource and ResourceType to be mentioned
 			// match out ns for which we want to take includeResource path and
 			// for which we want to take ResourceType path
-			if len(backup.Spec.ResourceTypes) != 0 {
+			if len(backup.Spec.ResourceTypes) != 0 || len(backup.Spec.ExcludeResourceTypes) != 0 {
 				if !resourcecollector.IsNsPresentInIncludeResource(objectMap, ns) {
 					resourceTypeNsBatch = append(resourceTypeNsBatch, ns)
 				} else {
@@ -297,18 +297,42 @@ func uploadResource(
 		}
 
 		if len(resourceTypeNsBatch) != 0 {
-			for _, backupResourceType := range backup.Spec.ResourceTypes {
-				for _, resource := range resourceTypes {
-					if resource.Kind == backupResourceType || (backupResourceType == "PersistentVolumeClaim" && resource.Kind == "PersistentVolume") {
-						log.ApplicationBackupLog(backup).Tracef("GetResourcesType for : %v", resource.Kind)
-						objects, _, err := rc.GetResourcesForType(resource, nil, resourceTypeNsBatch, backup.Spec.Selectors, nil, nil, true, resourceCollectorOpts)
-						if err != nil {
-							log.ApplicationBackupLog(backup).Errorf("Error getting resources: %v", err)
-							return err
+			if len(backup.Spec.ResourceTypes) != 0 {
+				for _, backupResourceType := range backup.Spec.ResourceTypes {
+					for _, resource := range resourceTypes {
+						if resource.Kind == backupResourceType ||
+							(backupResourceType == "PersistentVolumeClaim" && resource.Kind == "PersistentVolume") {
+							log.ApplicationBackupLog(backup).Tracef("GetResourcesType for : %v", resource.Kind)
+							objects, _, err := rc.GetResourcesForType(resource, nil, resourceTypeNsBatch,
+								backup.Spec.Selectors, nil, nil, true, resourceCollectorOpts)
+							if err != nil {
+								log.ApplicationBackupLog(backup).Errorf("Error getting resources: %v", err)
+								return err
+							}
+							allObjects = append(allObjects, objects.Items...)
 						}
-						allObjects = append(allObjects, objects.Items...)
 					}
 				}
+			} else if len(backup.Spec.ExcludeResourceTypes) != 0 {
+				exclude := backup.Spec.ExcludeResourceTypes
+				if IsPVCInExcludeResourceType(backup) {
+					exclude = append(exclude, "PersistentVolume")
+				}
+				excludeTypeObjects, _, err := rc.GetResourcesExcludingTypes(
+					resourceTypeNsBatch,
+					exclude,
+					backup.Spec.Selectors,
+					nil,
+					nil,
+					optionalBackupResources,
+					true,
+					resourceCollectorOpts,
+				)
+				if err != nil {
+					log.ApplicationBackupLog(backup).Errorf("Error getting resources for ExcludeResouceTypes: %v", err)
+					return err
+				}
+				allObjects = append(allObjects, excludeTypeObjects...)
 			}
 		}
 	}
@@ -383,6 +407,16 @@ func uploadResource(
 		return err
 	}
 	return nil
+}
+
+// IsPVCInExcludeResourceType check if given ResourceType is PVC
+func IsPVCInExcludeResourceType(backup *stork_api.ApplicationBackup) bool {
+	for _, resType := range backup.Spec.ExcludeResourceTypes {
+		if resType == "PersistentVolumeClaim" {
+			return true
+		}
+	}
+	return false
 }
 
 func uploadStorageClasses(
