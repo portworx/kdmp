@@ -1907,6 +1907,8 @@ func startTransferJob(
 	if err != nil {
 		return "", err
 	}
+	// update latest JobFailureRetryTimeout
+	utils.UpdateJobFailureTimeOut(jobConfigMap, jobConfigMapNs)
 
 	switch drv.Name() {
 	case drivers.Rsync:
@@ -2408,6 +2410,8 @@ func startNfsCSIRestoreVolumeJob(
 		return "", err
 	}
 
+	// update latest JobFailureRetryTimeout
+	utils.UpdateJobFailureTimeOut(jobConfigMap, jobConfigMapNs)
 	switch drv.Name() {
 	case drivers.NFSCSIRestore:
 		return drv.StartJob(
