@@ -37,6 +37,7 @@ var (
 	bkpNamespace    string
 	compression     string
 	excludeFileList string
+	mode			string
 )
 
 var (
@@ -62,7 +63,7 @@ func newBackupCommand() *cobra.Command {
 				util.CheckErr(err)
 				return
 			}
-
+			logrus.Infof("line 66 sourcePath: %v sourcePathGlob: %v", sourcePath, sourcePathGlob)
 			executor.HandleErr(runBackup(srcPath))
 		},
 	}
@@ -71,6 +72,7 @@ func newBackupCommand() *cobra.Command {
 	backupCommand.Flags().StringVar(&sourcePathGlob, "source-path-glob", "", "The regexp should match only one path that will be used for backup")
 	backupCommand.Flags().StringVar(&compression, "compression", "", "Compression type to be used")
 	backupCommand.Flags().StringVar(&excludeFileList, "exclude-file-list", "", " list of dir names that need to be exclude in the kopia snapshot")
+	backupCommand.Flags().StringVar(&mode, "mode", "", "Block/Filesystem PVC source to be backed up")
 
 	return backupCommand
 }
@@ -177,7 +179,7 @@ func runBackup(sourcePath string) error {
 		}
 	}
 
-	if err = runKopiaBackup(repo, sourcePath); err != nil {
+	if err = runKopiaBackup(repo, sourcePath, mode); err != nil {
 		errMsg := fmt.Sprintf("backup failed for repository %s: %v", repo.Name, err)
 		logrus.Errorf("%s: %v", fn, errMsg)
 		return fmt.Errorf(errMsg)
@@ -323,14 +325,16 @@ func runKopiaCreateRepo(repository *executor.Repository) error {
 	return nil
 }
 
-func runKopiaBackup(repository *executor.Repository, sourcePath string) error {
+func runKopiaBackup(repository *executor.Repository, sourcePath, mode string) error {
 	logrus.Infof("Backup started")
+	logrus.Infof("pvc mode: %v", mode)
 	backupCmd, err := kopia.GetBackupCommand(
 		repository.Path,
 		repository.Name,
 		repository.Password,
 		string(repository.Type),
 		sourcePath,
+		mode,
 	)
 	if err != nil {
 		return err

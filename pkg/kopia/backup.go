@@ -110,20 +110,25 @@ func (lw *logWriter) Write(p []byte) (n int, err error) {
 }
 
 // GetBackupCommand returns a wrapper over the kopia backup command
-func GetBackupCommand(path, repoName, password, provider, sourcePath string) (*Command, error) {
+func GetBackupCommand(path, repoName, password, provider, sourcePath, mode string) (*Command, error) {
 	if repoName == "" {
 		return nil, fmt.Errorf("repository name cannot be empty")
 	}
-
-	return &Command{
-		Name:           "create",
-		Password:       password,
-		RepositoryName: repoName,
-		Path:           path,
-		Dir:            sourcePath,
-		Provider:       provider,
-		Args:           []string{"."},
-	}, nil
+	cmd := Command{}
+	cmd.Name = "create"
+	cmd.Password = password
+	cmd.RepositoryName = repoName
+	cmd.Path = path
+	cmd.Provider = provider
+	if mode == "block" {
+		cmd.Mode = "block"
+		cmd.Dir = "/usr/bin"
+	} else {
+		cmd.Args = []string{"."}
+		cmd.Dir = sourcePath
+	}
+	logrus.Infof("line 129 cmd: %v", cmd)
+	return &cmd, nil
 }
 
 // NewBackupExecutor returns an instance of Executor that can be used for

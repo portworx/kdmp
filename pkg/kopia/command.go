@@ -18,7 +18,7 @@ const (
 
 // Command defines the essential fields required to
 // execute any kopia commands
-type Command struct {
+type Command struct { 
 	// Name is the name of the kopia sub command.
 	Name string
 	// Path is the bucket name for the repo
@@ -51,6 +51,8 @@ type Command struct {
 	ExcludeFileList string
 	// Region for S3 object
 	Region string
+	// Mode pvc access mode
+	Mode string
 }
 
 // Executor interface defines APIs for implementing a command wrapper
@@ -185,19 +187,28 @@ func (c *Command) BackupCmd() *exec.Cmd {
 	argsSlice := []string{
 		"snapshot",
 		c.Name, // create command
+	}
+	// Get the cmd args
+	argsSlice = append(argsSlice, c.Args...)
+	if c.Mode == "block" {
+		argsSlice = append(argsSlice, "/dev/volblk")
+		argsSlice = append(argsSlice, "--block-mode")
+	}
+	remainArgSlice := []string{
 		"--log-dir",
 		logDir,
 		"--config-file",
 		configFile,
 		"--json",
 	}
+	argsSlice = append(argsSlice, remainArgSlice...)
 	argsSlice = append(argsSlice, c.Flags...)
-	// Get the cmd args
-	argsSlice = append(argsSlice, c.Args...)
+	
 	cmd := exec.Command(baseCmd, argsSlice...)
 	if len(c.Env) > 0 {
 		cmd.Env = append(os.Environ(), c.Env...)
 	}
+	
 	cmd.Dir = c.Dir
 	logrus.Infof("the backup command is %+v", cmd)
 	return cmd
