@@ -326,6 +326,8 @@ func (c *Command) RestoreCmd() *exec.Cmd {
 		cmd.Env = append(os.Environ(), c.Env...)
 	}
 	cmd.Dir = c.Dir
+	logrus.Infof("cmd.dir: %v", cmd.Dir)
+	logrus.Infof("line 329 cmd: %+v", cmd)
 	return cmd
 }
 

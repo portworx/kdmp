@@ -53,16 +53,26 @@ func GetRestoreCommand(path, repoName, password, provider, targetPath, snapshotI
 	if snapshotID == "" {
 		return nil, fmt.Errorf("snapshot id cannot be empty")
 	}
-
-	args := []string{snapshotID, "."}
-
-	return &Command{
+	cmd := Command{}
+	cmd.Name = "restore"
+	cmd.Password = password
+	//cmd.RepositoryName = repoName
+	//cmd.Path = path
+	cmd.Provider = provider
+	//cmd.Mode = "block"
+	cmd.Dir = "/usr/bin"
+	
+	logrus.Infof("line 129 cmd: %v", cmd)
+	// args := []string{snapshotID, "."}
+	cmd.Args = []string{snapshotID, "/dev/volblk"}
+	/*return &Command{
 		Name:     "restore",
 		Password: password,
 		Dir:      targetPath,
 		Provider: provider,
-		Args:     args,
-	}, nil
+		// Args:     args,
+	}, nil*/
+	return &cmd, nil
 }
 
 // RestoreProgressResponse is the json representation of the in-progress
@@ -107,13 +117,13 @@ func (b *restoreExecutor) Run() error {
 
 	b.execCmd.Stdout = stdoutWriter
 	b.execCmd.Stderr = stderrWriter
+	logrus.Infof("line 116 b.execCmd: %v", b.execCmd)
 
 	if err := b.execCmd.Start(); err != nil {
 		b.lastError = err
 		return err
 	}
 	b.isRunning = true
-
 	go func() {
 		err := b.execCmd.Wait()
 		if err != nil {

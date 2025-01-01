@@ -107,12 +107,16 @@ func runKopiaRestore(repository *executor.Repository, targetPath, snapshotID str
 	if err != nil {
 		return err
 	}
-
+	logrus.Infof("line 110 restoreCmd: %+v", restoreCmd)
+	logrus.Infof("line 110 sleeping .... ")
 	initExecutor := kopia.NewRestoreExecutor(restoreCmd)
 	if err := initExecutor.Run(); err != nil {
 		err = fmt.Errorf("failed to run restore command: %v", err)
 		return err
 	}
+	logrus.Infof("")
+	time.Sleep(2 * time.Minute)
+
 	for {
 		time.Sleep(progressCheckInterval)
 		status, err := initExecutor.Status()
